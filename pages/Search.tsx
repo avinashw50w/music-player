@@ -48,7 +48,7 @@ const Search: React.FC<SearchProps> = ({ songs, albums, artists, onPlaySong, onN
   const filteredSongs = songs.filter(s => 
     s.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
     s.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.genre.toLowerCase().includes(searchTerm.toLowerCase())
+    s.genre.some(g => g.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const filteredAlbums = albums.filter(a => 

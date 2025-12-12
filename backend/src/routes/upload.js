@@ -111,7 +111,7 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
                             artist_name: metadata.artist,
                             cover_url: `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
                             year: metadata.year,
-                            genre: metadata.genre,
+                            genre: JSON.stringify(metadata.genre), // Store as JSON
                             track_count: 1
                         });
                     }
@@ -131,7 +131,7 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
                         ? (await db('albums').where({ id: albumId }).first())?.cover_url
                         : `https://picsum.photos/seed/${songId}/100/100`,
                     file_path: filePath,
-                    genre: metadata.genre,
+                    genre: JSON.stringify(metadata.genre), // Store as JSON
                     is_favorite: false,
                     bitrate: metadata.bitrate,
                     format: metadata.format,
@@ -225,7 +225,7 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
                             artist_name: metadata.artist,
                             cover_url: `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
                             year: metadata.year,
-                            genre: metadata.genre,
+                            genre: JSON.stringify(metadata.genre), // Store as JSON
                             track_count: 1
                         });
                     }
@@ -242,7 +242,7 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
                     duration_seconds: metadata.durationSeconds,
                     cover_url: `https://picsum.photos/seed/${songId}/100/100`,
                     file_path: filePath,
-                    genre: metadata.genre,
+                    genre: JSON.stringify(metadata.genre), // Store as JSON
                     is_favorite: false,
                     bitrate: metadata.bitrate,
                     format: metadata.format,

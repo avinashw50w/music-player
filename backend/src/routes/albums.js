@@ -36,7 +36,13 @@ const transformAlbum = (row) => ({
     artistId: row.artist_id,
     coverUrl: row.cover_url,
     year: row.year,
-    genre: row.genre,
+    genre: (() => { 
+        try { 
+            return JSON.parse(row.genre); 
+        } catch { 
+            return row.genre ? [row.genre] : ['Unknown']; 
+        } 
+    })(),
     trackCount: row.track_count,
     isFavorite: Boolean(row.is_favorite)
 });
@@ -70,7 +76,7 @@ router.get('/:id', async (req, res, next) => {
                 album: s.album_name,
                 duration: s.duration,
                 coverUrl: s.cover_url,
-                genre: s.genre,
+                genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite)
             }))
         });
@@ -85,6 +91,8 @@ router.post('/', async (req, res, next) => {
         const { title, artist, artistId, coverUrl, year, genre } = req.body;
         const id = uuidv4();
 
+        const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
+
         await db('albums').insert({
             id,
             title,
@@ -92,7 +100,7 @@ router.post('/', async (req, res, next) => {
             artist_id: artistId,
             cover_url: coverUrl,
             year,
-            genre,
+            genre: genreString,
             track_count: 0,
             is_favorite: false
         });
@@ -109,11 +117,13 @@ router.put('/:id', async (req, res, next) => {
     try {
         const { title, artist, year, genre } = req.body;
 
+        const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
+
         await db('albums').where({ id: req.params.id }).update({
             title,
             artist_name: artist,
             year,
-            genre
+            genre: genreString
         });
 
         const album = await db('albums').where({ id: req.params.id }).first();

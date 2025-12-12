@@ -60,11 +60,13 @@ app.get('/api/search', async (req, res, next) => {
         const db = (await import('./config/database.js')).default;
         const searchTerm = `%${q}%`;
 
+        // Note: For multi-genre search in SQLite with JSON string, LIKE works but isn't perfect.
+        // We'll search the text representation of the JSON array.
         const songs = await db('songs')
             .where('title', 'like', searchTerm)
             .orWhere('artist_name', 'like', searchTerm)
             .orWhere('album_name', 'like', searchTerm)
-            .orWhere('genre', 'like', searchTerm)
+            .orWhere('genre', 'like', searchTerm) 
             .limit(20)
             .select('*');
 
@@ -87,7 +89,7 @@ app.get('/api/search', async (req, res, next) => {
                 album: s.album_name,
                 duration: s.duration,
                 coverUrl: s.cover_url,
-                genre: s.genre,
+                genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite)
             })),
             albums: albums.map(a => ({
@@ -96,7 +98,7 @@ app.get('/api/search', async (req, res, next) => {
                 artist: a.artist_name,
                 coverUrl: a.cover_url,
                 year: a.year,
-                genre: a.genre
+                genre: (() => { try { return JSON.parse(a.genre); } catch { return [a.genre]; } })()
             })),
             artists: artists.map(ar => ({
                 id: ar.id,
@@ -129,9 +131,29 @@ app.get('/api/genres', async (req, res, next) => {
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`🎵 Myousic Backend running on http://localhost:${PORT}`);
     console.log(`📁 Uploads served from: ${path.join(__dirname, '../uploads')}`);
 });
+
+// Graceful Shutdown
+const shutdown = () => {
+    console.log('Received shutdown signal. Closing server...');
+    server.close(async () => {
+        console.log('HTTP server closed.');
+        try {
+            const db = (await import('./config/database.js')).default;
+            await db.destroy();
+            console.log('Database connection closed.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Error closing database connection:', err);
+            process.exit(1);
+        }
+    });
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 export default app;

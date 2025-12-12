@@ -41,9 +41,10 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
 
   const handleSave = async (data: any) => {
     try {
+      const genres = data.genre.split(',').map((g: string) => g.trim()).filter(Boolean);
       const updated = await api.updateAlbum(album.id, {
         title: data.title,
-        genre: data.genre,
+        genre: genres,
         year: parseInt(data.year) || album.year
       });
       onUpdateAlbum?.(updated);
@@ -73,7 +74,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
             <span className="text-slate-400 font-normal">{album.year}</span>
           </div>
         }
-        meta={<>{album.trackCount} songs <span className="text-slate-600 mx-2">•</span> {album.genre}</>}
+        meta={<>{album.trackCount} songs <span className="text-slate-600 mx-2">•</span> {album.genre.join(', ')}</>}
         image={album.coverUrl}
         type="Album"
         onBack={onBack}
@@ -103,7 +104,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
           fields={[
             { name: 'title', label: 'Title', value: album.title },
             { name: 'year', label: 'Year', value: String(album.year) },
-            { name: 'genre', label: 'Genre', value: album.genre }
+            { name: 'genre', label: 'Genre', value: album.genre.join(', ') }
           ]}
         />
       )}

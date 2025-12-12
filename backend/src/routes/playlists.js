@@ -1,6 +1,13 @@
 import express from 'express';
 import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
+import { pipeline } from 'stream/promises';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
@@ -71,7 +78,7 @@ router.get('/:id', async (req, res, next) => {
                 album: s.album_name,
                 duration: s.duration,
                 coverUrl: s.cover_url,
-                genre: s.genre,
+                genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite),
                 fileUrl: s.file_path ? `/uploads/audio/${s.file_path.split('/').pop()}` : null
             }))
@@ -86,11 +93,40 @@ router.post('/', async (req, res, next) => {
     try {
         const { name, coverUrl } = req.body;
         const id = uuidv4();
+        
+        let finalCoverUrl = coverUrl;
+
+        // If no cover URL provided, fetch a random one and save it locally
+        if (!finalCoverUrl) {
+            const tempUrl = `https://picsum.photos/seed/${encodeURIComponent(name)}-${Date.now()}/200/200`;
+            try {
+                const response = await fetch(tempUrl);
+                if (response.ok) {
+                    const filename = `playlist-${id}.jpg`;
+                    const uploadDir = path.join(__dirname, '../../uploads/covers');
+                    
+                    if (!fs.existsSync(uploadDir)) {
+                        fs.mkdirSync(uploadDir, { recursive: true });
+                    }
+                    
+                    const filepath = path.join(uploadDir, filename);
+                    const fileStream = fs.createWriteStream(filepath);
+                    // @ts-ignore
+                    await pipeline(response.body, fileStream);
+                    finalCoverUrl = `/uploads/covers/${filename}`;
+                } else {
+                    finalCoverUrl = tempUrl; // Fallback to remote if fetch fails
+                }
+            } catch (err) {
+                console.warn('Failed to cache playlist image:', err);
+                finalCoverUrl = tempUrl; // Fallback
+            }
+        }
 
         await db('playlists').insert({
             id,
             name,
-            cover_url: coverUrl || `https://picsum.photos/seed/${name}-${Date.now()}/200/200`
+            cover_url: finalCoverUrl
         });
 
         const playlist = await db('playlists').where({ id }).first();
@@ -127,11 +163,23 @@ router.put('/:id', async (req, res, next) => {
 // DELETE playlist
 router.delete('/:id', async (req, res, next) => {
     try {
-        // Delete associated playlist_songs first (handled by CASCADE)
+        const playlist = await db('playlists').where({ id: req.params.id }).first();
+        
+        // Delete associated playlist_songs first (handled by CASCADE in DB usually, but manual delete of image)
         const deleted = await db('playlists').where({ id: req.params.id }).del();
+        
         if (!deleted) {
             return res.status(404).json({ error: 'Playlist not found' });
         }
+
+        // Clean up cached image if it exists and is local
+        if (playlist && playlist.cover_url && playlist.cover_url.startsWith('/uploads/covers/playlist-')) {
+             const filepath = path.join(__dirname, '../../', playlist.cover_url);
+             fs.unlink(filepath, (err) => {
+                 if (err && err.code !== 'ENOENT') console.error('Failed to delete playlist image:', err);
+             });
+        }
+
         res.json({ success: true });
     } catch (err) {
         next(err);

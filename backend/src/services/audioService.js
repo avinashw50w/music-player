@@ -24,11 +24,20 @@ export async function extractMetadata(filePath) {
             const seconds = durationSeconds % 60;
             const duration = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
+            // Handle Multiple Genres
+            let genres = [];
+            const rawGenre = tags.genre || tags.GENRE || 'Unknown';
+            if (rawGenre) {
+                // Split by common delimiters (semicolon, comma, slash) and trim
+                genres = rawGenre.split(/[;,/]/).map(g => g.trim()).filter(Boolean);
+            }
+            if (genres.length === 0) genres = ['Unknown'];
+
             resolve({
                 title: tags.title || path.basename(filePath, path.extname(filePath)),
                 artist: tags.artist || tags.ARTIST || 'Unknown Artist',
                 album: tags.album || tags.ALBUM || 'Unknown Album',
-                genre: tags.genre || tags.GENRE || 'Unknown',
+                genre: genres, // Now returns an array
                 year: tags.date ? parseInt(tags.date.substring(0, 4)) : null,
                 duration,
                 durationSeconds,

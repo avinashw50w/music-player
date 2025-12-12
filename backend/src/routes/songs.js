@@ -40,7 +40,14 @@ const transformSong = (row) => ({
     durationSeconds: row.duration_seconds,
     coverUrl: row.cover_url,
     fileUrl: row.file_path ? `/uploads/audio/${row.file_path.split('/').pop()}` : null,
-    genre: row.genre,
+    // Parse JSON string genre, fallback to array of string
+    genre: (() => { 
+        try { 
+            return JSON.parse(row.genre); 
+        } catch { 
+            return row.genre ? [row.genre] : ['Unknown']; 
+        } 
+    })(),
     isFavorite: Boolean(row.is_favorite),
     lyrics: row.lyrics,
     bitrate: row.bitrate,
@@ -77,6 +84,9 @@ router.post('/', async (req, res, next) => {
         const { title, artist, album, duration, coverUrl, genre, filePath } = req.body;
         const id = uuidv4();
 
+        // Ensure genre is stringified for DB
+        const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
+
         await db('songs').insert({
             id,
             title,
@@ -84,7 +94,7 @@ router.post('/', async (req, res, next) => {
             album_name: album,
             duration,
             cover_url: coverUrl,
-            genre,
+            genre: genreString,
             file_path: filePath,
             is_favorite: false
         });
@@ -100,12 +110,15 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
     try {
         const { title, artist, album, genre, coverUrl } = req.body;
+        
+        // Ensure genre is stringified for DB
+        const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
 
         await db('songs').where({ id: req.params.id }).update({
             title,
             artist_name: artist,
             album_name: album,
-            genre,
+            genre: genreString,
             cover_url: coverUrl
         });
 

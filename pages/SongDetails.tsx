@@ -23,7 +23,7 @@ interface DetailProps {
   onNavigate?: (view: NavigationState['view'], id?: string) => void;
 }
 
-export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentSongId, isPlaying, onPlaySong, onToggleFavorite, onAddToPlaylist, onUpdateSong }) => {
+export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentSongId, isPlaying, onPlaySong, onToggleFavorite, onAddToPlaylist, onUpdateSong, onNavigate }) => {
   const song = songs.find(s => s.id === id);
   const [lyrics, setLyrics] = useState<string>("");
   const [isEditingLyrics, setIsEditingLyrics] = useState(false);
@@ -39,11 +39,14 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
 
   const handleSaveInfo = async (data: any) => {
     try {
+        // Split comma-separated genres back into array
+        const genres = data.genre.split(',').map((g: string) => g.trim()).filter(Boolean);
+
         const updated = await api.updateSong(song.id, {
             title: data.title,
             artist: data.artist,
             album: data.album,
-            genre: data.genre
+            genre: genres
         });
         onUpdateSong?.(updated);
         setIsEditingInfo(false);
@@ -148,11 +151,18 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
             <div className="grid grid-cols-2 gap-4 w-full bg-white/5 p-6 rounded-3xl border border-white/5">
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Album</span>
-                <span className="text-white font-medium truncate">{song.album}</span>
+                <span 
+                  className="text-white font-medium truncate cursor-pointer hover:text-indigo-400 transition-colors hover:underline"
+                  onClick={() => song.albumId && onNavigate?.('album_details', song.albumId)}
+                >
+                  {song.album}
+                </span>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genre</span>
-                <span className="text-white font-medium truncate">{song.genre}</span>
+                <span className="text-white font-medium truncate">
+                   {song.genre.join(', ')}
+                </span>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Length</span>
@@ -251,7 +261,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
                 { name: 'title', label: 'Title', value: song.title },
                 { name: 'artist', label: 'Artist', value: song.artist },
                 { name: 'album', label: 'Album', value: song.album },
-                { name: 'genre', label: 'Genre', value: song.genre }
+                { name: 'genre', label: 'Genre', value: song.genre.join(', ') }
             ]}
         />
       )}

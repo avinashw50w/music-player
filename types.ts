@@ -7,7 +7,7 @@ export interface Song {
   albumId?: string;
   duration: string;
   coverUrl: string;
-  genre: string;
+  genre: string[];
   isFavorite: boolean;
   fileUrl?: string;
   lyrics?: string;
@@ -23,7 +23,7 @@ export interface Album {
   coverUrl: string;
   year: number;
   trackCount: number;
-  genre: string;
+  genre: string[];
   isFavorite?: boolean;
 }
 
