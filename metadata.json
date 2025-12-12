@@ -1,0 +1,5 @@
+{
+  "name": "Myousic Player",
+  "description": "A modern, dark-themed music player application with local file browsing, favorites, and comprehensive search.",
+  "requestFramePermissions": []
+}
