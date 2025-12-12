@@ -441,7 +441,7 @@ const App: React.FC = () => {
             playlists={playlists}
         />
         
-        <main className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar scroll-smooth">
             {renderView()}
         </main>
       </div>

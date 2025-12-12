@@ -55,7 +55,7 @@ export const DetailHeader: React.FC<DetailHeaderProps> = ({ title, subtitle, met
         )}
       </div>
 
-      <div className="flex-1 mb-2">
+      <div className="flex-1 mb-2 min-w-0">
         <div className="flex items-center gap-3 mb-4">
           {type === 'Artist' && (
             <span className="bg-[#8b5cf6] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-purple-900/20">
@@ -65,7 +65,7 @@ export const DetailHeader: React.FC<DetailHeaderProps> = ({ title, subtitle, met
           <span className="text-sm font-bold tracking-[0.2em] text-indigo-300 uppercase">{type}</span>
         </div>
 
-        <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-6 tracking-tight leading-[0.9] drop-shadow-lg">
+        <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white mb-6 tracking-tight leading-[0.9] drop-shadow-lg break-words">
           {title}
         </h1>
 
