@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, Play, Pause, Shuffle, MoreHorizontal, Heart, Trash2, GripVertical, Edit3, Music, CheckCircle2, Mic2, ListPlus, Save } from 'lucide-react';
-import { Album, Artist, Playlist, Song } from '../types';
+import { ArrowLeft, Clock, Play, Pause, Shuffle, MoreHorizontal, Heart, Trash2, GripVertical, Edit3, Music, CheckCircle2, Mic2, ListPlus, Save, Camera } from 'lucide-react';
+import { Album, Artist, Playlist, Song, NavigationState } from '../types';
 import PlayingIndicator from '../components/PlayingIndicator';
 import * as api from '../services/api';
 
@@ -23,9 +23,10 @@ interface DetailHeaderProps {
   type: 'Album' | 'Artist' | 'Playlist';
   onBack: () => void;
   heroColor?: string;
+  onImageUpload?: (file: File) => void;
 }
 
-const DetailHeader: React.FC<DetailHeaderProps> = ({ title, subtitle, meta, image, type, onBack, heroColor = "from-indigo-500/20" }) => (
+const DetailHeader: React.FC<DetailHeaderProps> = ({ title, subtitle, meta, image, type, onBack, heroColor = "from-indigo-500/20", onImageUpload }) => (
   <div className="relative">
     {/* Background Atmosphere */}
     <div className="absolute inset-0 h-[500px] overflow-hidden pointer-events-none">
@@ -39,7 +40,7 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({ title, subtitle, meta, imag
     </div>
 
     <div className="relative px-10 pb-12 pt-4 flex flex-col md:flex-row gap-10 items-end z-20 max-w-7xl mx-auto">
-      <div className={`relative group ${type === 'Artist' ? 'rounded-full' : 'rounded-[2rem]'} overflow-hidden shadow-2xl shadow-black/50 flex-shrink-0`}>
+      <div className={`relative group ${type === 'Artist' ? 'rounded-full' : 'rounded-[2rem]'} overflow-hidden shadow-2xl shadow-black/50 flex-shrink-0 bg-[#1c1c1e]`}>
         <img
           src={image}
           alt={title}
@@ -47,6 +48,24 @@ const DetailHeader: React.FC<DetailHeaderProps> = ({ title, subtitle, meta, imag
         />
         {/* Shine effect */}
         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+        
+        {/* Image Upload Overlay */}
+        {onImageUpload && (
+          <label className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10">
+            <Camera className="w-10 h-10 text-white mb-2" />
+            <span className="text-white font-medium text-sm">Change Image</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  onImageUpload(e.target.files[0]);
+                }
+              }}
+            />
+          </label>
+        )}
       </div>
 
       <div className="flex-1 mb-2">
@@ -135,7 +154,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ isPlaying, onPlay, onEdit
                   onClick={() => { setShowMenu(false); onEdit(); }}
                   className="w-full text-left px-5 py-4 text-base text-slate-200 hover:bg-white/5 flex items-center gap-3 transition-colors"
                 >
-                  <Edit3 className="w-5 h-5" /> Edit
+                  <Edit3 className="w-5 h-5" /> Edit Details
                 </button>
               )}
               {onDelete && (
@@ -329,6 +348,7 @@ interface DetailProps {
   onUpdateSong?: (song: Song) => void;
   onUpdateAlbum?: (album: Album) => void;
   onUpdateArtist?: (artist: Artist) => void;
+  onNavigate?: (view: NavigationState['view'], id?: string) => void;
 }
 
 export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateAlbum }) => {
@@ -361,6 +381,15 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
     }
   };
 
+  const handleCoverUpload = async (file: File) => {
+    try {
+      const updated = await api.updateAlbumCover(album.id, file);
+      onUpdateAlbum?.(updated);
+    } catch (err) {
+      console.error("Failed to update album cover", err);
+    }
+  };
+
   return (
     <div className="min-h-full">
       <DetailHeader
@@ -377,6 +406,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
         type="Album"
         onBack={onBack}
         heroColor="from-blue-500/20"
+        onImageUpload={handleCoverUpload}
       />
       <ActionButtons 
         isPlaying={!!isContextPlaying}
@@ -409,7 +439,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
   );
 };
 
-export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums = [], artists = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist }) => {
+export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums = [], artists = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist, onNavigate }) => {
   const artist = artists.find(a => a.id === id) || artists[0];
   const [isEditing, setIsEditing] = useState(false);
 
@@ -439,6 +469,15 @@ export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums
     }
   };
 
+  const handleAvatarUpload = async (file: File) => {
+    try {
+      const updated = await api.updateArtistAvatar(artist.id, file);
+      onUpdateArtist?.(updated);
+    } catch (err) {
+      console.error("Failed to update artist avatar", err);
+    }
+  };
+
   return (
     <div className="min-h-full">
       <DetailHeader
@@ -449,6 +488,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums
         type="Artist"
         onBack={onBack}
         heroColor="from-purple-500/20"
+        onImageUpload={handleAvatarUpload}
       />
       <ActionButtons 
         isPlaying={!!isContextPlaying}
@@ -486,7 +526,11 @@ export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {artistAlbums.map(album => (
-              <div key={album.id} className="bg-white/5 p-5 rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 duration-300 cursor-pointer group shadow-xl border border-white/5">
+              <div 
+                key={album.id} 
+                onClick={() => onNavigate && onNavigate('album_details', album.id)}
+                className="bg-white/5 p-5 rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 duration-300 cursor-pointer group shadow-xl border border-white/5"
+              >
                 <div className="overflow-hidden rounded-2xl mb-4 shadow-lg">
                   <img src={album.coverUrl} alt={album.title} className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>

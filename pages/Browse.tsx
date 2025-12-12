@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { FolderOpen, ArrowRight, Music, UploadCloud, Play, Pause } from 'lucide-react';
-import { Song, Album, Artist, NavigationState } from '../types';
+import { FolderOpen, ArrowRight, Music, UploadCloud, Play, Pause, ListMusic } from 'lucide-react';
+import { Song, Album, Artist, NavigationState, Playlist } from '../types';
 import PlayingIndicator from '../components/PlayingIndicator';
 import { uploadFolder, UploadProgress } from '../services/api';
 
@@ -13,6 +13,7 @@ interface BrowseProps {
   albums: Album[];
   artists: Artist[];
   songs: Song[];
+  playlists: Playlist[];
 }
 
 const Browse: React.FC<BrowseProps> = ({
@@ -23,7 +24,8 @@ const Browse: React.FC<BrowseProps> = ({
   isPlaying,
   albums,
   artists,
-  songs
+  songs,
+  playlists
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [folderName, setFolderName] = useState<string | null>(null);
@@ -268,6 +270,42 @@ const Browse: React.FC<BrowseProps> = ({
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Playlists Section */}
+      {playlists.length > 0 && (
+        <div className="mb-14">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white">Playlists</h2>
+            <button className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">See all <ArrowRight className="w-4 h-4" /></button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {playlists.slice(0, 4).map(playlist => (
+               <div
+                  key={playlist.id}
+                  onClick={() => onNavigate('playlist_details', playlist.id)}
+                  className="p-4 rounded-2xl hover:bg-white/10 transition-all group cursor-pointer border bg-white/5 border-white/5"
+                >
+                  <div className="relative mb-4 overflow-hidden rounded-xl bg-[#2c2c2e] aspect-square flex items-center justify-center shadow-md">
+                     {playlist.coverUrl && !playlist.coverUrl.includes('picsum') ? (
+                         <img src={playlist.coverUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={playlist.name} />
+                     ) : (
+                        <ListMusic className="w-20 h-20 text-slate-500 group-hover:scale-110 transition-transform duration-500" />
+                     )}
+                     
+                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <button className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0">
+                          <Play className="w-5 h-5 fill-current ml-0.5" />
+                        </button>
+                     </div>
+                  </div>
+
+                  <h4 className="font-bold text-lg truncate text-white">{playlist.name}</h4>
+                  <p className="text-slate-500 text-sm truncate">{playlist.songIds.length} Songs</p>
+                </div>
+            ))}
           </div>
         </div>
       )}

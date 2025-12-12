@@ -533,6 +533,7 @@ const App: React.FC = () => {
             albums={albums}
             artists={artists}
             songs={songs}
+            playlists={playlists}
           />
         );
       case 'favorites':
@@ -596,7 +597,7 @@ const App: React.FC = () => {
       />
 
       {/* Sidebar - Fixed on desktop, z-40 to sit below PlayerBar z-50 but above content */}
-      <div className="fixed left-0 top-0 bottom-28 w-72 z-40 hidden md:block">
+      <div className="fixed left-0 top-0 bottom-0 w-72 z-40 hidden md:block">
         <Sidebar
           currentView={navState.view}
           onNavigate={(view) => handleNavigate(view)}
@@ -609,7 +610,7 @@ const App: React.FC = () => {
       {/* Main Content Area - Fixed positioning to avoid overlap logic issues */}
       <main
         id="main-content"
-        className="fixed top-0 right-0 bottom-28 left-0 md:left-72 overflow-y-auto scroll-smooth z-10"
+        className="fixed top-0 right-0 bottom-0 left-0 md:left-72 overflow-y-auto scroll-smooth z-10"
       >
         {renderContent()}
       </main>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Home, Search, FolderOpen, Heart, PlusSquare, Music, ListMusic } from 'lucide-react';
+import React, { useState } from 'react';
+import { Home, Search, FolderOpen, Heart, PlusSquare, Music, ListMusic, ChevronDown, ChevronUp } from 'lucide-react';
 import { NavigationState, Playlist } from '../types';
 
 interface SidebarProps {
@@ -11,6 +11,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistClick, onCreatePlaylist, playlists }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const menuItems = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'search', label: 'Search', icon: Search },
@@ -18,18 +20,24 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistCl
     { id: 'favorites', label: 'Favorite', icon: Heart },
   ];
 
+  const visiblePlaylists = isExpanded ? playlists : playlists.slice(0, 3);
+  const showExpandButton = playlists.length > 3;
+
   return (
-    <div className="w-72 h-full flex flex-col flex-shrink-0 z-20">
-      <div className="p-8 flex-1 flex flex-col">
-        {/* Logo */}
-        <div className="flex items-center gap-3 text-white mb-12 px-2">
+    <div className="w-72 h-full flex flex-col flex-shrink-0 z-20 bg-black/20 backdrop-blur-md border-r border-white/5">
+      {/* Fixed Header/Logo */}
+      <div className="p-8 pb-4 flex-shrink-0">
+        <div className="flex items-center gap-3 text-white px-2">
           <Music className="w-8 h-8 text-indigo-500" />
           <span className="text-2xl font-bold tracking-tight">Myousic</span>
         </div>
+      </div>
 
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-6 pb-40">
         {/* Menu */}
-        <div className="mb-10">
-          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-5 px-3">Menu</h3>
+        <div className="mb-8 mt-4">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 px-4">Menu</h3>
           <nav className="space-y-2">
             {menuItems.map((item) => (
               <button
@@ -49,19 +57,20 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistCl
         </div>
 
         {/* Playlists */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-5 px-3">Playlists</h3>
-          <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-2">
+        <div>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 px-4">Playlists</h3>
+          <div className="space-y-2">
             <button 
               onClick={onCreatePlaylist}
               className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-base font-medium group"
             >
               <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center group-hover:bg-indigo-500 transition-colors">
-                <PlusSquare className="w-5 h-5" />
+                <PlusSquare className="w-4 h-4" />
               </div>
               Create New
             </button>
-            {playlists.map((pl) => (
+            
+            {visiblePlaylists.map((pl) => (
               <button
                 key={pl.id}
                 onClick={() => onPlaylistClick(pl.id)}
@@ -71,24 +80,19 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistCl
                 <span className="truncate">{pl.name}</span>
               </button>
             ))}
+
+            {showExpandButton && (
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center justify-between px-4 py-3 mt-1 text-xs font-bold text-slate-500 hover:text-white transition-colors uppercase tracking-wider group rounded-xl hover:bg-white/5"
+              >
+                <span>{isExpanded ? 'View Less' : `View All (${playlists.length})`}</span>
+                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            )}
           </div>
         </div>
       </div>
-
-      {/* User Profile */}
-      {/*<div className="p-6 mx-2 mb-2">
-        <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer">
-          <img 
-            src="https://picsum.photos/id/64/100/100" 
-            alt="User" 
-            className="w-12 h-12 rounded-full object-cover border border-white/10"
-          />
-          <div className="overflow-hidden">
-            <h4 className="text-base font-bold text-white truncate">Mardo Umulumu</h4>
-            <p className="text-sm text-slate-500 truncate">Free Plan</p>
-          </div>
-        </div>
-      </div>*/}
     </div>
   );
 };
