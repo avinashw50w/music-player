@@ -23,6 +23,15 @@ export const PlaylistDetails: React.FC<any> = (props) => {
     }
   };
 
+  const handlePlayToggle = () => {
+    if (isContextPlaying && props.currentSongId) {
+        const song = props.songs.find((s: Song) => s.id === props.currentSongId);
+        if (song) props.onPlaySong(song);
+    } else {
+        props.onPlayContext(playlistSongs);
+    }
+  };
+
   return (
     <div className="min-h-full">
       <DetailHeader
@@ -36,10 +45,12 @@ export const PlaylistDetails: React.FC<any> = (props) => {
       />
       <ActionButtons
         isPlaying={!!isContextPlaying}
-        onPlay={() => props.onPlayContext(playlistSongs)}
+        onPlay={handlePlayToggle}
         showEditControls={true}
         onDelete={() => onDeletePlaylist(playlist.id)}
         onEdit={handleEdit}
+        isFavorite={!!playlist.isFavorite} // Ensure boolean
+        onToggleFavorite={() => props.onToggleFavorite(playlist.id)}
       />
       <div className="mt-8 px-4">
         {playlistSongs.length === 0 ? (

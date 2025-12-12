@@ -63,6 +63,15 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
     }
   };
 
+  const handlePlayToggle = () => {
+    if (isContextPlaying && currentSongId) {
+        const song = songs.find(s => s.id === currentSongId);
+        if (song) onPlaySong(song); // Toggles pause if current song is passed
+    } else {
+        onPlayContext(albumSongs);
+    }
+  };
+
   return (
     <div className="min-h-full">
       <DetailHeader
@@ -83,9 +92,11 @@ export const AlbumDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums 
       />
       <ActionButtons 
         isPlaying={!!isContextPlaying}
-        onPlay={() => onPlayContext(albumSongs)} 
+        onPlay={handlePlayToggle} 
         onFollow={() => { }} 
         onEdit={() => setIsEditing(true)}
+        isFavorite={album.isFavorite}
+        onToggleFavorite={() => onToggleFavorite(album.id)}
       />
       <div className="mt-8">
         <TrackList

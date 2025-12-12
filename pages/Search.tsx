@@ -70,7 +70,7 @@ const Search: React.FC<SearchProps> = ({ songs, albums, artists, onPlaySong, onN
   ];
 
   return (
-    <div className="p-10 pb-40">
+    <div className="p-10 pb-10">
       <div className="max-w-6xl mx-auto">
         {/* Search Bar */}
         <div className="relative mb-12">

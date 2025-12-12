@@ -34,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistCl
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-6 pb-40">
+      <div className="flex-1 overflow-y-auto custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-6 pb-6">
         {/* Menu */}
         <div className="mb-8 mt-4">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 px-4">Menu</h3>

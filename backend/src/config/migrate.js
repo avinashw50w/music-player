@@ -53,6 +53,7 @@ async function migrate() {
         table.string('id').primary();
         table.string('name').notNullable();
         table.string('cover_url');
+        table.boolean('is_favorite').defaultTo(false);
         table.timestamp('created_at').defaultTo(db.fn.now());
     });
 

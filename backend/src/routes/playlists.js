@@ -16,7 +16,8 @@ const transformPlaylist = (row) => ({
     id: row.id,
     name: row.name,
     coverUrl: row.cover_url,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    isFavorite: Boolean(row.is_favorite)
 });
 
 // GET all playlists
@@ -126,7 +127,8 @@ router.post('/', async (req, res, next) => {
         await db('playlists').insert({
             id,
             name,
-            cover_url: finalCoverUrl
+            cover_url: finalCoverUrl,
+            is_favorite: false
         });
 
         const playlist = await db('playlists').where({ id }).first();
@@ -155,6 +157,25 @@ router.put('/:id', async (req, res, next) => {
             return res.status(404).json({ error: 'Playlist not found' });
         }
         res.json(transformPlaylist(playlist));
+    } catch (err) {
+        next(err);
+    }
+});
+
+// PATCH toggle favorite
+router.patch('/:id/favorite', async (req, res, next) => {
+    try {
+        const playlist = await db('playlists').where({ id: req.params.id }).first();
+        if (!playlist) {
+            return res.status(404).json({ error: 'Playlist not found' });
+        }
+
+        await db('playlists').where({ id: req.params.id }).update({
+            is_favorite: !playlist.is_favorite
+        });
+
+        const updated = await db('playlists').where({ id: req.params.id }).first();
+        res.json(transformPlaylist(updated));
     } catch (err) {
         next(err);
     }

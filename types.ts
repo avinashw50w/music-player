@@ -41,6 +41,7 @@ export interface Playlist {
   coverUrl?: string;
   songIds: string[];
   songCount?: number;
+  isFavorite?: boolean;
 }
 
 export type ViewType =

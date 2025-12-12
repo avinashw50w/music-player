@@ -9,9 +9,21 @@ interface ActionButtonsProps {
   showEditControls?: boolean;
   isFollowing?: boolean;
   onFollow?: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
-export const ActionButtons: React.FC<ActionButtonsProps> = ({ isPlaying, onPlay, onEdit, onDelete, showEditControls, isFollowing, onFollow }) => {
+export const ActionButtons: React.FC<ActionButtonsProps> = ({ 
+  isPlaying, 
+  onPlay, 
+  onEdit, 
+  onDelete, 
+  showEditControls, 
+  isFollowing, 
+  onFollow,
+  isFavorite,
+  onToggleFavorite
+}) => {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -43,9 +55,14 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ isPlaying, onPlay,
         <button className="p-3 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/5">
           <Shuffle className="w-7 h-7" />
         </button>
-        <button className="p-3 text-slate-400 hover:text-rose-500 transition-colors rounded-full hover:bg-white/5">
-          <Heart className="w-7 h-7" />
-        </button>
+        {onToggleFavorite && (
+          <button 
+            onClick={onToggleFavorite}
+            className="p-3 text-slate-400 hover:text-rose-500 transition-colors rounded-full hover:bg-white/5"
+          >
+            <Heart className={`w-7 h-7 ${isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
+          </button>
+        )}
       </div>
 
       {(showEditControls || onEdit) && (

@@ -21,10 +21,11 @@ type Tab = 'Playlists' | 'Artists' | 'Albums' | 'Songs';
 const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists, onPlaySong, currentSongId, isPlaying, onNavigate, onToggleFavorite, onAddToPlaylist }) => {
   const [activeTab, setActiveTab] = useState<Tab>('Songs');
 
-  const favoriteSongs = songs.filter(s => s.isFavorite);
-  const favoriteAlbums = albums.filter(a => a.isFavorite);
-  const favoriteArtists = artists.filter(a => a.isFavorite);
-  const favoritePlaylists = playlists; // Playlists don't have isFavorite flag yet, so showing all
+  // Strict boolean check to avoid truthy/falsy issues
+  const favoriteSongs = songs.filter(s => s.isFavorite === true);
+  const favoriteAlbums = albums.filter(a => a.isFavorite === true);
+  const favoriteArtists = artists.filter(a => a.isFavorite === true);
+  const favoritePlaylists = playlists.filter(p => p.isFavorite === true);
 
   const renderContent = () => {
     if (activeTab === 'Songs') {
@@ -100,7 +101,10 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                   </div>
                 </div>
                 <div className="flex items-center gap-6 pr-4">
-                   <button className="p-2 text-rose-500 hover:scale-110 transition-transform">
+                   <button 
+                    onClick={(e) => { e.stopPropagation(); onToggleFavorite(album.id); }}
+                    className="p-2 text-rose-500 hover:scale-110 transition-transform"
+                   >
                     <Heart className="w-6 h-6 fill-current" />
                   </button>
                   <button className="p-2 text-slate-600 hover:text-white transition-colors">
@@ -131,7 +135,10 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                   </div>
                 </div>
                 <div className="flex items-center gap-6 pr-4">
-                   <button className="p-2 text-rose-500 hover:scale-110 transition-transform">
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); onToggleFavorite(artist.id); }}
+                     className="p-2 text-rose-500 hover:scale-110 transition-transform"
+                   >
                     <Heart className="w-6 h-6 fill-current" />
                   </button>
                   <button className="p-2 text-slate-600 hover:text-white transition-colors">
@@ -145,7 +152,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
     }
     
     if (activeTab === 'Playlists') {
-         if (favoritePlaylists.length === 0) return <div className="text-slate-500 mt-10 text-left">No playlists created.</div>;
+         if (favoritePlaylists.length === 0) return <div className="text-slate-500 mt-10 text-left">No favorite playlists yet.</div>;
          return (
             <div className="space-y-1">
             {favoritePlaylists.map((pl) => (
@@ -156,7 +163,11 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
               >
                 <div className="flex items-center gap-5">
                   <div className="w-14 h-14 rounded-2xl bg-[#2c2c2e] flex items-center justify-center text-slate-400 shadow-lg">
-                    <ListMusic className="w-7 h-7" />
+                    {pl.coverUrl ? (
+                         <img src={pl.coverUrl} className="w-full h-full object-cover rounded-2xl" alt={pl.name} />
+                     ) : (
+                        <ListMusic className="w-7 h-7" />
+                     )}
                   </div>
                   <div>
                     <h4 className="font-bold text-lg text-white mb-1">{pl.name}</h4>
@@ -164,7 +175,10 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                   </div>
                 </div>
                 <div className="flex items-center gap-6 pr-4">
-                   <button className="p-2 text-rose-500 hover:scale-110 transition-transform">
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); onToggleFavorite(pl.id); }}
+                     className="p-2 text-rose-500 hover:scale-110 transition-transform"
+                   >
                     <Heart className="w-6 h-6 fill-current" />
                   </button>
                   <button className="p-2 text-slate-600 hover:text-white transition-colors">
@@ -179,7 +193,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
   };
 
   return (
-    <div className="p-10 pb-40 w-full">
+    <div className="p-10 pb-10 w-full">
       <div className="mb-12">
         <h1 className="text-4xl font-bold text-white mb-8 tracking-tight">Favorite</h1>
         

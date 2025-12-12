@@ -76,7 +76,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
 
 
   return (
-    <div className="min-h-full flex flex-col p-8 pb-40 relative overflow-hidden">
+    <div className="min-h-full flex flex-col p-8 pb-10 relative overflow-hidden">
       {/* Ambient Backdrops */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-rose-600/10 rounded-full blur-[120px] pointer-events-none"></div>

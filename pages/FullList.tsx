@@ -138,7 +138,7 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
   };
 
   return (
-    <div className="p-10 pb-40">
+    <div className="p-10 pb-10">
         <div className="flex items-center gap-4 mb-10">
             <BackButton onClick={onBack} />
             <h1 className="text-4xl font-bold text-white tracking-tight">{getTitle()}</h1>
