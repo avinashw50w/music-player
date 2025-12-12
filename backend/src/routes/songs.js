@@ -1,8 +1,32 @@
 import express from 'express';
 import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+// Configure multer for cover uploads
+const storage = multer.diskStorage({
+    destination: path.join(__dirname, '../../uploads/covers'),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `song-${Date.now()}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage,
+    fileFilter: (req, file, cb) => {
+        const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, allowed.includes(ext));
+    }
+});
 
 // Helper to transform DB row to API response format
 const transformSong = (row) => ({
@@ -120,6 +144,29 @@ router.patch('/:id/lyrics', async (req, res, next) => {
         const { lyrics } = req.body;
 
         await db('songs').where({ id: req.params.id }).update({ lyrics });
+
+        const song = await db('songs').where({ id: req.params.id }).first();
+        if (!song) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+        res.json(transformSong(song));
+    } catch (err) {
+        next(err);
+    }
+});
+
+// PATCH update song cover
+router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No cover image provided' });
+        }
+
+        const coverUrl = `/uploads/covers/${req.file.filename}`;
+
+        await db('songs').where({ id: req.params.id }).update({
+            cover_url: coverUrl
+        });
 
         const song = await db('songs').where({ id: req.params.id }).first();
         if (!song) {

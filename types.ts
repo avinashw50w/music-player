@@ -2,7 +2,9 @@ export interface Song {
   id: string;
   title: string;
   artist: string;
+  artistId?: string;
   album: string;
+  albumId?: string;
   duration: string;
   coverUrl: string;
   genre: string;
@@ -49,7 +51,11 @@ export type ViewType =
   | 'album_details'
   | 'artist_details'
   | 'playlist_details'
-  | 'song_details';
+  | 'song_details'
+  | 'all_songs'
+  | 'all_albums'
+  | 'all_artists'
+  | 'all_playlists';
 
 export interface NavigationState {
   view: ViewType;

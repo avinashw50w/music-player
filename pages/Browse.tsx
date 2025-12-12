@@ -175,7 +175,12 @@ const Browse: React.FC<BrowseProps> = ({
         <div className="mb-14">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Top Songs</h2>
-            <button className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">See all <ArrowRight className="w-4 h-4" /></button>
+            <button 
+                onClick={() => onNavigate('all_songs')}
+                className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
+            >
+                See all <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {songs.slice(0, 4).map(song => {
@@ -228,7 +233,12 @@ const Browse: React.FC<BrowseProps> = ({
         <div className="mb-14">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Albums</h2>
-            <button className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">See all <ArrowRight className="w-4 h-4" /></button>
+            <button 
+                onClick={() => onNavigate('all_albums')}
+                className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
+            >
+                See all <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {albums.slice(0, 4).map(album => {
@@ -279,7 +289,12 @@ const Browse: React.FC<BrowseProps> = ({
         <div className="mb-14">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Playlists</h2>
-            <button className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">See all <ArrowRight className="w-4 h-4" /></button>
+            <button 
+                onClick={() => onNavigate('all_playlists')}
+                className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
+            >
+                See all <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {playlists.slice(0, 4).map(playlist => (
@@ -289,7 +304,7 @@ const Browse: React.FC<BrowseProps> = ({
                   className="p-4 rounded-2xl hover:bg-white/10 transition-all group cursor-pointer border bg-white/5 border-white/5"
                 >
                   <div className="relative mb-4 overflow-hidden rounded-xl bg-[#2c2c2e] aspect-square flex items-center justify-center shadow-md">
-                     {playlist.coverUrl && !playlist.coverUrl.includes('picsum') ? (
+                     {playlist.coverUrl ? (
                          <img src={playlist.coverUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={playlist.name} />
                      ) : (
                         <ListMusic className="w-20 h-20 text-slate-500 group-hover:scale-110 transition-transform duration-500" />
@@ -315,7 +330,12 @@ const Browse: React.FC<BrowseProps> = ({
         <div className="mb-14">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Artists</h2>
-            <button className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">See all <ArrowRight className="w-4 h-4" /></button>
+            <button 
+                onClick={() => onNavigate('all_artists')}
+                className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
+            >
+                See all <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
             {artists.slice(0, 6).map(artist => (

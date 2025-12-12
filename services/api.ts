@@ -131,6 +131,17 @@ export async function updateSongLyrics(id: string, lyrics: string): Promise<Song
     return handleResponse<Song>(response);
 }
 
+export async function updateSongCover(id: string, file: File): Promise<Song> {
+    const formData = new FormData();
+    formData.append('cover', file);
+
+    const response = await fetch(`${API_BASE_URL}/songs/${id}/cover`, {
+        method: 'PATCH',
+        body: formData
+    });
+    return handleResponse<Song>(response);
+}
+
 export async function deleteSong(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/songs/${id}`, {
         method: 'DELETE'

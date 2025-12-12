@@ -24,7 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistCl
   const showExpandButton = playlists.length > 3;
 
   return (
-    <div className="w-72 h-full flex flex-col flex-shrink-0 z-20 bg-black/20 backdrop-blur-md border-r border-white/5">
+    <div className="w-72 h-full flex flex-col flex-shrink-0 z-20">
       {/* Fixed Header/Logo */}
       <div className="p-8 pb-4 flex-shrink-0">
         <div className="flex items-center gap-3 text-white px-2">

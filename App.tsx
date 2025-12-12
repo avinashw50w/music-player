@@ -6,6 +6,7 @@ import Search from './pages/Search';
 import Browse from './pages/Browse';
 import Favorites from './pages/Favorites';
 import { AlbumDetails, ArtistDetails, PlaylistDetails, SongDetails } from './pages/DetailViews';
+import FullList from './pages/FullList';
 import { NavigationState, Song, Playlist, Album, Artist } from './types';
 import { ListMusic, Plus, Loader2 } from 'lucide-react';
 import * as api from './services/api';
@@ -579,6 +580,14 @@ const App: React.FC = () => {
             {...commonProps}
           />
         );
+      case 'all_songs':
+        return <FullList type="songs" items={songs} onBack={handleBack} {...commonProps} />;
+      case 'all_albums':
+        return <FullList type="albums" items={albums} onBack={handleBack} {...commonProps} />;
+      case 'all_artists':
+        return <FullList type="artists" items={artists} onBack={handleBack} {...commonProps} />;
+      case 'all_playlists':
+        return <FullList type="playlists" items={playlists} onBack={handleBack} {...commonProps} />;
       default:
         return <Home recentSongs={songs} {...commonProps} />;
     }
