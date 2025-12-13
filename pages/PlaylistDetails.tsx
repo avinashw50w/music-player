@@ -1,19 +1,61 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Song, Playlist } from '../types';
+import * as api from '../services/api';
 import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrackList } from '../components/TrackList';
 import { Music } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 
-export const PlaylistDetails: React.FC<any> = (props) => {
+interface PlaylistDetailsProps {
+    currentSongId?: string;
+    isPlaying: boolean;
+    onPlaySong: (song: Song, context?: Song[]) => void;
+    onPlayContext: (context: Song[]) => void;
+    onToggleFavorite: (id: string) => void;
+    onAddToPlaylist: (song: Song) => void;
+    onDeletePlaylist: (id: string) => void;
+    onRenamePlaylist: (id: string, name: string) => void;
+    onRemoveSong: (playlistId: string, songId: string) => void;
+    onReorderSongs: (playlistId: string, from: number, to: number) => void;
+}
+
+export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({ 
+    currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onAddToPlaylist,
+    onDeletePlaylist, onRenamePlaylist, onRemoveSong, onReorderSongs
+}) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
-  // Find playlist from props
-  const playlist = props.playlists ? props.playlists.find((p: Playlist) => p.id === id) : null;
-  const { onDeletePlaylist, onRenamePlaylist, onRemoveSong, onReorderSongs } = props;
+  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+      if (id) {
+          setLoading(true);
+          api.getPlaylist(id)
+            .then(data => {
+                const { songs: playlistSongs, ...plData } = data;
+                setPlaylist(plData);
+                setSongs(playlistSongs);
+            })
+            .catch(err => {
+                console.error("Failed to fetch playlist", err);
+                setPlaylist(null);
+            })
+            .finally(() => setLoading(false));
+      }
+  }, [id]);
+
+  if (loading) {
+      return (
+          <div className="min-h-full flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+      );
+  }
 
   if (!playlist) return (
      <div className="min-h-full flex items-center justify-center">
@@ -21,26 +63,52 @@ export const PlaylistDetails: React.FC<any> = (props) => {
      </div>
   );
 
-  const playlistSongs = playlist.songIds
-    .map((id: string) => props.songs.find((s: Song) => s.id === id))
-    .filter((s: Song | undefined): s is Song => !!s);
-
-  const isContextPlaying = props.isPlaying && props.currentSongId && playlistSongs.some((s: Song) => s.id === props.currentSongId);
+  const isContextPlaying = isPlaying && currentSongId && songs.some((s: Song) => s.id === currentSongId);
 
   const handleEdit = () => {
     const newName = window.prompt("Rename Playlist", playlist.name);
     if (newName && newName.trim() !== "") {
       onRenamePlaylist(playlist.id, newName);
+      setPlaylist(prev => prev ? { ...prev, name: newName } : null);
     }
   };
 
   const handlePlayToggle = () => {
-    if (isContextPlaying && props.currentSongId) {
-        const song = props.songs.find((s: Song) => s.id === props.currentSongId);
-        if (song) props.onPlaySong(song);
+    if (isContextPlaying && currentSongId) {
+        const song = songs.find((s: Song) => s.id === currentSongId);
+        if (song) onPlaySong(song);
     } else {
-        props.onPlayContext(playlistSongs);
+        onPlayContext(songs);
     }
+  };
+
+  const handleDelete = () => {
+      onDeletePlaylist(playlist.id);
+      navigate('/');
+  };
+
+  const handleRemoveSong = (songId: string) => {
+      onRemoveSong(playlist.id, songId);
+      setSongs(prev => prev.filter(s => s.id !== songId));
+  };
+
+  const handleReorder = (from: number, to: number) => {
+      // Optimistic update
+      const newSongs = [...songs];
+      const [moved] = newSongs.splice(from, 1);
+      newSongs.splice(to, 0, moved);
+      setSongs(newSongs);
+      onReorderSongs(playlist.id, from, to);
+  };
+
+  // Internal favorite toggle wrapper to update local state
+  const handleToggleFavoriteInternal = (targetId: string) => {
+      onToggleFavorite(targetId);
+      if (targetId === playlist.id) {
+          setPlaylist(prev => prev ? { ...prev, isFavorite: !prev.isFavorite } : null);
+      } else {
+          setSongs(prev => prev.map(s => s.id === targetId ? { ...s, isFavorite: !s.isFavorite } : s));
+      }
   };
 
   return (
@@ -48,7 +116,7 @@ export const PlaylistDetails: React.FC<any> = (props) => {
       <DetailHeader
         title={playlist.name}
         subtitle="Public Playlist"
-        meta={`${playlistSongs.length} songs`}
+        meta={`${songs.length} songs`}
         image={playlist.coverUrl || 'https://picsum.photos/200/200'}
         type="Playlist"
         onBack={() => navigate(-1)}
@@ -58,13 +126,13 @@ export const PlaylistDetails: React.FC<any> = (props) => {
         isPlaying={!!isContextPlaying}
         onPlay={handlePlayToggle}
         showEditControls={true}
-        onDelete={() => onDeletePlaylist(playlist.id)}
+        onDelete={handleDelete}
         onEdit={handleEdit}
         isFavorite={!!playlist.isFavorite} // Ensure boolean
-        onToggleFavorite={() => props.onToggleFavorite(playlist.id)}
+        onToggleFavorite={() => handleToggleFavoriteInternal(playlist.id)}
       />
       <div className="mt-8 px-4">
-        {playlistSongs.length === 0 ? (
+        {songs.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-20 border-2 border-dashed border-white/5 rounded-[3rem] text-center bg-white/[0.02] max-w-4xl mx-auto">
             <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6 text-slate-400">
               <Music className="w-10 h-10" />
@@ -74,15 +142,15 @@ export const PlaylistDetails: React.FC<any> = (props) => {
           </div>
         ) : (
           <TrackList
-            songs={playlistSongs}
-            currentSongId={props.currentSongId}
-            isPlaying={props.isPlaying}
-            onPlaySong={props.onPlaySong}
-            onToggleFavorite={props.onToggleFavorite}
+            songs={songs}
+            currentSongId={currentSongId}
+            isPlaying={isPlaying}
+            onPlaySong={onPlaySong}
+            onToggleFavorite={handleToggleFavoriteInternal}
             isEditable={true}
-            onRemoveSong={(songId) => onRemoveSong(playlist.id, songId)}
-            onReorder={(from, to) => onReorderSongs(playlist.id, from, to)}
-            onAddToPlaylist={props.onAddToPlaylist}
+            onRemoveSong={handleRemoveSong}
+            onReorder={handleReorder}
+            onAddToPlaylist={onAddToPlaylist}
             onNavigate={(view, id) => {
                  if (view === 'song_details') navigate(`/song/${id}`);
                  else if (view === 'artist_details') navigate(`/artist/${id}`);

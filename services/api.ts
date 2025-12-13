@@ -141,6 +141,11 @@ export async function getArtists(limit?: number, offset?: number, search?: strin
   return handleResponse<Artist[]>(response);
 }
 
+export async function getArtist(id: string): Promise<Artist & { songs: Song[], albums: Album[] }> {
+    const response = await fetch(`${API_BASE_URL}/artists/${id}`);
+    return handleResponse<Artist & { songs: Song[], albums: Album[] }>(response);
+}
+
 export async function toggleArtistFavorite(id: string): Promise<Artist> {
   const response = await fetch(`${API_BASE_URL}/artists/${id}/favorite`, { method: 'PATCH' });
   return handleResponse<Artist>(response);
@@ -169,6 +174,11 @@ export async function updateArtistAvatar(id: string, file: File): Promise<Artist
 export async function getPlaylists(): Promise<Playlist[]> {
   const response = await fetch(`${API_BASE_URL}/playlists`);
   return handleResponse<Playlist[]>(response);
+}
+
+export async function getPlaylist(id: string): Promise<Playlist & { songs: Song[] }> {
+    const response = await fetch(`${API_BASE_URL}/playlists/${id}`);
+    return handleResponse<Playlist & { songs: Song[] }>(response);
 }
 
 export async function createPlaylist(name: string): Promise<Playlist> {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
 import Home from './pages/Home';
@@ -21,6 +21,7 @@ import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import Wavis from './lib/waviz';
 
 const App: React.FC = () => {
+  const location = useLocation();
   const [songs, setSongs] = useState<Song[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
@@ -35,6 +36,14 @@ const App: React.FC = () => {
   
   // Abort Controllers
   const searchAbortControllers = useRef<{ [key: string]: AbortController }>({});
+  
+  // Fetch Guards to prevent double-calling in StrictMode or rapid navigation
+  const isFetching = useRef({
+      playlists: false,
+      songs: false,
+      albums: false,
+      artists: false
+  });
   
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -60,32 +69,51 @@ const App: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const wavisRef = useRef<any>(null);
 
+  // 1. Fetch Playlists ONCE on mount
   useEffect(() => {
-    fetchData();
+    if (playlists.length === 0 && !isFetching.current.playlists) {
+        isFetching.current.playlists = true;
+        api.getPlaylists()
+            .then(setPlaylists)
+            .catch(err => console.error("Failed to fetch playlists", err))
+            .finally(() => { isFetching.current.playlists = false; });
+    }
   }, []);
 
-  const fetchData = async () => {
-    try {
-      const [s, a, ar, p] = await Promise.all([
-        api.getSongs(PAGE_LIMIT, 0),
-        api.getAlbums(PAGE_LIMIT, 0),
-        api.getArtists(PAGE_LIMIT, 0),
-        api.getPlaylists()
-      ]);
-      setSongs(s);
-      setAlbums(a);
-      setArtists(ar);
-      setPlaylists(p);
-      
-      setHasMore({
-          songs: s.length === PAGE_LIMIT,
-          albums: a.length === PAGE_LIMIT,
-          artists: ar.length === PAGE_LIMIT
-      });
-    } catch (err) {
-      console.error("Failed to fetch initial data", err);
+  // 2. Optimized Data Fetching based on Route
+  useEffect(() => {
+    const path = location.pathname;
+
+    // Fetch songs for Home, Browse, or Song Library
+    if ((path === '/' || path === '/browse' || path === '/library/songs' || path === '/favorites') && songs.length === 0 && !isFetching.current.songs) {
+        isFetching.current.songs = true;
+        api.getSongs(PAGE_LIMIT, 0).then(data => {
+            setSongs(data);
+            setHasMore(prev => ({ ...prev, songs: data.length === PAGE_LIMIT }));
+        }).catch(err => console.error("Failed to fetch songs", err))
+          .finally(() => { isFetching.current.songs = false; });
     }
-  };
+
+    // Fetch albums for Browse or Album Library
+    if ((path === '/browse' || path === '/library/albums' || path === '/favorites') && albums.length === 0 && !isFetching.current.albums) {
+        isFetching.current.albums = true;
+        api.getAlbums(PAGE_LIMIT, 0).then(data => {
+            setAlbums(data);
+            setHasMore(prev => ({ ...prev, albums: data.length === PAGE_LIMIT }));
+        }).catch(err => console.error("Failed to fetch albums", err))
+          .finally(() => { isFetching.current.albums = false; });
+    }
+
+    // Fetch artists for Browse or Artist Library
+    if ((path === '/browse' || path === '/library/artists' || path === '/favorites') && artists.length === 0 && !isFetching.current.artists) {
+        isFetching.current.artists = true;
+        api.getArtists(PAGE_LIMIT, 0).then(data => {
+            setArtists(data);
+            setHasMore(prev => ({ ...prev, artists: data.length === PAGE_LIMIT }));
+        }).catch(err => console.error("Failed to fetch artists", err))
+          .finally(() => { isFetching.current.artists = false; });
+    }
+  }, [location.pathname]); // Re-run when path changes
 
   const handleListSearch = async (type: 'songs' | 'albums' | 'artists', query: string) => {
       setListQueries(prev => ({ ...prev, [type]: query }));
@@ -172,7 +200,10 @@ const App: React.FC = () => {
                 setScanStatus(payload);
                 setIsScanning(false);
                 if (payload.totalFound > 0) {
-                     fetchData(); // Refresh all data when scan completes
+                     // Refresh relevant data
+                     api.getSongs(PAGE_LIMIT, 0).then(setSongs);
+                     api.getAlbums(PAGE_LIMIT, 0).then(setAlbums);
+                     api.getArtists(PAGE_LIMIT, 0).then(setArtists);
                 }
             } else if (type === 'scan:error') {
                 setScanStatus(payload);
@@ -393,7 +424,10 @@ const App: React.FC = () => {
       try {
           await api.refreshLibrary();
           setPlaybackError(null);
-          await fetchData();
+          // Refetch what we need based on current path
+          const path = location.pathname;
+          if (path === '/') api.getSongs(PAGE_LIMIT, 0).then(setSongs);
+          // ... simpler to just let user navigation trigger reload or reload page
       } catch (e) {
           console.error(e);
       } finally {
@@ -451,6 +485,7 @@ const App: React.FC = () => {
   const handleCreatePlaylist = async (name: string) => {
       try {
           const newPlaylist = await api.createPlaylist(name);
+          setPlaylists(prev => [newPlaylist, ...prev]); // update local state
           setShowCreatePlaylistModal(false);
           if (songToAdd) {
              handleConfirmAddToPlaylist(newPlaylist.id);
@@ -474,6 +509,14 @@ const App: React.FC = () => {
       if (!songToAdd) return;
       try {
           await api.addSongToPlaylist(playlistId, songToAdd.id);
+          // Update local playlist state to reflect added song (optimistic or re-fetch)
+          // Simplified: just update the count/ids in local state
+          setPlaylists(prev => prev.map(p => {
+              if (p.id === playlistId && !p.songIds.includes(songToAdd.id)) {
+                  return { ...p, songIds: [...p.songIds, songToAdd.id], songCount: (p.songCount || 0) + 1 };
+              }
+              return p;
+          }));
           setShowAddToPlaylistModal(false);
           setSongToAdd(null);
       } catch (e) {
@@ -611,9 +654,6 @@ const App: React.FC = () => {
                 } />
                 <Route path="/artist/:id" element={
                     <ArtistDetails 
-                        songs={songs} 
-                        albums={albums}
-                        artists={artists}
                         currentSongId={currentSong?.id}
                         isPlaying={isPlaying}
                         onPlaySong={handlePlaySong}
@@ -625,8 +665,6 @@ const App: React.FC = () => {
                 } />
                 <Route path="/playlist/:id" element={
                     <PlaylistDetails 
-                        playlists={playlists}
-                        songs={songs}
                         currentSongId={currentSong?.id}
                         isPlaying={isPlaying}
                         onPlaySong={handlePlaySong}
@@ -634,14 +672,26 @@ const App: React.FC = () => {
                         onToggleFavorite={handleToggleFavorite}
                         onDeletePlaylist={async (id: string) => {
                             await api.deletePlaylist(id);
+                            setPlaylists(prev => prev.filter(p => p.id !== id));
                         }}
                         onRenamePlaylist={async (id: string, name: string) => {
                             await api.renamePlaylist(id, name);
+                            setPlaylists(prev => prev.map(p => p.id === id ? { ...p, name } : p));
                         }}
                         onRemoveSong={async (pid: string, sid: string) => {
                             await api.removeSongFromPlaylist(pid, sid);
+                            // Update local playlist state
+                            setPlaylists(prev => prev.map(p => {
+                                if (p.id === pid) {
+                                    return { ...p, songIds: p.songIds.filter(id => id !== sid), songCount: (p.songCount || 1) - 1 };
+                                }
+                                return p;
+                            }));
                         }}
                         onReorderSongs={async (pid: string, from: number, to: number) => {
+                            // Optimistic update logic moved to component, but we sync global state here if needed
+                            // For simplicity, we just trigger API. Component handles its local view.
+                            // However, we should update global playlists state to be safe.
                             const pl = playlists.find(p => p.id === pid);
                             if (pl) {
                                 const newOrder = [...pl.songIds];

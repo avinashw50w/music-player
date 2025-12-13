@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Song, Album, Artist } from '../types';
 import * as api from '../services/api';
 import { DetailHeader } from '../components/DetailHeader';
@@ -9,9 +9,6 @@ import { EditModal } from '../components/EditModal';
 import { useParams, useNavigate } from 'react-router-dom';
 
 interface DetailProps {
-  songs: Song[];
-  albums?: Album[];
-  artists?: Artist[];
   currentSongId?: string;
   isPlaying: boolean;
   onPlaySong: (song: Song, context?: Song[]) => void;
@@ -21,36 +18,58 @@ interface DetailProps {
   onUpdateArtist?: (artist: Artist) => void;
 }
 
-export const ArtistDetails: React.FC<DetailProps> = ({ songs, albums = [], artists = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist, onAddToPlaylist }) => {
+export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist, onAddToPlaylist }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const artist = artists.find(a => a.id === id) || artists[0]; // Fallback purely for dev safety, real app should fetch
+  
+  const [artist, setArtist] = useState<Artist | null>(null);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
-  // In a real refactor with router, we might fetch specific artist details here like AlbumDetails, 
-  // but for now we rely on the props passed down from App state (which contains all artists)
-  
-  if (!artist || artist.id !== id) {
-     // If not in the pre-loaded list, one might fetch it here. 
-     // For this step, we'll assume the list is sufficient or display not found
-     if (!artist) {
-        return (
-            <div className="min-h-full flex items-center justify-center">
-                <p className="text-slate-400">Artist not found</p>
-            </div>
-        );
-     }
+  useEffect(() => {
+    if (id) {
+        setLoading(true);
+        api.getArtist(id)
+            .then(data => {
+                const { songs, albums, ...artistData } = data;
+                setArtist(artistData);
+                setSongs(songs);
+                setAlbums(albums);
+            })
+            .catch(err => {
+                console.error("Failed to fetch artist details", err);
+                setArtist(null);
+            })
+            .finally(() => setLoading(false));
+    }
+  }, [id]);
+
+  if (loading) {
+      return (
+          <div className="min-h-full flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+      );
   }
 
-  const artistSongs = songs.filter(s => s.artist === artist.name);
-  const artistAlbums = albums.filter(a => a.artist === artist.name);
-  const isContextPlaying = isPlaying && currentSongId && artistSongs.some(s => s.id === currentSongId);
+  if (!artist) {
+    return (
+        <div className="min-h-full flex items-center justify-center">
+            <p className="text-slate-400">Artist not found</p>
+        </div>
+    );
+  }
+
+  const isContextPlaying = isPlaying && currentSongId && songs.some(s => s.id === currentSongId);
 
   const handleSave = async (data: any) => {
     try {
         const updated = await api.updateArtist(artist.id, {
             name: data.name
         });
+        setArtist(prev => prev ? { ...prev, ...updated } : null);
         onUpdateArtist?.(updated);
         setIsEditing(false);
     } catch (err) {
@@ -61,6 +80,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ songs, albums = [], artis
   const handleAvatarUpload = async (file: File) => {
     try {
       const updated = await api.updateArtistAvatar(artist.id, file);
+      setArtist(prev => prev ? { ...prev, avatarUrl: updated.avatarUrl } : null);
       onUpdateArtist?.(updated);
     } catch (err) {
       console.error("Failed to update artist avatar", err);
@@ -72,9 +92,18 @@ export const ArtistDetails: React.FC<DetailProps> = ({ songs, albums = [], artis
         const song = songs.find(s => s.id === currentSongId);
         if (song) onPlaySong(song);
     } else {
-        onPlayContext(artistSongs);
+        onPlayContext(songs);
     }
   };
+
+  const handleToggleFavoriteInternal = (targetId: string) => {
+      onToggleFavorite(targetId);
+      if (targetId === artist.id) {
+          setArtist(prev => prev ? { ...prev, isFavorite: !prev.isFavorite } : null);
+      } else {
+          setSongs(prev => prev.map(s => s.id === targetId ? { ...s, isFavorite: !s.isFavorite } : s));
+      }
+  }
 
   return (
     <div className="min-h-full">
@@ -94,7 +123,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ songs, albums = [], artis
         onFollow={() => { }} 
         onEdit={() => setIsEditing(true)}
         isFavorite={artist.isFavorite}
-        onToggleFavorite={() => onToggleFavorite(artist.id)}
+        onToggleFavorite={() => handleToggleFavoriteInternal(artist.id)}
       />
 
       {/* Biography Section */}
@@ -110,11 +139,11 @@ export const ArtistDetails: React.FC<DetailProps> = ({ songs, albums = [], artis
       </div>
 
       <TrackList
-        songs={artistSongs}
+        songs={songs}
         currentSongId={currentSongId}
         isPlaying={isPlaying}
         onPlaySong={onPlaySong}
-        onToggleFavorite={onToggleFavorite}
+        onToggleFavorite={handleToggleFavoriteInternal}
         onAddToPlaylist={onAddToPlaylist}
         onNavigate={(view, id) => {
              if (view === 'song_details') navigate(`/song/${id}`);
@@ -124,14 +153,14 @@ export const ArtistDetails: React.FC<DetailProps> = ({ songs, albums = [], artis
         showHeader={false}
       />
 
-      {artistAlbums.length > 0 && (
+      {albums.length > 0 && (
         <div className="px-10 max-w-7xl mx-auto mt-16 mb-12">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold text-white">Albums</h2>
             <button className="text-slate-400 text-base font-bold hover:text-white transition-colors">See all</button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {artistAlbums.map(album => (
+            {albums.map(album => (
               <div 
                 key={album.id} 
                 onClick={() => navigate(`/album/${album.id}`)}
