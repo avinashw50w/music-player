@@ -1,8 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { FolderOpen, ArrowRight, Music, UploadCloud, Play, Pause, ListMusic } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FolderOpen, ArrowRight, Music, Play, Pause, ListMusic, RefreshCw, FolderSearch, Loader2 } from 'lucide-react';
 import { Song, Album, Artist, NavigationState, Playlist } from '../types';
 import PlayingIndicator from '../components/PlayingIndicator';
-import { uploadFolder, UploadProgress } from '../services/api';
+import { scanLibrary, getLibraryStatus, refreshLibrary, ScanStatus } from '../services/api';
 
 interface BrowseProps {
   onImportSongs: (songs: Song[]) => void;
@@ -27,61 +27,68 @@ const Browse: React.FC<BrowseProps> = ({
   songs,
   playlists
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [folderName, setFolderName] = useState<string | null>(null);
-  const [importedCount, setImportedCount] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [scanPath, setScanPath] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+
+  // Poll for scan status
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isScanning) {
+      interval = setInterval(async () => {
+        try {
+          const status = await getLibraryStatus();
+          setScanStatus(status);
+          if (!status.isScanning) {
+            setIsScanning(false);
+            if (status.totalFound > 0) {
+                 // Trigger a reload of data in parent
+                 // Hacky way: import empty array then refresh happens elsewhere? 
+                 // Ideally onImportSongs calls fetchData
+                 onImportSongs([]); 
+            }
+          }
+        } catch (e) {
+          console.error("Poll failed", e);
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isScanning, onImportSongs]);
+
+  const handleScan = async () => {
+    if (!scanPath.trim()) return;
+    try {
+      setIsScanning(true);
+      setScanError(null);
+      await scanLibrary(scanPath);
+    } catch (e: any) {
+      setScanError(e.message || 'Failed to start scan');
+      setIsScanning(false);
+    }
+  };
+
+  const handleRefreshLibrary = async () => {
+      try {
+          setIsRefreshing(true);
+          const result = await refreshLibrary();
+          setRefreshMessage(result.message);
+          setTimeout(() => setRefreshMessage(null), 5000);
+          onImportSongs([]); // Trigger re-fetch
+      } catch (e: any) {
+          setRefreshMessage(`Failed: ${e.message}`);
+      } finally {
+          setIsRefreshing(false);
+      }
+  };
 
   // Helper to check if an album is active (contains the current song)
   const isAlbumActive = (albumTitle: string) => {
     const currentSong = songs.find(s => s.id === currentSongId);
     return currentSong?.album === albumTitle;
-  };
-
-  const handleFolderSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const fileArray: File[] = Array.from(files) as File[];
-      const audioFiles = fileArray.filter(
-        (f: File) => f.type.startsWith('audio/') ||
-          f.name.endsWith('.mp3') ||
-          f.name.endsWith('.flac') ||
-          f.name.endsWith('.m4a') ||
-          f.name.endsWith('.wav')
-      );
-
-      if (audioFiles.length === 0) {
-        setUploadError('No audio files found in the selected folder');
-        return;
-      }
-
-      const path = files[0].webkitRelativePath;
-      const folder = path.split('/')[0];
-      setFolderName(folder || 'Selected Folder');
-      setIsUploading(true);
-      setUploadProgress({ loaded: 0, total: 0, percentage: 0 });
-      setUploadError(null);
-
-      try {
-        const result = await uploadFolder(audioFiles, (progress) => {
-          setUploadProgress(progress);
-        });
-
-        if (result.songs && result.songs.length > 0) {
-          onImportSongs(result.songs);
-          setImportedCount(result.count);
-        }
-      } catch (err) {
-        console.error('Upload failed:', err);
-        setUploadError('Failed to upload files. Make sure the backend is running.');
-        setFolderName(null);
-      } finally {
-        setIsUploading(false);
-        setUploadProgress(null);
-      }
-    }
   };
 
   const genres = [
@@ -102,73 +109,85 @@ const Browse: React.FC<BrowseProps> = ({
 
   return (
     <div className="p-10 pb-10">
-      <h1 className="text-4xl font-bold text-white mb-10">Browse</h1>
-
-      {/* Local Files Section */}
-      <div className="mb-14">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">Import Music</h2>
-        </div>
-
-        {/* Upload Progress */}
-        {isUploading && uploadProgress && (
-          <div className="mb-6 bg-indigo-900/30 border border-indigo-500/30 rounded-2xl p-6">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-10 h-10 bg-indigo-500/20 rounded-full flex items-center justify-center">
-                <UploadCloud className="w-5 h-5 text-indigo-400 animate-pulse" />
-              </div>
-              <div className="flex-1">
-                <p className="text-white font-bold">Uploading music...</p>
-                <p className="text-indigo-300 text-sm">Processing files from "{folderName}"</p>
-              </div>
-              <span className="text-2xl font-bold text-indigo-400">{uploadProgress.percentage}%</span>
-            </div>
-            <div className="w-full h-3 bg-black/30 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${uploadProgress.percentage}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {uploadError && (
-          <div className="mb-6 bg-red-900/30 border border-red-500/30 rounded-2xl p-4 text-red-300">
-            {uploadError}
-          </div>
-        )}
-
-        {!folderName && !isUploading ? (
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-white/10 rounded-3xl p-12 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-all cursor-pointer group bg-white/[0.02]"
+      <div className="flex justify-between items-center mb-10">
+          <h1 className="text-4xl font-bold text-white">Browse</h1>
+          <button 
+            onClick={handleRefreshLibrary}
+            disabled={isRefreshing || isScanning}
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full font-bold text-sm text-white transition-colors disabled:opacity-50"
           >
-            <div className="w-24 h-24 bg-indigo-500/20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <UploadCloud className="w-10 h-10 text-indigo-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Import Local Folder</h3>
-            <p className="text-slate-400 text-lg max-w-md">Select a folder from your device to add all audio files to your library instantly.</p>
-          </div>
-        ) : !isUploading ? (
-          <div className="bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-white/10 rounded-3xl p-8 flex items-center gap-6 shadow-xl">
-            <div className="w-20 h-20 bg-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <FolderOpen className="w-10 h-10 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-2xl font-bold text-white mb-1">Successfully Imported!</h3>
-              <p className="text-indigo-200 text-lg">Added {importedCount} songs from <span className="font-bold text-white">"{folderName}"</span> to your library.</p>
-            </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-white transition-colors"
-            >
-              Import Another
-            </button>
-          </div>
-        ) : null}
-        <input type="file" ref={fileInputRef} className="hidden" webkitdirectory="" directory="" multiple onChange={handleFolderSelect} />
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh Library
+          </button>
       </div>
+      
+      {refreshMessage && (
+          <div className="mb-6 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 px-6 py-4 rounded-2xl animate-in fade-in slide-in-from-top-2">
+              {refreshMessage}
+          </div>
+      )}
+
+      {/* Library Scanner Section */}
+      <div className="mb-14 bg-gradient-to-br from-[#1e1e24] to-[#151518] rounded-[2rem] p-8 border border-white/5 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none -translate-y-1/2 translate-x-1/2"></div>
+        
+        <div className="relative z-10">
+             <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <FolderSearch className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-white">Scan Local Library</h2>
+                    <p className="text-slate-400">Add music from a folder on your computer</p>
+                </div>
+             </div>
+
+             {/* Input Area */}
+             {!isScanning ? (
+                 <div className="flex gap-4">
+                    <div className="flex-1 relative">
+                        <input 
+                            type="text" 
+                            value={scanPath}
+                            onChange={(e) => setScanPath(e.target.value)}
+                            placeholder="Enter full folder path (e.g. C:\Music or /Users/Name/Music)"
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono text-sm"
+                        />
+                    </div>
+                    <button 
+                        onClick={handleScan}
+                        disabled={!scanPath.trim()}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                        Start Scan
+                    </button>
+                 </div>
+             ) : (
+                 <div className="bg-black/40 rounded-xl p-6 border border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                         <span className="text-indigo-300 font-bold text-sm uppercase tracking-wider animate-pulse">Scanning...</span>
+                         <span className="text-white font-bold">{scanStatus?.progress || 0}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-4">
+                        <div 
+                            className="h-full bg-indigo-500 transition-all duration-300"
+                            style={{ width: `${scanStatus?.progress || 0}%` }}
+                        ></div>
+                    </div>
+                    <p className="text-slate-400 text-sm font-mono truncate">
+                        {scanStatus?.currentFile || 'Initializing...'}
+                    </p>
+                 </div>
+             )}
+
+             {scanError && (
+                 <div className="mt-4 text-rose-400 text-sm font-medium bg-rose-500/10 px-4 py-3 rounded-xl border border-rose-500/20">
+                     Error: {scanError}
+                 </div>
+             )}
+        </div>
+      </div>
+
 
       {/* Top Songs Section */}
       {songs.length > 0 && (
@@ -381,13 +400,5 @@ const Browse: React.FC<BrowseProps> = ({
     </div>
   );
 };
-
-// @ts-ignore - webkitdirectory is a non-standard attribute
-declare module 'react' {
-  interface InputHTMLAttributes<T> {
-    webkitdirectory?: string;
-    directory?: string;
-  }
-}
 
 export default Browse;

@@ -10,6 +10,15 @@ export interface UploadProgress {
   count?: number;
 }
 
+export interface ScanStatus {
+    isScanning: boolean;
+    progress: number;
+    currentFile: string;
+    totalFound: number;
+    processed: number;
+    error?: string;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -173,34 +182,24 @@ export async function reorderPlaylistSongs(playlistId: string, songIds: string[]
     });
 }
 
-// Upload
-export async function uploadFolder(files: File[], onProgress: (progress: UploadProgress) => void): Promise<{ success: boolean; count: number; songs: Song[] }> {
-    const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
-
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_BASE_URL}/upload/folder`);
-
-        xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-                onProgress({
-                    loaded: event.loaded,
-                    total: event.total,
-                    percentage: Math.round((event.loaded / event.total) * 100)
-                });
-            }
-        };
-
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                resolve(JSON.parse(xhr.responseText));
-            } else {
-                reject(new Error('Upload failed'));
-            }
-        };
-
-        xhr.onerror = () => reject(new Error('Upload failed'));
-        xhr.send(formData);
+// Library Management
+export async function scanLibrary(path: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/library/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path })
     });
+    return handleResponse(response);
+}
+
+export async function getLibraryStatus(): Promise<ScanStatus> {
+    const response = await fetch(`${API_BASE_URL}/library/status`);
+    return handleResponse<ScanStatus>(response);
+}
+
+export async function refreshLibrary(): Promise<{ success: boolean; removedCount: number; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/library/refresh`, {
+        method: 'POST'
+    });
+    return handleResponse(response);
 }

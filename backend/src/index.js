@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { migrate } from './config/migrate.js';
 
 // Routes
 import songsRouter from './routes/songs.js';
@@ -10,6 +11,7 @@ import albumsRouter from './routes/albums.js';
 import artistsRouter from './routes/artists.js';
 import playlistsRouter from './routes/playlists.js';
 import uploadRouter from './routes/upload.js';
+import libraryRouter from './routes/library.js';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -43,6 +45,7 @@ app.use('/api/albums', albumsRouter);
 app.use('/api/artists', artistsRouter);
 app.use('/api/playlists', playlistsRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/library', libraryRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -130,30 +133,42 @@ app.get('/api/genres', async (req, res, next) => {
 // Error handling middleware
 app.use(errorHandler);
 
-// Start server
-const server = app.listen(PORT, () => {
-    console.log(`🎵 Myousic Backend running on http://localhost:${PORT}`);
-    console.log(`📁 Uploads served from: ${path.join(__dirname, '../uploads')}`);
-});
+// Start server with DB Migration check
+const startServer = async () => {
+    try {
+        await migrate();
 
-// Graceful Shutdown
-const shutdown = () => {
-    console.log('Received shutdown signal. Closing server...');
-    server.close(async () => {
-        console.log('HTTP server closed.');
-        try {
-            const db = (await import('./config/database.js')).default;
-            await db.destroy();
-            console.log('Database connection closed.');
-            process.exit(0);
-        } catch (err) {
-            console.error('Error closing database connection:', err);
-            process.exit(1);
-        }
-    });
+        const server = app.listen(PORT, () => {
+            console.log(`🎵 Myousic Backend running on http://localhost:${PORT}`);
+            console.log(`📁 Uploads served from: ${path.join(__dirname, '../uploads')}`);
+        });
+
+        // Graceful Shutdown
+        const shutdown = () => {
+            console.log('Received shutdown signal. Closing server...');
+            server.close(async () => {
+                console.log('HTTP server closed.');
+                try {
+                    const db = (await import('./config/database.js')).default;
+                    await db.destroy();
+                    console.log('Database connection closed.');
+                    process.exit(0);
+                } catch (err) {
+                    console.error('Error closing database connection:', err);
+                    process.exit(1);
+                }
+            });
+        };
+
+        process.on('SIGTERM', shutdown);
+        process.on('SIGINT', shutdown);
+
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        process.exit(1);
+    }
 };
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+startServer();
 
 export default app;

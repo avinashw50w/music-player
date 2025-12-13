@@ -39,7 +39,8 @@ const transformSong = (row) => ({
     duration: row.duration,
     durationSeconds: row.duration_seconds,
     coverUrl: row.cover_url,
-    fileUrl: row.file_path ? `/uploads/audio/${row.file_path.split('/').pop()}` : null,
+    // Use the stream endpoint for file playback
+    fileUrl: row.file_path ? `/api/songs/${row.id}/stream` : null,
     // Parse JSON string genre, fallback to array of string
     genre: (() => { 
         try { 
@@ -73,6 +74,19 @@ router.get('/:id', async (req, res, next) => {
             return res.status(404).json({ error: 'Song not found' });
         }
         res.json(transformSong(song));
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET stream song file
+router.get('/:id/stream', async (req, res, next) => {
+    try {
+        const song = await db('songs').where({ id: req.params.id }).first();
+        if (!song || !song.file_path) {
+            return res.status(404).send('Audio file not found');
+        }
+        res.sendFile(song.file_path);
     } catch (err) {
         next(err);
     }
