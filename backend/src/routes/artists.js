@@ -92,7 +92,8 @@ router.get('/:id', async (req, res, next) => {
                 duration: s.duration,
                 coverUrl: s.cover_url,
                 genre: s.genre,
-                isFavorite: Boolean(s.is_favorite)
+                isFavorite: Boolean(s.is_favorite),
+                fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
             }))
         });
     } catch (err) {

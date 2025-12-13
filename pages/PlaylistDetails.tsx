@@ -1,14 +1,25 @@
+
 import React from 'react';
 import { Song, Playlist } from '../types';
 import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrackList } from '../components/TrackList';
 import { Music } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
 
 export const PlaylistDetails: React.FC<any> = (props) => {
-  const { playlist, onDeletePlaylist, onRenamePlaylist, onRemoveSong, onReorderSongs } = props;
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  
+  // Find playlist from props
+  const playlist = props.playlists ? props.playlists.find((p: Playlist) => p.id === id) : null;
+  const { onDeletePlaylist, onRenamePlaylist, onRemoveSong, onReorderSongs } = props;
 
-  if (!playlist) return null;
+  if (!playlist) return (
+     <div className="min-h-full flex items-center justify-center">
+        <p className="text-slate-400">Playlist not found</p>
+     </div>
+  );
 
   const playlistSongs = playlist.songIds
     .map((id: string) => props.songs.find((s: Song) => s.id === id))
@@ -40,7 +51,7 @@ export const PlaylistDetails: React.FC<any> = (props) => {
         meta={`${playlistSongs.length} songs`}
         image={playlist.coverUrl || 'https://picsum.photos/200/200'}
         type="Playlist"
-        onBack={props.onBack}
+        onBack={() => navigate(-1)}
         heroColor="from-green-500/20"
       />
       <ActionButtons
@@ -72,7 +83,11 @@ export const PlaylistDetails: React.FC<any> = (props) => {
             onRemoveSong={(songId) => onRemoveSong(playlist.id, songId)}
             onReorder={(from, to) => onReorderSongs(playlist.id, from, to)}
             onAddToPlaylist={props.onAddToPlaylist}
-            onNavigate={props.onNavigate}
+            onNavigate={(view, id) => {
+                 if (view === 'song_details') navigate(`/song/${id}`);
+                 else if (view === 'artist_details') navigate(`/artist/${id}`);
+                 else if (view === 'album_details') navigate(`/album/${id}`);
+            }}
           />
         )}
       </div>

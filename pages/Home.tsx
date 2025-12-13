@@ -1,18 +1,21 @@
+
 import React from 'react';
-import { Song, NavigationState } from '../types';
+import { Song } from '../types';
 import { Heart, Play, Disc, Music, Mic2 } from 'lucide-react';
 import PlayingIndicator from '../components/PlayingIndicator';
+import { useNavigate } from 'react-router-dom';
 
 interface HomeProps {
   recentSongs: Song[];
   onPlaySong: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying: boolean;
-  onNavigate: (view: NavigationState['view'], id?: string) => void;
   onToggleFavorite: (id: string) => void;
 }
 
-const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isPlaying, onNavigate, onToggleFavorite }) => {
+const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isPlaying, onToggleFavorite }) => {
+  const navigate = useNavigate();
+
   return (
     <div className="p-10 pb-10">
       <div className="flex items-center justify-between mb-10">
@@ -23,7 +26,7 @@ const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isP
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
         {/* Card 1: Albums */}
         <div 
-          onClick={() => onNavigate('all_albums')}
+          onClick={() => navigate('/library/albums')}
           className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#4f46e5] to-[#3b82f6] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-indigo-900/20 isolate"
           style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
@@ -46,7 +49,7 @@ const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isP
 
         {/* Card 2: Songs */}
         <div 
-          onClick={() => onNavigate('all_songs')}
+          onClick={() => navigate('/library/songs')}
           className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#f59e0b] to-[#fbbf24] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-amber-900/20 isolate"
           style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
@@ -69,7 +72,7 @@ const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isP
 
         {/* Card 3: Artists */}
         <div 
-          onClick={() => onNavigate('all_artists')}
+          onClick={() => navigate('/library/artists')}
           className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#f43f5e] to-[#fb7185] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-rose-900/20 isolate"
           style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >

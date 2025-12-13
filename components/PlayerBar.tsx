@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Shuffle, Heart, Maximize2, VolumeX } from 'lucide-react';
-import { Song, NavigationState } from '../types';
+import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
+import { useNavigate } from 'react-router-dom';
 
 interface PlayerBarProps {
   currentSong: Song | null;
@@ -10,13 +12,13 @@ interface PlayerBarProps {
   onNext: () => void;
   onPrev: () => void;
   onToggleFavorite: (id: string) => void;
-  onNavigate: (view: NavigationState['view'], id?: string) => void;
   currentTime: number;
   duration: number;
   onSeek: (time: number) => void;
   volume: number;
   onVolumeChange: (vol: number) => void;
   onExpand?: () => void;
+  onNavigate?: any; // kept for legacy props safety
 }
 
 const formatTime = (seconds: number) => {
@@ -33,7 +35,6 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   onNext, 
   onPrev, 
   onToggleFavorite, 
-  onNavigate,
   currentTime,
   duration,
   onSeek,
@@ -41,6 +42,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   onVolumeChange,
   onExpand
 }) => {
+  const navigate = useNavigate();
   
   if (!currentSong) return null;
 
@@ -53,7 +55,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
            <img
              src={currentSong.coverUrl}
              alt={currentSong.title}
-             onClick={() => onNavigate('song_details', currentSong.id)}
+             onClick={() => navigate(`/song/${currentSong.id}`)}
              className="w-16 h-16 rounded-xl object-cover shadow-lg group-hover:opacity-80 transition-opacity cursor-pointer"
            />
            {onExpand && (
@@ -67,13 +69,13 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
         </div>
         <div className="overflow-hidden min-w-0">
           <h4 
-            onClick={() => onNavigate('song_details', currentSong.id)}
+            onClick={() => navigate(`/song/${currentSong.id}`)}
             className="text-white text-lg font-semibold truncate cursor-pointer hover:underline hover:text-indigo-400 transition-colors w-fit"
           >
             {currentSong.title}
           </h4>
           <p 
-            onClick={() => onNavigate('artist_details', currentSong.artistId || 'ar1')} 
+            onClick={() => navigate(`/artist/${currentSong.artistId || 'ar1'}`)} 
             className="text-slate-400 text-sm truncate hover:text-white cursor-pointer transition-colors w-fit"
           >
             {currentSong.artist}

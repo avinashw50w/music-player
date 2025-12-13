@@ -1,14 +1,14 @@
+
 import React, { useState } from 'react';
-import { Song, Album, NavigationState, Artist } from '../types';
+import { Song, Album, Artist } from '../types';
 import * as api from '../services/api';
 import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrackList } from '../components/TrackList';
 import { EditModal } from '../components/EditModal';
+import { useParams, useNavigate } from 'react-router-dom';
 
 interface DetailProps {
-  id?: string;
-  onBack: () => void;
   songs: Song[];
   albums?: Album[];
   artists?: Artist[];
@@ -18,22 +18,28 @@ interface DetailProps {
   onPlayContext: (context: Song[]) => void;
   onToggleFavorite: (id: string) => void;
   onAddToPlaylist: (song: Song) => void;
-  onUpdateSong?: (song: Song) => void;
-  onUpdateAlbum?: (album: Album) => void;
   onUpdateArtist?: (artist: Artist) => void;
-  onNavigate?: (view: NavigationState['view'], id?: string) => void;
 }
 
-export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums = [], artists = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist, onAddToPlaylist, onNavigate }) => {
-  const artist = artists.find(a => a.id === id) || artists[0];
+export const ArtistDetails: React.FC<DetailProps> = ({ songs, albums = [], artists = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist, onAddToPlaylist }) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const artist = artists.find(a => a.id === id) || artists[0]; // Fallback purely for dev safety, real app should fetch
   const [isEditing, setIsEditing] = useState(false);
 
-  if (!artist) {
-    return (
-      <div className="min-h-full flex items-center justify-center">
-        <p className="text-slate-400">Artist not found</p>
-      </div>
-    );
+  // In a real refactor with router, we might fetch specific artist details here like AlbumDetails, 
+  // but for now we rely on the props passed down from App state (which contains all artists)
+  
+  if (!artist || artist.id !== id) {
+     // If not in the pre-loaded list, one might fetch it here. 
+     // For this step, we'll assume the list is sufficient or display not found
+     if (!artist) {
+        return (
+            <div className="min-h-full flex items-center justify-center">
+                <p className="text-slate-400">Artist not found</p>
+            </div>
+        );
+     }
   }
 
   const artistSongs = songs.filter(s => s.artist === artist.name);
@@ -78,7 +84,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums
         meta={<>{artist.followers} Monthly Listeners</>}
         image={artist.avatarUrl}
         type="Artist"
-        onBack={onBack}
+        onBack={() => navigate(-1)}
         heroColor="from-purple-500/20"
         onImageUpload={handleAvatarUpload}
       />
@@ -110,7 +116,11 @@ export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums
         onPlaySong={onPlaySong}
         onToggleFavorite={onToggleFavorite}
         onAddToPlaylist={onAddToPlaylist}
-        onNavigate={onNavigate || (() => {})}
+        onNavigate={(view, id) => {
+             if (view === 'song_details') navigate(`/song/${id}`);
+             else if (view === 'artist_details') navigate(`/artist/${id}`);
+             else if (view === 'album_details') navigate(`/album/${id}`);
+        }}
         showHeader={false}
       />
 
@@ -124,7 +134,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums
             {artistAlbums.map(album => (
               <div 
                 key={album.id} 
-                onClick={() => onNavigate && onNavigate('album_details', album.id)}
+                onClick={() => navigate(`/album/${album.id}`)}
                 className="bg-white/5 p-5 rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 duration-300 cursor-pointer group shadow-xl border border-white/5"
               >
                 <div className="overflow-hidden rounded-2xl mb-4 shadow-lg">

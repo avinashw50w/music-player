@@ -1,13 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { Song, Album, NavigationState, Artist } from '../types';
+import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
 import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play } from 'lucide-react';
 import * as api from '../services/api';
+import { useParams, useNavigate } from 'react-router-dom';
 
 interface DetailProps {
-  id?: string;
-  onBack: () => void;
   songs: Song[];
   albums?: Album[];
   artists?: Artist[];
@@ -18,24 +18,59 @@ interface DetailProps {
   onToggleFavorite: (id: string) => void;
   onAddToPlaylist: (song: Song) => void;
   onUpdateSong?: (song: Song) => void;
-  onUpdateAlbum?: (album: Album) => void;
-  onUpdateArtist?: (artist: Artist) => void;
-  onNavigate?: (view: NavigationState['view'], id?: string) => void;
 }
 
-export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentSongId, isPlaying, onPlaySong, onToggleFavorite, onAddToPlaylist, onUpdateSong, onNavigate }) => {
-  const song = songs.find(s => s.id === id);
+export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPlaying, onPlaySong, onToggleFavorite, onAddToPlaylist, onUpdateSong }) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [song, setSong] = useState<Song | undefined>(songs.find(s => s.id === id));
+  const [loading, setLoading] = useState(!song);
   const [lyrics, setLyrics] = useState<string>("");
   const [isEditingLyrics, setIsEditingLyrics] = useState(false);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
 
   useEffect(() => {
-    if (song?.lyrics) {
+    // If song is not found in initial props (e.g. refresh or direct link), fetch it
+    if (!song && id) {
+        setLoading(true);
+        api.getSong(id)
+            .then(data => {
+                setSong(data);
+                if (data.lyrics) setLyrics(data.lyrics);
+            })
+            .catch(err => {
+                console.error("Failed to fetch song", err);
+            })
+            .finally(() => setLoading(false));
+    } else if (song?.lyrics) {
       setLyrics(song.lyrics);
     }
-  }, [song]);
+  }, [id, song]);
 
-  if (!song) return null;
+  // Update local state if props change (e.g. favorite toggle from parent)
+  useEffect(() => {
+      const propSong = songs.find(s => s.id === id);
+      if (propSong) {
+          setSong(propSong);
+          if (propSong.lyrics) setLyrics(propSong.lyrics);
+      }
+  }, [songs, id]);
+
+  if (loading) {
+      return (
+          <div className="min-h-full flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+      );
+  }
+
+  if (!song) {
+      return (
+          <div className="min-h-full flex items-center justify-center">
+              <p className="text-slate-400">Song not found</p>
+          </div>
+      );
+  }
 
   const handleSaveInfo = async (data: any) => {
     try {
@@ -48,6 +83,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
             album: data.album,
             genre: genres
         });
+        setSong(updated);
         onUpdateSong?.(updated);
         setIsEditingInfo(false);
     } catch (err) {
@@ -58,6 +94,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
   const handleSaveLyrics = async () => {
     try {
         const updated = await api.updateSongLyrics(song.id, lyrics);
+        setSong(updated);
         onUpdateSong?.(updated);
         setIsEditingLyrics(false);
     } catch (err) {
@@ -68,6 +105,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
   const handleCoverUpload = async (file: File) => {
     try {
       const updated = await api.updateSongCover(song.id, file);
+      setSong(updated);
       onUpdateSong?.(updated);
     } catch (err) {
       console.error("Failed to update song cover", err);
@@ -83,7 +121,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
 
       <div className="relative z-10 w-full max-w-7xl mx-auto">
         <div className="flex justify-start mb-8">
-          <BackButton onClick={onBack} />
+          <BackButton />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -153,7 +191,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Album</span>
                 <span 
                   className="text-white font-medium truncate cursor-pointer hover:text-indigo-400 transition-colors hover:underline"
-                  onClick={() => song.albumId && onNavigate?.('album_details', song.albumId)}
+                  onClick={() => song.albumId && navigate(`/album/${song.albumId}`)}
                 >
                   {song.album}
                 </span>

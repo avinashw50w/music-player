@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search as SearchIcon, X, TrendingUp, Clock, Disc, Mic2, Music } from 'lucide-react';
-import { Song, Album, Artist, NavigationState } from '../types';
+import { Song, Album, Artist } from '../types';
 import * as api from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 interface SearchProps {
   songs: Song[];
@@ -11,13 +12,13 @@ interface SearchProps {
   onPlaySong: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying: boolean;
-  onNavigate: (view: NavigationState['view'], id?: string) => void;
   onToggleFavorite: (id: string) => void;
 }
 
-const Search: React.FC<SearchProps> = ({ onPlaySong, onNavigate }) => {
+const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const navigate = useNavigate();
   
   // Local state for search results
   const [results, setResults] = useState<{ songs: Song[], albums: Album[], artists: Artist[] }>({
@@ -127,7 +128,7 @@ const Search: React.FC<SearchProps> = ({ onPlaySong, onNavigate }) => {
                         {results.artists.map(artist => (
                         <div 
                             key={artist.id}
-                            onClick={() => { addToRecent(artist.name); onNavigate('artist_details', artist.id); }}
+                            onClick={() => { addToRecent(artist.name); navigate(`/artist/${artist.id}`); }}
                             className="bg-white/5 hover:bg-white/10 p-5 rounded-3xl flex flex-col items-center text-center cursor-pointer transition-colors border border-white/5"
                         >
                             <img src={artist.avatarUrl} alt={artist.name} className="w-32 h-32 rounded-full object-cover mb-4 shadow-lg" />
@@ -147,7 +148,7 @@ const Search: React.FC<SearchProps> = ({ onPlaySong, onNavigate }) => {
                         {results.albums.map(album => (
                         <div 
                             key={album.id}
-                            onClick={() => { addToRecent(album.title); onNavigate('album_details', album.id); }}
+                            onClick={() => { addToRecent(album.title); navigate(`/album/${album.id}`); }}
                             className="bg-white/5 hover:bg-white/10 p-5 rounded-3xl cursor-pointer transition-colors border border-white/5 group"
                         >
                             <img src={album.coverUrl} alt={album.title} className="w-full aspect-square rounded-2xl object-cover mb-4 shadow-lg group-hover:scale-105 transition-transform" />
@@ -229,7 +230,7 @@ const Search: React.FC<SearchProps> = ({ onPlaySong, onNavigate }) => {
                   <div key={i} onClick={() => setSearchTerm(cat.title)} className="relative h-40 rounded-3xl overflow-hidden cursor-pointer group shadow-lg">
                     <div className={`absolute inset-0 bg-gradient-to-br ${cat.color} opacity-80 group-hover:opacity-90 transition-opacity z-10`}></div>
                     <img src={cat.img} className="absolute inset-0 w-full h-full object-cover grayscale mix-blend-overlay" alt={cat.title} />
-                    <span className="absolute bottom-4 left-5 text-white font-bold text-xl z-20">{cat.title}</span>
+                    <span className="absolute bottom-4 left-5 text-white font-bold text-2xl z-20">{cat.title}</span>
                     <img src={cat.img} className="absolute -bottom-5 -right-5 w-20 h-20 rounded-xl rotate-12 shadow-lg z-20 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" alt={cat.title} />
                   </div>
                 ))}

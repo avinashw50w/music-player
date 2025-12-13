@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Song, NavigationState } from '../types';
+import { Song } from '../types';
 import { Play, Pause, Heart, ListPlus, GripVertical, Trash2 } from 'lucide-react';
 import PlayingIndicator from './PlayingIndicator';
+import { useNavigate } from 'react-router-dom';
 
 interface SongListItemProps {
   song: Song;
@@ -10,7 +11,6 @@ interface SongListItemProps {
   currentSongId?: string;
   isPlaying: boolean;
   onPlay: () => void;
-  onNavigate: (view: NavigationState['view'], id?: string) => void;
   onToggleFavorite: (id: string) => void;
   onAddToPlaylist: (song: Song) => void;
   isEditable?: boolean;
@@ -19,6 +19,7 @@ interface SongListItemProps {
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
   showAlbum?: boolean;
+  onNavigate?: any; // Kept for backward compat if passed explicitly, though we use hook mostly
 }
 
 const SongListItemComponent: React.FC<SongListItemProps> = ({
@@ -27,7 +28,6 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
   currentSongId,
   isPlaying,
   onPlay,
-  onNavigate,
   onToggleFavorite,
   onAddToPlaylist,
   isEditable,
@@ -39,6 +39,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
 }) => {
   const isCurrent = currentSongId === song.id;
   const displayIndex = String(index + 1).padStart(2, '0');
+  const navigate = useNavigate();
 
   return (
     <div
@@ -106,7 +107,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
                 title={song.title}
                 onClick={(e) => {
                     e.stopPropagation();
-                    onNavigate('song_details', song.id);
+                    navigate(`/song/${song.id}`);
                 }}
             >
                 {song.title}
@@ -116,7 +117,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
                     className="hover:text-white hover:underline cursor-pointer transition-colors truncate max-w-full"
                     onClick={(e) => {
                         e.stopPropagation();
-                        if (song.artistId) onNavigate('artist_details', song.artistId);
+                        if (song.artistId) navigate(`/artist/${song.artistId}`);
                     }}
                 >
                     {song.artist}
@@ -132,7 +133,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
                 className="text-slate-400 text-sm font-medium truncate max-w-full hover:text-white hover:underline cursor-pointer transition-colors"
                 onClick={(e) => {
                     e.stopPropagation();
-                    if (song.albumId) onNavigate('album_details', song.albumId);
+                    if (song.albumId) navigate(`/album/${song.albumId}`);
                 }}
              >
                 {song.album}

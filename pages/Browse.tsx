@@ -1,12 +1,13 @@
+
 import React, { useState } from 'react';
 import { FolderOpen, ArrowRight, Music, Play, Pause, ListMusic, RefreshCw, FolderSearch } from 'lucide-react';
-import { Song, Album, Artist, NavigationState, Playlist } from '../types';
+import { Song, Album, Artist, Playlist } from '../types';
 import PlayingIndicator from '../components/PlayingIndicator';
 import { scanLibrary, refreshLibrary, ScanStatus } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 interface BrowseProps {
   onImportSongs: (songs: Song[]) => void;
-  onNavigate: (view: NavigationState['view'], id?: string) => void;
   onPlaySong: (song: Song) => void;
   currentSongId?: string;
   isPlaying?: boolean;
@@ -24,7 +25,6 @@ interface BrowseProps {
 
 const Browse: React.FC<BrowseProps> = ({
   onImportSongs,
-  onNavigate,
   onPlaySong,
   currentSongId,
   isPlaying,
@@ -41,8 +41,7 @@ const Browse: React.FC<BrowseProps> = ({
   const [scanPath, setScanPath] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
-
-  // SSE Logic moved to App.tsx
+  const navigate = useNavigate();
 
   const handleScan = async () => {
     if (!scanPath.trim()) return;
@@ -180,7 +179,7 @@ const Browse: React.FC<BrowseProps> = ({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Top Songs</h2>
             <button 
-                onClick={() => onNavigate('all_songs')}
+                onClick={() => navigate('/library/songs')}
                 className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
             >
                 See all <ArrowRight className="w-4 h-4" />
@@ -238,7 +237,7 @@ const Browse: React.FC<BrowseProps> = ({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Albums</h2>
             <button 
-                onClick={() => onNavigate('all_albums')}
+                onClick={() => navigate('/library/albums')}
                 className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
             >
                 See all <ArrowRight className="w-4 h-4" />
@@ -252,7 +251,7 @@ const Browse: React.FC<BrowseProps> = ({
               return (
                 <div
                   key={album.id}
-                  onClick={() => onNavigate('album_details', album.id)}
+                  onClick={() => navigate(`/album/${album.id}`)}
                   className={`p-4 rounded-2xl hover:bg-white/10 transition-all group cursor-pointer border ${active ? 'bg-white/10 border-indigo-500/50 shadow-lg shadow-indigo-900/20' : 'bg-white/5 border-white/5'}`}
                 >
                   <div className="relative mb-4 overflow-hidden rounded-xl">
@@ -294,7 +293,7 @@ const Browse: React.FC<BrowseProps> = ({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Playlists</h2>
             <button 
-                onClick={() => onNavigate('all_playlists')}
+                onClick={() => navigate('/library/playlists')}
                 className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
             >
                 See all <ArrowRight className="w-4 h-4" />
@@ -304,7 +303,7 @@ const Browse: React.FC<BrowseProps> = ({
             {playlists.slice(0, 4).map(playlist => (
                <div
                   key={playlist.id}
-                  onClick={() => onNavigate('playlist_details', playlist.id)}
+                  onClick={() => navigate(`/playlist/${playlist.id}`)}
                   className="p-4 rounded-2xl hover:bg-white/10 transition-all group cursor-pointer border bg-white/5 border-white/5"
                 >
                   <div className="relative mb-4 overflow-hidden rounded-xl bg-[#2c2c2e] aspect-square flex items-center justify-center shadow-md">
@@ -335,7 +334,7 @@ const Browse: React.FC<BrowseProps> = ({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Artists</h2>
             <button 
-                onClick={() => onNavigate('all_artists')}
+                onClick={() => navigate('/library/artists')}
                 className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1"
             >
                 See all <ArrowRight className="w-4 h-4" />
@@ -345,7 +344,7 @@ const Browse: React.FC<BrowseProps> = ({
             {artists.slice(0, 6).map(artist => (
               <div
                 key={artist.id}
-                onClick={() => onNavigate('artist_details', artist.id)}
+                onClick={() => navigate(`/artist/${artist.id}`)}
                 className="flex flex-col items-center text-center cursor-pointer group"
               >
                 <img src={artist.avatarUrl} className="w-32 h-32 rounded-full object-cover mb-4 shadow-lg group-hover:scale-105 transition-transform border-4 border-white/5 group-hover:border-indigo-500/30" alt={artist.name} />

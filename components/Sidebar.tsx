@@ -1,23 +1,23 @@
+
 import React, { useState } from 'react';
 import { Home, Search, FolderOpen, Heart, PlusSquare, Music, ListMusic, ChevronDown, ChevronUp } from 'lucide-react';
-import { NavigationState, Playlist } from '../types';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Playlist } from '../types';
 
 interface SidebarProps {
-  currentView: NavigationState['view'];
-  onNavigate: (view: NavigationState['view']) => void;
-  onPlaylistClick: (id: string) => void;
   onCreatePlaylist: () => void;
   playlists: Playlist[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistClick, onCreatePlaylist, playlists }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onCreatePlaylist, playlists }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const navigate = useNavigate();
 
   const menuItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'search', label: 'Search', icon: Search },
-    { id: 'browse', label: 'Browse', icon: FolderOpen },
-    { id: 'favorites', label: 'Favorite', icon: Heart },
+    { path: '/', label: 'Home', icon: Home },
+    { path: '/search', label: 'Search', icon: Search },
+    { path: '/browse', label: 'Browse', icon: FolderOpen },
+    { path: '/favorites', label: 'Favorite', icon: Heart },
   ];
 
   const visiblePlaylists = isExpanded ? playlists : playlists.slice(0, 3);
@@ -40,18 +40,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistCl
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 px-4">Menu</h3>
           <nav className="space-y-2">
             {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id as any)}
-                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all text-base font-semibold ${
-                  currentView === item.id
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) => `w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all text-base font-semibold ${
+                  isActive
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <item.icon className={`w-5 h-5 ${currentView === item.id ? 'text-white' : 'text-slate-400'}`} />
+                <item.icon className="w-5 h-5" />
                 {item.label}
-              </button>
+              </NavLink>
             ))}
           </nav>
         </div>
@@ -73,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onPlaylistCl
             {visiblePlaylists.map((pl) => (
               <button
                 key={pl.id}
-                onClick={() => onPlaylistClick(pl.id)}
+                onClick={() => navigate(`/playlist/${pl.id}`)}
                 className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-base font-medium truncate"
               >
                 <ListMusic className="w-5 h-5 flex-shrink-0" />

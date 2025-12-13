@@ -1,14 +1,13 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { ArrowLeft, Play, ListMusic, Search, X } from 'lucide-react';
-import { Song, Album, Artist, Playlist, NavigationState } from '../types';
+import { Play, ListMusic, Search, X } from 'lucide-react';
+import { Song, Album, Artist, Playlist } from '../types';
 import { SongListItem } from '../components/SongListItem';
+import { BackButton } from '../components/BackButton';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface FullListProps {
-  type: 'songs' | 'albums' | 'artists' | 'playlists';
-  items: Song[] | Album[] | Artist[] | Playlist[];
-  onBack: () => void;
-  onNavigate: (view: NavigationState['view'], id?: string) => void;
+  items?: Song[] | Album[] | Artist[] | Playlist[]; // Made optional, as we might fetch
   onPlaySong?: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying?: boolean;
@@ -17,22 +16,30 @@ interface FullListProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   onSearch?: (query: string) => void;
+  // Pass correct data from parent
+  songs: Song[];
+  albums: Album[];
+  artists: Artist[];
+  playlists: Playlist[];
 }
 
-const BackButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-    <button
-      onClick={onClick}
-      className="p-3 text-slate-400 hover:text-white transition-colors hover:bg-white/10 rounded-full backdrop-blur-md"
-    >
-      <ArrowLeft className="w-6 h-6" />
-    </button>
-  );
-
-const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist, onLoadMore, hasMore, onSearch }) => {
+const FullList: React.FC<FullListProps> = ({ 
+    onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist, onLoadMore, hasMore, onSearch,
+    songs, albums, artists, playlists
+}) => {
+  const { type } = useParams<{ type: string }>(); // 'songs', 'albums', 'artists', 'playlists'
+  const navigate = useNavigate();
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Resolve items based on URL param 'type'
+  let items: any[] = [];
+  if (type === 'songs') items = songs;
+  else if (type === 'albums') items = albums;
+  else if (type === 'artists') items = artists;
+  else if (type === 'playlists') items = playlists;
+
   // Use a ref for onSearch to avoid effect re-triggering when the function prop changes
   const onSearchRef = useRef(onSearch);
   
@@ -49,7 +56,7 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
         }, 500);
         return () => clearTimeout(timer);
     }
-  }, [searchQuery]); // Depend ONLY on searchQuery to avoid loops
+  }, [searchQuery]); 
 
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
       const target = entries[0];
@@ -105,7 +112,6 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
                   currentSongId={currentSongId}
                   isPlaying={!!isPlaying}
                   onPlay={() => onPlaySong?.(song, songItems)}
-                  onNavigate={onNavigate}
                   onToggleFavorite={onToggleFavorite || (() => {})}
                   onAddToPlaylist={onAddToPlaylist || (() => {})}
                />
@@ -119,7 +125,7 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
             {(items as Album[]).map((album, i) => (
               <div 
                 key={`${album.id}-${i}`}
-                onClick={() => onNavigate('album_details', album.id)}
+                onClick={() => navigate(`/album/${album.id}`)}
                 className="bg-white/5 hover:bg-white/10 p-5 rounded-[2rem] cursor-pointer transition-colors border border-white/5 group"
               >
                 <div className="overflow-hidden rounded-2xl mb-4 shadow-lg">
@@ -138,7 +144,7 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
             {(items as Artist[]).map((artist, i) => (
                 <div 
                 key={`${artist.id}-${i}`}
-                onClick={() => onNavigate('artist_details', artist.id)}
+                onClick={() => navigate(`/artist/${artist.id}`)}
                 className="bg-white/5 hover:bg-white/10 p-5 rounded-[2rem] flex flex-col items-center text-center cursor-pointer transition-colors border border-white/5 group"
                 >
                     <img src={artist.avatarUrl} alt={artist.name} className="w-32 h-32 rounded-full object-cover mb-4 shadow-lg group-hover:scale-105 transition-transform" />
@@ -155,7 +161,7 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
             {(items as Playlist[]).map((playlist) => (
                 <div 
                     key={playlist.id} 
-                    onClick={() => onNavigate('playlist_details', playlist.id)}
+                    onClick={() => navigate(`/playlist/${playlist.id}`)}
                     className="bg-white/5 hover:bg-white/10 p-5 rounded-[2rem] cursor-pointer transition-colors border border-white/5 group"
                 >
                     <div className="relative mb-4 overflow-hidden rounded-2xl bg-[#2c2c2e] aspect-square flex items-center justify-center shadow-md">
@@ -173,7 +179,7 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
         );
 
       default:
-        return null;
+        return <div>Invalid list type</div>;
     }
   };
 
@@ -181,7 +187,7 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
     <div className="p-10 pb-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
             <div className="flex items-center gap-4">
-                <BackButton onClick={onBack} />
+                <BackButton />
                 <h1 className="text-4xl font-bold text-white tracking-tight">{getTitle()}</h1>
             </div>
             

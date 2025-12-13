@@ -51,6 +51,11 @@ export async function getSongs(limit?: number, offset?: number, search?: string,
   return handleResponse<Song[]>(response);
 }
 
+export async function getSong(id: string): Promise<Song> {
+    const response = await fetch(`${API_BASE_URL}/songs/${id}`);
+    return handleResponse<Song>(response);
+}
+
 export async function toggleSongFavorite(id: string): Promise<Song> {
   const response = await fetch(`${API_BASE_URL}/songs/${id}/favorite`, { method: 'PATCH' });
   return handleResponse<Song>(response);

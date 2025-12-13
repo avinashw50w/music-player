@@ -44,21 +44,7 @@ export interface Playlist {
   isFavorite?: boolean;
 }
 
-export type ViewType =
-  | 'home'
-  | 'search'
-  | 'browse'
-  | 'favorites'
-  | 'album_details'
-  | 'artist_details'
-  | 'playlist_details'
-  | 'song_details'
-  | 'all_songs'
-  | 'all_albums'
-  | 'all_artists'
-  | 'all_playlists';
-
 export interface NavigationState {
-  view: ViewType;
-  entityId?: string; // Used for details views (albumId, artistId, etc.)
+  view: 'song_details' | 'album_details' | 'artist_details' | 'playlist_details' | string;
+  id?: string;
 }

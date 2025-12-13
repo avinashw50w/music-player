@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
-import { Song, Album, Artist, Playlist, NavigationState } from '../types';
+import { Song, Album, Artist, Playlist } from '../types';
 import { Heart, ListMusic, MoreHorizontal } from 'lucide-react';
 import { SongListItem } from '../components/SongListItem';
+import { useNavigate } from 'react-router-dom';
 
 interface FavoritesProps {
   songs: Song[];
@@ -11,15 +13,15 @@ interface FavoritesProps {
   onPlaySong: (song: Song) => void;
   currentSongId?: string;
   isPlaying: boolean;
-  onNavigate: (view: NavigationState['view'], id?: string) => void;
   onToggleFavorite: (id: string) => void;
   onAddToPlaylist: (song: Song) => void;
 }
 
 type Tab = 'Playlists' | 'Artists' | 'Albums' | 'Songs';
 
-const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists, onPlaySong, currentSongId, isPlaying, onNavigate, onToggleFavorite, onAddToPlaylist }) => {
+const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists, onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist }) => {
   const [activeTab, setActiveTab] = useState<Tab>('Songs');
+  const navigate = useNavigate();
 
   // Strict boolean check to avoid truthy/falsy issues
   const favoriteSongs = songs.filter(s => s.isFavorite === true);
@@ -40,7 +42,6 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                 currentSongId={currentSongId}
                 isPlaying={isPlaying}
                 onPlay={() => onPlaySong(song)}
-                onNavigate={onNavigate}
                 onToggleFavorite={onToggleFavorite}
                 onAddToPlaylist={onAddToPlaylist}
              />
@@ -56,7 +57,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
             {favoriteAlbums.map((album) => (
               <div 
                 key={album.id} 
-                onClick={() => onNavigate('album_details', album.id)}
+                onClick={() => navigate(`/album/${album.id}`)}
                 className="group flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-5">
@@ -90,7 +91,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
             {favoriteArtists.map((artist) => (
               <div 
                 key={artist.id} 
-                onClick={() => onNavigate('artist_details', artist.id)}
+                onClick={() => navigate(`/artist/${artist.id}`)}
                 className="group flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-5">
@@ -124,7 +125,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
             {favoritePlaylists.map((pl) => (
               <div 
                 key={pl.id} 
-                onClick={() => onNavigate('playlist_details', pl.id)}
+                onClick={() => navigate(`/playlist/${pl.id}`)}
                 className="group flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-5">

@@ -1,42 +1,34 @@
 
 import React, { useState, useEffect } from 'react';
-import { Song, Album, NavigationState, Artist } from '../types';
+import { Song, Album, Artist } from '../types';
 import * as api from '../services/api';
 import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrackList } from '../components/TrackList';
 import { EditModal } from '../components/EditModal';
+import { useParams, useNavigate } from 'react-router-dom';
 
 interface DetailProps {
-  id?: string;
-  onBack: () => void;
-  songs: Song[];
-  albums?: Album[];
-  artists?: Artist[];
   currentSongId?: string;
   isPlaying: boolean;
   onPlaySong: (song: Song, context?: Song[]) => void;
   onPlayContext: (context: Song[]) => void;
   onToggleFavorite: (id: string) => void;
   onAddToPlaylist: (song: Song) => void;
-  onUpdateSong?: (song: Song) => void;
   onUpdateAlbum?: (album: Album) => void;
-  onUpdateArtist?: (artist: Artist) => void;
-  onNavigate?: (view: NavigationState['view'], id?: string) => void;
 }
 
 export const AlbumDetails: React.FC<DetailProps> = ({ 
-  id, 
-  onBack, 
   currentSongId, 
   isPlaying, 
   onPlaySong, 
   onPlayContext, 
   onToggleFavorite, 
   onUpdateAlbum, 
-  onAddToPlaylist, 
-  onNavigate 
+  onAddToPlaylist
 }) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [album, setAlbum] = useState<Album | null>(null);
   const [tracks, setTracks] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +132,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({
         meta={<>{album.trackCount} songs <span className="text-slate-600 mx-2">•</span> {album.genre.join(', ')}</>}
         image={album.coverUrl}
         type="Album"
-        onBack={onBack}
+        onBack={() => navigate(-1)}
         heroColor="from-blue-500/20"
         onImageUpload={handleCoverUpload}
       />
@@ -160,7 +152,12 @@ export const AlbumDetails: React.FC<DetailProps> = ({
           onPlaySong={onPlaySong}
           onToggleFavorite={handleToggleFavoriteInternal}
           onAddToPlaylist={onAddToPlaylist}
-          onNavigate={onNavigate || (() => {})}
+          onNavigate={(view, id) => {
+            // Mapping navigation state to routes
+             if (view === 'song_details') navigate(`/song/${id}`);
+             else if (view === 'artist_details') navigate(`/artist/${id}`);
+             else if (view === 'album_details') navigate(`/album/${id}`);
+          }}
         />
       </div>
       {isEditing && (

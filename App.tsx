@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
 import Home from './pages/Home';
@@ -15,7 +16,7 @@ import { CreatePlaylistModal } from './components/CreatePlaylistModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { Visualizer } from './components/Visualizer';
 import * as api from './services/api';
-import { Song, Album, Artist, Playlist, NavigationState, ViewType } from './types';
+import { Song, Album, Artist, Playlist } from './types';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import Wavis from './lib/waviz';
 
@@ -40,9 +41,6 @@ const App: React.FC = () => {
   const [volume, setVolume] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  
-  const [navState, setNavState] = useState<NavigationState>({ view: 'home' });
-  const [navHistory, setNavHistory] = useState<NavigationState[]>([]);
   
   const [playbackQueue, setPlaybackQueue] = useState<Song[]>([]);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
@@ -318,22 +316,6 @@ const App: React.FC = () => {
     }
   }, [volume]);
 
-  const handleNavigate = (view: ViewType, entityId?: string) => {
-    setNavHistory(prev => [...prev, navState]);
-    setNavState({ view, entityId });
-    setShowVisualizer(false);
-  };
-
-  const handleBack = () => {
-    if (navHistory.length > 0) {
-        const prev = navHistory[navHistory.length - 1];
-        setNavHistory(prevHist => prevHist.slice(0, -1));
-        setNavState(prev);
-    } else {
-        setNavState({ view: 'home' });
-    }
-  };
-
   const handlePlaySong = (song: Song, context?: Song[]) => {
     // If playing the exact same song, toggle play/pause
     if (currentSong?.id === song.id) {
@@ -520,181 +502,6 @@ const App: React.FC = () => {
       setArtists(prev => prev.map(a => a.id === updated.id ? updated : a));
   };
 
-  const renderView = () => {
-    switch (navState.view) {
-      case 'home':
-        return <Home 
-            recentSongs={songs.slice(0, 10)} 
-            onPlaySong={handlePlaySong} 
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            onNavigate={handleNavigate}
-            onToggleFavorite={handleToggleFavorite}
-        />;
-      case 'search':
-        return <Search 
-            songs={songs} 
-            albums={albums} 
-            artists={artists} 
-            onPlaySong={handlePlaySong}
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            onNavigate={handleNavigate}
-            onToggleFavorite={handleToggleFavorite}
-        />;
-      case 'browse':
-        return <Browse 
-            onImportSongs={handleImportSongs}
-            onNavigate={handleNavigate}
-            onPlaySong={handlePlaySong}
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            albums={albums}
-            artists={artists}
-            songs={songs}
-            playlists={playlists}
-            // Pass scan state
-            scanStatus={scanStatus}
-            isScanning={isScanning}
-            scanError={scanError}
-            setScanError={setScanError}
-            setIsScanning={setIsScanning}
-        />;
-      case 'favorites':
-        return <Favorites 
-            songs={songs} 
-            albums={albums} 
-            artists={artists} 
-            playlists={playlists}
-            onPlaySong={handlePlaySong}
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            onNavigate={handleNavigate}
-            onToggleFavorite={handleToggleFavorite}
-            onAddToPlaylist={handleAddToPlaylist}
-        />;
-      case 'album_details':
-        return <AlbumDetails 
-            id={navState.entityId} 
-            onBack={handleBack} 
-            songs={songs} 
-            albums={albums}
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            onPlaySong={handlePlaySong}
-            onPlayContext={handlePlayContext}
-            onToggleFavorite={handleToggleFavorite}
-            onAddToPlaylist={handleAddToPlaylist}
-            onUpdateAlbum={onUpdateAlbum}
-            onNavigate={handleNavigate}
-        />;
-      case 'artist_details':
-        return <ArtistDetails 
-            id={navState.entityId} 
-            onBack={handleBack} 
-            songs={songs} 
-            albums={albums}
-            artists={artists}
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            onPlaySong={handlePlaySong}
-            onPlayContext={handlePlayContext}
-            onToggleFavorite={handleToggleFavorite}
-            onAddToPlaylist={handleAddToPlaylist}
-            onUpdateArtist={onUpdateArtist}
-            onNavigate={handleNavigate}
-        />;
-      case 'playlist_details':
-        const playlist = playlists.find(p => p.id === navState.entityId);
-        return <PlaylistDetails 
-            playlist={playlist}
-            songs={songs}
-            onBack={handleBack}
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            onPlaySong={handlePlaySong}
-            onPlayContext={handlePlayContext}
-            onToggleFavorite={handleToggleFavorite}
-            onDeletePlaylist={async (id: string) => {
-                await api.deletePlaylist(id);
-                handleBack();
-            }}
-            onRenamePlaylist={async (id: string, name: string) => {
-                await api.renamePlaylist(id, name);
-            }}
-            onRemoveSong={async (pid: string, sid: string) => {
-                await api.removeSongFromPlaylist(pid, sid);
-            }}
-            onReorderSongs={async (pid: string, from: number, to: number) => {
-                 const pl = playlists.find(p => p.id === pid);
-                 if (pl) {
-                     const newOrder = [...pl.songIds];
-                     const [moved] = newOrder.splice(from, 1);
-                     newOrder.splice(to, 0, moved);
-                     setPlaylists(prev => prev.map(p => p.id === pid ? { ...p, songIds: newOrder } : p));
-                     
-                     await api.reorderPlaylistSongs(pid, newOrder);
-                 }
-            }}
-            onNavigate={handleNavigate}
-            onAddToPlaylist={handleAddToPlaylist}
-        />;
-      case 'song_details':
-         return <SongDetails
-            id={navState.entityId}
-            onBack={handleBack}
-            songs={songs}
-            currentSongId={currentSong?.id}
-            isPlaying={isPlaying}
-            onPlaySong={handlePlaySong}
-            onPlayContext={handlePlayContext}
-            onToggleFavorite={handleToggleFavorite}
-            onAddToPlaylist={handleAddToPlaylist}
-            onUpdateSong={onUpdateSong}
-            onNavigate={handleNavigate}
-         />;
-       case 'all_songs':
-          return <FullList 
-                type="songs" 
-                items={songs} 
-                onBack={handleBack} 
-                onNavigate={handleNavigate} 
-                onPlaySong={handlePlaySong} 
-                currentSongId={currentSong?.id} 
-                isPlaying={isPlaying} 
-                onToggleFavorite={handleToggleFavorite} 
-                onAddToPlaylist={handleAddToPlaylist}
-                onLoadMore={handleLoadMoreSongs}
-                hasMore={hasMore.songs}
-                onSearch={(q) => handleListSearch('songs', q)}
-            />;
-       case 'all_albums':
-          return <FullList 
-                type="albums" 
-                items={albums} 
-                onBack={handleBack} 
-                onNavigate={handleNavigate} 
-                onLoadMore={handleLoadMoreAlbums}
-                hasMore={hasMore.albums}
-                onSearch={(q) => handleListSearch('albums', q)}
-            />;
-       case 'all_artists':
-          return <FullList 
-                type="artists" 
-                items={artists} 
-                onBack={handleBack} 
-                onNavigate={handleNavigate} 
-                onLoadMore={handleLoadMoreArtists}
-                hasMore={hasMore.artists}
-                onSearch={(q) => handleListSearch('artists', q)}
-            />;
-       case 'all_playlists':
-          return <FullList type="playlists" items={playlists} onBack={handleBack} onNavigate={handleNavigate} />;
-      default:
-        return <div>View not found</div>;
-    }
-  };
-
   return (
     <div className="flex h-screen flex-col text-white font-sans overflow-hidden">
       {/* Background Ambience */}
@@ -735,15 +542,161 @@ const App: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden relative z-10">
         <Sidebar 
-            currentView={navState.view} 
-            onNavigate={(view) => handleNavigate(view)} 
-            onPlaylistClick={(id) => handleNavigate('playlist_details', id)}
             onCreatePlaylist={() => setShowCreatePlaylistModal(true)}
             playlists={playlists}
         />
         
         <main className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar scroll-smooth">
-            {renderView()}
+            <Routes>
+                <Route path="/" element={
+                    <Home 
+                        recentSongs={songs.slice(0, 10)} 
+                        onPlaySong={handlePlaySong} 
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        onToggleFavorite={handleToggleFavorite}
+                    />
+                } />
+                <Route path="/search" element={
+                    <Search 
+                        songs={songs} 
+                        albums={albums} 
+                        artists={artists} 
+                        onPlaySong={handlePlaySong}
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        onToggleFavorite={handleToggleFavorite}
+                    />
+                } />
+                <Route path="/browse" element={
+                    <Browse 
+                        onImportSongs={handleImportSongs}
+                        onPlaySong={handlePlaySong}
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        albums={albums}
+                        artists={artists}
+                        songs={songs}
+                        playlists={playlists}
+                        scanStatus={scanStatus}
+                        isScanning={isScanning}
+                        scanError={scanError}
+                        setScanError={setScanError}
+                        setIsScanning={setIsScanning}
+                    />
+                } />
+                <Route path="/favorites" element={
+                    <Favorites 
+                        songs={songs} 
+                        albums={albums} 
+                        artists={artists} 
+                        playlists={playlists}
+                        onPlaySong={handlePlaySong}
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        onToggleFavorite={handleToggleFavorite}
+                        onAddToPlaylist={handleAddToPlaylist}
+                    />
+                } />
+                <Route path="/album/:id" element={
+                    <AlbumDetails 
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        onPlaySong={handlePlaySong}
+                        onPlayContext={handlePlayContext}
+                        onToggleFavorite={handleToggleFavorite}
+                        onAddToPlaylist={handleAddToPlaylist}
+                        onUpdateAlbum={onUpdateAlbum}
+                    />
+                } />
+                <Route path="/artist/:id" element={
+                    <ArtistDetails 
+                        songs={songs} 
+                        albums={albums}
+                        artists={artists}
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        onPlaySong={handlePlaySong}
+                        onPlayContext={handlePlayContext}
+                        onToggleFavorite={handleToggleFavorite}
+                        onAddToPlaylist={handleAddToPlaylist}
+                        onUpdateArtist={onUpdateArtist}
+                    />
+                } />
+                <Route path="/playlist/:id" element={
+                    <PlaylistDetails 
+                        playlists={playlists}
+                        songs={songs}
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        onPlaySong={handlePlaySong}
+                        onPlayContext={handlePlayContext}
+                        onToggleFavorite={handleToggleFavorite}
+                        onDeletePlaylist={async (id: string) => {
+                            await api.deletePlaylist(id);
+                        }}
+                        onRenamePlaylist={async (id: string, name: string) => {
+                            await api.renamePlaylist(id, name);
+                        }}
+                        onRemoveSong={async (pid: string, sid: string) => {
+                            await api.removeSongFromPlaylist(pid, sid);
+                        }}
+                        onReorderSongs={async (pid: string, from: number, to: number) => {
+                            const pl = playlists.find(p => p.id === pid);
+                            if (pl) {
+                                const newOrder = [...pl.songIds];
+                                const [moved] = newOrder.splice(from, 1);
+                                newOrder.splice(to, 0, moved);
+                                setPlaylists(prev => prev.map(p => p.id === pid ? { ...p, songIds: newOrder } : p));
+                                await api.reorderPlaylistSongs(pid, newOrder);
+                            }
+                        }}
+                        onAddToPlaylist={handleAddToPlaylist}
+                    />
+                } />
+                <Route path="/song/:id" element={
+                    <SongDetails
+                        songs={songs}
+                        currentSongId={currentSong?.id}
+                        isPlaying={isPlaying}
+                        onPlaySong={handlePlaySong}
+                        onPlayContext={handlePlayContext}
+                        onToggleFavorite={handleToggleFavorite}
+                        onAddToPlaylist={handleAddToPlaylist}
+                        onUpdateSong={onUpdateSong}
+                    />
+                } />
+                <Route path="/library/:type" element={
+                    <FullList 
+                        songs={songs}
+                        albums={albums}
+                        artists={artists}
+                        playlists={playlists}
+                        onPlaySong={handlePlaySong} 
+                        currentSongId={currentSong?.id} 
+                        isPlaying={isPlaying} 
+                        onToggleFavorite={handleToggleFavorite} 
+                        onAddToPlaylist={handleAddToPlaylist}
+                        onLoadMore={() => {
+                           // Determine which load more handler to call based on location or path
+                           // Simple heuristic based on active route param 'type' handled in FullList
+                           const path = window.location.pathname;
+                           if (path.includes('songs')) handleLoadMoreSongs();
+                           if (path.includes('albums')) handleLoadMoreAlbums();
+                           if (path.includes('artists')) handleLoadMoreArtists();
+                        }}
+                        hasMore={true} // Simplified for brevity in routing switch, FullList can manage
+                        onSearch={(q) => {
+                           const path = window.location.pathname;
+                           if (path.includes('songs')) handleListSearch('songs', q);
+                           if (path.includes('albums')) handleListSearch('albums', q);
+                           if (path.includes('artists')) handleListSearch('artists', q);
+                        }}
+                    />
+                } />
+                {/* Fallback route */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
         </main>
       </div>
 
@@ -755,7 +708,6 @@ const App: React.FC = () => {
             onNext={handleNext}
             onPrev={handlePrev}
             onToggleFavorite={handleToggleFavorite}
-            onNavigate={handleNavigate}
             currentTime={currentTime}
             duration={duration}
             onSeek={handleSeek}
