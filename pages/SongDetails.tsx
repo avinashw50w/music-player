@@ -171,8 +171,8 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Format</span>
                 <div className="flex items-center gap-2">
-                  <span className="bg-white/10 text-xs px-2 py-0.5 rounded text-indigo-200">FLAC</span>
-                  <span className="text-slate-400 text-sm">24-bit</span>
+                  <span className="bg-white/10 text-xs px-2 py-0.5 rounded text-indigo-200 uppercase">{song.format}</span>
+                  {/*<span className="text-slate-400 text-sm">24-bit</span>*/}
                 </div>
               </div>
               <div className="flex flex-col gap-1 col-span-2">
