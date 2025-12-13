@@ -52,7 +52,7 @@ const transformAlbum = (row) => ({
 // GET all albums
 router.get('/', async (req, res, next) => {
     try {
-        const { limit, offset, search } = req.query;
+        const { limit, offset, search, favorites } = req.query;
         let query = db('albums').select('*').orderBy('created_at', 'desc');
 
         if (search) {
@@ -61,6 +61,10 @@ router.get('/', async (req, res, next) => {
                 this.where('title', 'like', term)
                     .orWhere('artist_name', 'like', term);
             });
+        }
+
+        if (favorites === 'true') {
+            query = query.where('is_favorite', true);
         }
 
         if (limit) {

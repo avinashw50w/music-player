@@ -84,8 +84,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const path = location.pathname;
 
-    // Fetch songs for Home, Browse, or Song Library
-    if ((path === '/' || path === '/browse' || path === '/library/songs' || path === '/favorites') && songs.length === 0 && !isFetching.current.songs) {
+    // Fetch songs for Home, Browse, or Song Library (NOT Favorites anymore, it fetches its own)
+    if ((path === '/' || path === '/browse' || path === '/library/songs') && songs.length === 0 && !isFetching.current.songs) {
         isFetching.current.songs = true;
         api.getSongs(PAGE_LIMIT, 0).then(data => {
             setSongs(data);
@@ -95,7 +95,7 @@ const App: React.FC = () => {
     }
 
     // Fetch albums for Browse or Album Library
-    if ((path === '/browse' || path === '/library/albums' || path === '/favorites') && albums.length === 0 && !isFetching.current.albums) {
+    if ((path === '/browse' || path === '/library/albums') && albums.length === 0 && !isFetching.current.albums) {
         isFetching.current.albums = true;
         api.getAlbums(PAGE_LIMIT, 0).then(data => {
             setAlbums(data);
@@ -105,7 +105,7 @@ const App: React.FC = () => {
     }
 
     // Fetch artists for Browse or Artist Library
-    if ((path === '/browse' || path === '/library/artists' || path === '/favorites') && artists.length === 0 && !isFetching.current.artists) {
+    if ((path === '/browse' || path === '/library/artists') && artists.length === 0 && !isFetching.current.artists) {
         isFetching.current.artists = true;
         api.getArtists(PAGE_LIMIT, 0).then(data => {
             setArtists(data);
@@ -630,10 +630,6 @@ const App: React.FC = () => {
                 } />
                 <Route path="/favorites" element={
                     <Favorites 
-                        songs={songs} 
-                        albums={albums} 
-                        artists={artists} 
-                        playlists={playlists}
                         onPlaySong={handlePlaySong}
                         currentSongId={currentSong?.id}
                         isPlaying={isPlaying}
@@ -689,9 +685,6 @@ const App: React.FC = () => {
                             }));
                         }}
                         onReorderSongs={async (pid: string, from: number, to: number) => {
-                            // Optimistic update logic moved to component, but we sync global state here if needed
-                            // For simplicity, we just trigger API. Component handles its local view.
-                            // However, we should update global playlists state to be safe.
                             const pl = playlists.find(p => p.id === pid);
                             if (pl) {
                                 const newOrder = [...pl.songIds];
@@ -728,14 +721,12 @@ const App: React.FC = () => {
                         onToggleFavorite={handleToggleFavorite} 
                         onAddToPlaylist={handleAddToPlaylist}
                         onLoadMore={() => {
-                           // Determine which load more handler to call based on location or path
-                           // Simple heuristic based on active route param 'type' handled in FullList
                            const path = window.location.pathname;
                            if (path.includes('songs')) handleLoadMoreSongs();
                            if (path.includes('albums')) handleLoadMoreAlbums();
                            if (path.includes('artists')) handleLoadMoreArtists();
                         }}
-                        hasMore={true} // Simplified for brevity in routing switch, FullList can manage
+                        hasMore={true}
                         onSearch={(q) => {
                            const path = window.location.pathname;
                            if (path.includes('songs')) handleListSearch('songs', q);
@@ -744,7 +735,6 @@ const App: React.FC = () => {
                         }}
                     />
                 } />
-                {/* Fallback route */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </main>

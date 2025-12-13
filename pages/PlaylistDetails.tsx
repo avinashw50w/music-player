@@ -35,6 +35,10 @@ export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({
   useEffect(() => {
       if (id) {
           setLoading(true);
+          // Clear previous state
+          setPlaylist(null);
+          setSongs([]);
+
           api.getPlaylist(id)
             .then(data => {
                 const { songs: playlistSongs, ...plData } = data;

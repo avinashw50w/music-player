@@ -37,6 +37,10 @@ export const AlbumDetails: React.FC<DetailProps> = ({
   useEffect(() => {
     if (id) {
         setLoading(true);
+        // Clean up internal state to prevent flashing old data
+        setAlbum(null);
+        setTracks([]);
+        
         api.getAlbum(id)
             .then(data => {
                 const { songs, ...albumData } = data;

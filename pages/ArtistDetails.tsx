@@ -31,6 +31,11 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
   useEffect(() => {
     if (id) {
         setLoading(true);
+        // Reset state to avoid flashing previous data
+        setArtist(null);
+        setSongs([]);
+        setAlbums([]);
+
         api.getArtist(id)
             .then(data => {
                 const { songs, albums, ...artistData } = data;

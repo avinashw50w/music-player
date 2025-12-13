@@ -41,11 +41,12 @@ export async function search(query: string, signal?: AbortSignal): Promise<Searc
 }
 
 // Songs
-export async function getSongs(limit?: number, offset?: number, search?: string, signal?: AbortSignal): Promise<Song[]> {
+export async function getSongs(limit?: number, offset?: number, search?: string, signal?: AbortSignal, favorites?: boolean): Promise<Song[]> {
   const params = new URLSearchParams();
   if (limit !== undefined) params.append('limit', limit.toString());
   if (offset !== undefined) params.append('offset', offset.toString());
   if (search) params.append('search', search);
+  if (favorites) params.append('favorites', 'true');
   
   const response = await fetch(`${API_BASE_URL}/songs?${params.toString()}`, { signal });
   return handleResponse<Song[]>(response);
@@ -91,11 +92,12 @@ export async function updateSongCover(id: string, file: File): Promise<Song> {
 
 
 // Albums
-export async function getAlbums(limit?: number, offset?: number, search?: string, signal?: AbortSignal): Promise<Album[]> {
+export async function getAlbums(limit?: number, offset?: number, search?: string, signal?: AbortSignal, favorites?: boolean): Promise<Album[]> {
   const params = new URLSearchParams();
   if (limit !== undefined) params.append('limit', limit.toString());
   if (offset !== undefined) params.append('offset', offset.toString());
   if (search) params.append('search', search);
+  if (favorites) params.append('favorites', 'true');
 
   const response = await fetch(`${API_BASE_URL}/albums?${params.toString()}`, { signal });
   return handleResponse<Album[]>(response);
@@ -131,11 +133,12 @@ export async function updateAlbumCover(id: string, file: File): Promise<Album> {
 }
 
 // Artists
-export async function getArtists(limit?: number, offset?: number, search?: string, signal?: AbortSignal): Promise<Artist[]> {
+export async function getArtists(limit?: number, offset?: number, search?: string, signal?: AbortSignal, favorites?: boolean): Promise<Artist[]> {
   const params = new URLSearchParams();
   if (limit !== undefined) params.append('limit', limit.toString());
   if (offset !== undefined) params.append('offset', offset.toString());
   if (search) params.append('search', search);
+  if (favorites) params.append('favorites', 'true');
 
   const response = await fetch(`${API_BASE_URL}/artists?${params.toString()}`, { signal });
   return handleResponse<Artist[]>(response);
@@ -171,8 +174,10 @@ export async function updateArtistAvatar(id: string, file: File): Promise<Artist
 }
 
 // Playlists
-export async function getPlaylists(): Promise<Playlist[]> {
-  const response = await fetch(`${API_BASE_URL}/playlists`);
+export async function getPlaylists(favorites?: boolean): Promise<Playlist[]> {
+  const params = new URLSearchParams();
+  if (favorites) params.append('favorites', 'true');
+  const response = await fetch(`${API_BASE_URL}/playlists?${params.toString()}`);
   return handleResponse<Playlist[]>(response);
 }
 

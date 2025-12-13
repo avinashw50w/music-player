@@ -58,7 +58,7 @@ const transformSong = (row) => ({
 // GET all songs
 router.get('/', async (req, res, next) => {
     try {
-        const { limit, offset, search } = req.query;
+        const { limit, offset, search, favorites } = req.query;
         let query = db('songs').select('*').orderBy('created_at', 'desc');
         
         if (search) {
@@ -68,6 +68,10 @@ router.get('/', async (req, res, next) => {
                     .orWhere('artist_name', 'like', term)
                     .orWhere('album_name', 'like', term);
             });
+        }
+
+        if (favorites === 'true') {
+            query = query.where('is_favorite', true);
         }
 
         if (limit) {

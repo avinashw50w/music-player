@@ -1,3 +1,4 @@
+
 import express from 'express';
 import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -41,7 +42,14 @@ const getFullPlaylist = async (id) => {
 // GET all playlists
 router.get('/', async (req, res, next) => {
     try {
-        const playlists = await db('playlists').select('*').orderBy('created_at', 'desc');
+        const { favorites } = req.query;
+        let query = db('playlists').select('*').orderBy('created_at', 'desc');
+
+        if (favorites === 'true') {
+            query = query.where('is_favorite', true);
+        }
+
+        const playlists = await query;
 
         // Get songs and counts for each playlist
         const playlistsWithSongs = await Promise.all(

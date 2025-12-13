@@ -42,11 +42,15 @@ const transformArtist = (row) => ({
 // GET all artists
 router.get('/', async (req, res, next) => {
     try {
-        const { limit, offset, search } = req.query;
+        const { limit, offset, search, favorites } = req.query;
         let query = db('artists').select('*').orderBy('name', 'asc');
 
         if (search) {
             query = query.where('name', 'like', `%${search}%`);
+        }
+
+        if (favorites === 'true') {
+            query = query.where('is_favorite', true);
         }
 
         if (limit) {

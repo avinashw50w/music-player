@@ -1,15 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Song, Album, Artist, Playlist } from '../types';
 import { Heart, ListMusic, MoreHorizontal } from 'lucide-react';
 import { SongListItem } from '../components/SongListItem';
 import { useNavigate } from 'react-router-dom';
+import * as api from '../services/api';
 
 interface FavoritesProps {
-  songs: Song[];
-  albums: Album[];
-  artists: Artist[];
-  playlists: Playlist[];
   onPlaySong: (song: Song) => void;
   currentSongId?: string;
   isPlaying: boolean;
@@ -19,17 +16,66 @@ interface FavoritesProps {
 
 type Tab = 'Playlists' | 'Artists' | 'Albums' | 'Songs';
 
-const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists, onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist }) => {
+const Favorites: React.FC<FavoritesProps> = ({ onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist }) => {
   const [activeTab, setActiveTab] = useState<Tab>('Songs');
   const navigate = useNavigate();
+  
+  const [favoriteSongs, setFavoriteSongs] = useState<Song[]>([]);
+  const [favoriteAlbums, setFavoriteAlbums] = useState<Album[]>([]);
+  const [favoriteArtists, setFavoriteArtists] = useState<Artist[]>([]);
+  const [favoritePlaylists, setFavoritePlaylists] = useState<Playlist[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Ref to prevent double fetching in React Strict Mode
+  const dataFetchedRef = useRef(false);
 
-  // Strict boolean check to avoid truthy/falsy issues
-  const favoriteSongs = songs.filter(s => s.isFavorite === true);
-  const favoriteAlbums = albums.filter(a => a.isFavorite === true);
-  const favoriteArtists = artists.filter(a => a.isFavorite === true);
-  const favoritePlaylists = playlists.filter(p => p.isFavorite === true);
+  // Fetch data on mount
+  useEffect(() => {
+      // Prevent double call in strict mode
+      if (dataFetchedRef.current) return;
+      dataFetchedRef.current = true;
+
+      const fetchData = async () => {
+          setLoading(true);
+          try {
+              // Fetch all types in parallel
+              const [songs, albums, artists, playlists] = await Promise.all([
+                  api.getSongs(100, 0, '', undefined, true),
+                  api.getAlbums(100, 0, '', undefined, true),
+                  api.getArtists(100, 0, '', undefined, true),
+                  api.getPlaylists(true)
+              ]);
+              setFavoriteSongs(songs);
+              setFavoriteAlbums(albums);
+              setFavoriteArtists(artists);
+              setFavoritePlaylists(playlists);
+          } catch (e) {
+              console.error("Failed to fetch favorites", e);
+          } finally {
+              setLoading(false);
+          }
+      };
+      fetchData();
+  }, []);
+
+  const handleToggleFavoriteLocal = (id: string, type: 'song' | 'album' | 'artist' | 'playlist') => {
+      onToggleFavorite(id);
+      // Optimistically remove from list
+      if (type === 'song') setFavoriteSongs(prev => prev.filter(s => s.id !== id));
+      if (type === 'album') setFavoriteAlbums(prev => prev.filter(a => a.id !== id));
+      if (type === 'artist') setFavoriteArtists(prev => prev.filter(a => a.id !== id));
+      if (type === 'playlist') setFavoritePlaylists(prev => prev.filter(p => p.id !== id));
+  };
 
   const renderContent = () => {
+    if (loading) {
+        return (
+            <div className="flex justify-center pt-20">
+                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
     if (activeTab === 'Songs') {
       if (favoriteSongs.length === 0) return <div className="text-slate-500 mt-10 text-left">No favorite songs yet.</div>;
       return (
@@ -42,7 +88,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                 currentSongId={currentSongId}
                 isPlaying={isPlaying}
                 onPlay={() => onPlaySong(song)}
-                onToggleFavorite={onToggleFavorite}
+                onToggleFavorite={() => handleToggleFavoriteLocal(song.id, 'song')}
                 onAddToPlaylist={onAddToPlaylist}
              />
           ))}
@@ -69,7 +115,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                 </div>
                 <div className="flex items-center gap-6 pr-4">
                    <button 
-                    onClick={(e) => { e.stopPropagation(); onToggleFavorite(album.id); }}
+                    onClick={(e) => { e.stopPropagation(); handleToggleFavoriteLocal(album.id, 'album'); }}
                     className="p-2 text-rose-500 hover:scale-110 transition-transform"
                    >
                     <Heart className="w-6 h-6 fill-current" />
@@ -103,7 +149,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                 </div>
                 <div className="flex items-center gap-6 pr-4">
                    <button 
-                     onClick={(e) => { e.stopPropagation(); onToggleFavorite(artist.id); }}
+                     onClick={(e) => { e.stopPropagation(); handleToggleFavoriteLocal(artist.id, 'artist'); }}
                      className="p-2 text-rose-500 hover:scale-110 transition-transform"
                    >
                     <Heart className="w-6 h-6 fill-current" />
@@ -143,7 +189,7 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
                 </div>
                 <div className="flex items-center gap-6 pr-4">
                    <button 
-                     onClick={(e) => { e.stopPropagation(); onToggleFavorite(pl.id); }}
+                     onClick={(e) => { e.stopPropagation(); handleToggleFavoriteLocal(pl.id, 'playlist'); }}
                      className="p-2 text-rose-500 hover:scale-110 transition-transform"
                    >
                     <Heart className="w-6 h-6 fill-current" />
