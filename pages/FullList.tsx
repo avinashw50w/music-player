@@ -32,6 +32,7 @@ const FullList: React.FC<FullListProps> = ({
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const isFirstRun = useRef(true);
   
   // Resolve items based on URL param 'type'
   let items: any[] = [];
@@ -49,7 +50,13 @@ const FullList: React.FC<FullListProps> = ({
 
   // Debounce Search
   useEffect(() => {
-    // Only set up debounce if onSearch is provided
+    // Skip the first run to avoid triggering a search (and API call) on mount,
+    // which duplicates the route-based fetch in App.tsx.
+    if (isFirstRun.current) {
+        isFirstRun.current = false;
+        return;
+    }
+
     if (onSearchRef.current) {
         const timer = setTimeout(() => {
             if (onSearchRef.current) onSearchRef.current(searchQuery);
@@ -168,7 +175,7 @@ const FullList: React.FC<FullListProps> = ({
                         {playlist.coverUrl ? (
                             <img src={playlist.coverUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={playlist.name} />
                         ) : (
-                            <ListMusic className="w-20 h-20 text-slate-500 group-hover:scale-110 transition-transform duration-500" />
+                            <ListMusic className="w-20 h-20 text-slate-500 group-hover:scale-105 transition-transform duration-500" />
                         )}
                     </div>
                     <h4 className="text-white font-bold text-lg truncate">{playlist.name}</h4>

@@ -27,6 +27,9 @@ const App: React.FC = () => {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   
+  // Recently Played State
+  const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
+
   // Pagination State
   const [hasMore, setHasMore] = useState({ songs: true, albums: true, artists: true });
   const [loadingMore, setLoadingMore] = useState({ songs: false, albums: false, artists: false });
@@ -69,8 +72,18 @@ const App: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const wavisRef = useRef<any>(null);
 
-  // 1. Fetch Playlists ONCE on mount
+  // 1. Fetch Playlists ONCE on mount & Load History
   useEffect(() => {
+    // Load Recently Played from LocalStorage
+    try {
+        const storedHistory = localStorage.getItem('recentlyPlayed');
+        if (storedHistory) {
+            setRecentlyPlayed(JSON.parse(storedHistory));
+        }
+    } catch (e) {
+        console.error("Failed to load history", e);
+    }
+
     if (playlists.length === 0 && !isFetching.current.playlists) {
         isFetching.current.playlists = true;
         api.getPlaylists()
@@ -151,7 +164,7 @@ const App: React.FC = () => {
   };
 
   const handleLoadMoreSongs = async () => {
-      if (loadingMore.songs || !hasMore.songs) return;
+      if (loadingMore.songs || !hasMore.songs || isFetching.current.songs) return;
       setLoadingMore(prev => ({ ...prev, songs: true }));
       try {
           const newSongs = await api.getSongs(PAGE_LIMIT, songs.length, listQueries.songs);
@@ -162,7 +175,7 @@ const App: React.FC = () => {
   };
 
   const handleLoadMoreAlbums = async () => {
-      if (loadingMore.albums || !hasMore.albums) return;
+      if (loadingMore.albums || !hasMore.albums || isFetching.current.albums) return;
       setLoadingMore(prev => ({ ...prev, albums: true }));
       try {
           const newAlbums = await api.getAlbums(PAGE_LIMIT, albums.length, listQueries.albums);
@@ -173,7 +186,7 @@ const App: React.FC = () => {
   };
 
   const handleLoadMoreArtists = async () => {
-      if (loadingMore.artists || !hasMore.artists) return;
+      if (loadingMore.artists || !hasMore.artists || isFetching.current.artists) return;
       setLoadingMore(prev => ({ ...prev, artists: true }));
       try {
           const newArtists = await api.getArtists(PAGE_LIMIT, artists.length, listQueries.artists);
@@ -348,6 +361,13 @@ const App: React.FC = () => {
   }, [volume]);
 
   const handlePlaySong = (song: Song, context?: Song[]) => {
+    // Add to Recently Played (History)
+    setRecentlyPlayed(prev => {
+        const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 20);
+        localStorage.setItem('recentlyPlayed', JSON.stringify(newHistory));
+        return newHistory;
+    });
+
     // If playing the exact same song, toggle play/pause
     if (currentSong?.id === song.id) {
         setIsPlaying(!isPlaying);
@@ -452,12 +472,21 @@ const App: React.FC = () => {
         setSongs(prev => prev.map((s, i) => i === songIndex ? { ...s, isFavorite: !s.isFavorite } : s));
     }
 
+    // 3. Check Recently Played
+    if (recentlyPlayed.some(s => s.id === id)) {
+        setRecentlyPlayed(prev => {
+            const updated = prev.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s);
+            localStorage.setItem('recentlyPlayed', JSON.stringify(updated));
+            return updated;
+        });
+    }
+
     if (isSong) {
         try { await api.toggleSongFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
 
-    // 3. Check Albums
+    // 4. Check Albums
     const albumIndex = albums.findIndex(a => a.id === id);
     if (albumIndex !== -1) {
         setAlbums(prev => prev.map((a, i) => i === albumIndex ? { ...a, isFavorite: !a.isFavorite } : a));
@@ -465,7 +494,7 @@ const App: React.FC = () => {
         return;
     }
 
-    // 4. Check Artists
+    // 5. Check Artists
     const artistIndex = artists.findIndex(a => a.id === id);
     if (artistIndex !== -1) {
         setArtists(prev => prev.map((a, i) => i === artistIndex ? { ...a, isFavorite: !a.isFavorite } : a));
@@ -473,7 +502,7 @@ const App: React.FC = () => {
         return;
     }
     
-    // 5. Check Playlists
+    // 6. Check Playlists
     const playlistIndex = playlists.findIndex(p => p.id === id);
     if (playlistIndex !== -1) {
         setPlaylists(prev => prev.map((p, i) => i === playlistIndex ? { ...p, isFavorite: !p.isFavorite } : p));
@@ -593,7 +622,7 @@ const App: React.FC = () => {
             <Routes>
                 <Route path="/" element={
                     <Home 
-                        recentSongs={songs.slice(0, 10)} 
+                        recentSongs={recentlyPlayed} 
                         onPlaySong={handlePlaySong} 
                         currentSongId={currentSong?.id}
                         isPlaying={isPlaying}
