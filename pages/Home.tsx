@@ -1,6 +1,6 @@
 import React from 'react';
 import { Song, NavigationState } from '../types';
-import { Heart, Play } from 'lucide-react';
+import { Heart, Play, Disc, Music, Mic2 } from 'lucide-react';
 import PlayingIndicator from '../components/PlayingIndicator';
 
 interface HomeProps {
@@ -21,63 +21,72 @@ const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isP
       
       {/* Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-        {/* Card 1: Jazz Holic */}
+        {/* Card 1: Albums */}
         <div 
-          onClick={() => onNavigate('album_details', 'al1')}
-          className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#4f46e5] to-[#3b82f6] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-indigo-900/20"
+          onClick={() => onNavigate('all_albums')}
+          className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#4f46e5] to-[#3b82f6] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-indigo-900/20 isolate"
+          style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
-          <div className="relative z-10 flex flex-col h-full justify-between">
-            <div className="bg-white/20 backdrop-blur-md w-fit px-4 py-1.5 rounded-full text-sm font-semibold text-white">New Album</div>
+          <div className="relative z-10 flex flex-col h-full justify-between pointer-events-none">
+            <div className="bg-white/20 backdrop-blur-md w-fit px-4 py-1.5 rounded-full text-sm font-semibold text-white flex items-center gap-2">
+              <Disc className="w-4 h-4" /> Library
+            </div>
             <div>
-              <h2 className="text-4xl font-bold text-white mb-2">Jazz Holic</h2>
-              <p className="text-indigo-100 text-base font-medium opacity-80">15 Tracks</p>
+              <h2 className="text-4xl font-bold text-white mb-2">Albums</h2>
+              <p className="text-indigo-100 text-base font-medium opacity-80">Explore all albums</p>
             </div>
           </div>
           <img 
-            src="https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400&q=80" 
-            className="absolute bottom-0 right-0 w-56 h-64 object-cover object-center mask-image-linear-gradient opacity-90 grayscale-[0.2] group-hover:scale-110 transition-transform duration-500" 
+            src="https://images.unsplash.com/photo-1487180144351-b8472da7d4f1?w=400&q=80" 
+            className="absolute bottom-0 right-0 w-56 h-64 object-cover object-center opacity-60 mix-blend-overlay group-hover:scale-110 transition-transform duration-500 ease-out" 
             style={{ maskImage: 'linear-gradient(to right, transparent, black)' }}
-            alt="Jazz" 
+            alt="Albums" 
           />
         </div>
 
-        {/* Card 2: Chillin Hits */}
+        {/* Card 2: Songs */}
         <div 
-          onClick={() => onNavigate('album_details', 'al2')}
-          className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#f59e0b] to-[#fbbf24] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-amber-900/20"
+          onClick={() => onNavigate('all_songs')}
+          className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#f59e0b] to-[#fbbf24] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-amber-900/20 isolate"
+          style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
-          <div className="relative z-10 flex flex-col h-full justify-between">
-             <div className="bg-white/20 backdrop-blur-md w-fit px-4 py-1.5 rounded-full text-sm font-semibold text-white">Trending</div>
+          <div className="relative z-10 flex flex-col h-full justify-between pointer-events-none">
+             <div className="bg-white/20 backdrop-blur-md w-fit px-4 py-1.5 rounded-full text-sm font-semibold text-white flex items-center gap-2">
+               <Music className="w-4 h-4" /> Library
+             </div>
             <div>
-              <h2 className="text-4xl font-bold text-white mb-2">Chillin Hits</h2>
-              <p className="text-amber-100 text-base font-medium opacity-80">176 Tracks</p>
+              <h2 className="text-4xl font-bold text-white mb-2">Songs</h2>
+              <p className="text-amber-100 text-base font-medium opacity-80">Discover new tracks</p>
             </div>
           </div>
            <img 
-            src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=400&q=80" 
-            className="absolute bottom-0 right-0 w-56 h-64 object-cover object-center opacity-90 grayscale-[0.2] group-hover:scale-110 transition-transform duration-500"
+            src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80" 
+            className="absolute bottom-0 right-0 w-56 h-64 object-cover object-center opacity-60 mix-blend-overlay group-hover:scale-110 transition-transform duration-500 ease-out"
             style={{ maskImage: 'linear-gradient(to right, transparent, black)' }}
-            alt="Chill" 
+            alt="Songs" 
           />
         </div>
 
-        {/* Card 3: Good Times */}
+        {/* Card 3: Artists */}
         <div 
-          onClick={() => onNavigate('album_details', 'al3')}
-          className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#f43f5e] to-[#fb7185] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-rose-900/20"
+          onClick={() => onNavigate('all_artists')}
+          className="h-64 rounded-[2.5rem] bg-gradient-to-br from-[#f43f5e] to-[#fb7185] p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl shadow-rose-900/20 isolate"
+          style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
-          <div className="relative z-10 flex flex-col h-full justify-between">
-             <div className="bg-white/20 backdrop-blur-md w-fit px-4 py-1.5 rounded-full text-sm font-semibold text-white">Editors Choice</div>
+          <div className="relative z-10 flex flex-col h-full justify-between pointer-events-none">
+             <div className="bg-white/20 backdrop-blur-md w-fit px-4 py-1.5 rounded-full text-sm font-semibold text-white flex items-center gap-2">
+               <Mic2 className="w-4 h-4" /> Library
+             </div>
             <div>
-              <h2 className="text-4xl font-bold text-white mb-2">Good Times</h2>
-              <p className="text-rose-100 text-base font-medium opacity-80">98 Tracks</p>
+              <h2 className="text-4xl font-bold text-white mb-2">Artists</h2>
+              <p className="text-rose-100 text-base font-medium opacity-80">Find your favorites</p>
             </div>
           </div>
            <img 
-            src="https://images.unsplash.com/photo-1514525253440-b393452e8d26?w=400&q=80" 
-            className="absolute bottom-0 right-0 w-56 h-64 object-cover object-center opacity-90 grayscale-[0.2] group-hover:scale-110 transition-transform duration-500"
+            src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80" 
+            className="absolute bottom-0 right-0 w-56 h-64 object-cover object-center opacity-60 mix-blend-overlay group-hover:scale-110 transition-transform duration-500 ease-out"
             style={{ maskImage: 'linear-gradient(to right, transparent, black)' }}
-            alt="Happy" 
+            alt="Artists" 
           />
         </div>
       </div>
