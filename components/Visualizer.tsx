@@ -14,6 +14,8 @@ interface VisualizerProps {
     currentTime: number;
     duration: number;
     onSeek: (time: number) => void;
+    activeVisualizer: string;
+    onVisualizerChange: (visualizer: string) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -33,30 +35,33 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     onPrev,
     currentTime,
     duration,
-    onSeek
+    onSeek,
+    activeVisualizer,
+    onVisualizerChange
 }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const [activeVisualizer, setActiveVisualizer] = useState('bars');
     const [showControls, setShowControls] = useState(true);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     const visualizers = ['bars', 'wave', 'circle', 'dots', 'shockwave', 'album cover', 'none'];
 
     useEffect(() => {
-        if (canvasRef.current) {
+        const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none';
+        
+        if (isCanvasVisualizer && canvasRef.current) {
             wavis.mount(canvasRef.current);
             wavis.start();
-        }
-        return () => {
-            wavis.unmount();
-        };
-    }, []);
-
-    useEffect(() => {
-        if (activeVisualizer !== 'album cover' && activeVisualizer !== 'none') {
             wavis.setVisualizer(activeVisualizer);
+        } else {
+            wavis.unmount();
         }
-    }, [activeVisualizer]);
+
+        // Cleanup isn't strictly necessary here as Wavis handles re-mounts gracefully,
+        // but unmounting on actual component unmount is handled in App if needed,
+        // or effectively by wavis.unmount() calls when conditions change.
+        
+    }, [activeVisualizer, wavis]);
 
     const handleMouseMove = () => {
         setShowControls(true);
@@ -103,30 +108,43 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
             {/* Controls Overlay */}
             <div 
-                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0'}`}
                 style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 20%, transparent 80%, rgba(0,0,0,0.8))' }}
             >
                 {/* Header */}
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start relative z-50">
                     <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 flex items-center gap-2">
                         <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Visualizer</span>
                         <div className="w-[1px] h-3 bg-white/20"></div>
-                        <div className="relative group">
-                            <button className="flex items-center gap-1 text-white text-sm font-bold hover:text-indigo-400 transition-colors uppercase">
-                                {activeVisualizer} <ChevronDown className="w-3 h-3" />
+                        <div className="relative">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
+                                className="flex items-center gap-1 text-white text-sm font-bold hover:text-indigo-400 transition-colors uppercase"
+                            >
+                                {activeVisualizer} <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
                             {/* Dropdown */}
-                            <div className="absolute top-full left-0 mt-2 w-40 bg-[#1c1c1e] border border-white/10 rounded-xl shadow-xl overflow-hidden hidden group-hover:block z-50">
-                                {visualizers.map(v => (
-                                    <button
-                                        key={v}
-                                        onClick={() => setActiveVisualizer(v)}
-                                        className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-white/10 transition-colors capitalize ${activeVisualizer === v ? 'text-indigo-400 bg-white/5' : 'text-slate-300'}`}
-                                    >
-                                        {v}
-                                    </button>
-                                ))}
-                            </div>
+                            {isDropdownOpen && (
+                                <>
+                                    <div 
+                                        className="fixed inset-0 z-40" 
+                                        onClick={() => setIsDropdownOpen(false)} 
+                                    ></div>
+                                    <div className="absolute top-full left-0 mt-4 w-48 bg-[#1c1c1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                            {visualizers.map(v => (
+                                                <button
+                                                    key={v}
+                                                    onClick={() => { onVisualizerChange(v); setIsDropdownOpen(false); }}
+                                                    className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/10 transition-colors capitalize border-b border-white/5 last:border-0 ${activeVisualizer === v ? 'text-indigo-400 bg-white/5' : 'text-slate-300'}`}
+                                                >
+                                                    {v}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                     <button 

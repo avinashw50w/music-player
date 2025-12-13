@@ -41,6 +41,7 @@ const App: React.FC = () => {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showVisualizer, setShowVisualizer] = useState(false);
+  const [activeVisualizer, setActiveVisualizer] = useState('bars');
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const wavisRef = useRef<Wavis | null>(null);
@@ -565,6 +566,8 @@ const App: React.FC = () => {
               currentTime={currentTime}
               duration={duration}
               onSeek={handleSeek}
+              activeVisualizer={activeVisualizer}
+              onVisualizerChange={setActiveVisualizer}
           />
       )}
 
