@@ -5,7 +5,7 @@ import PlayingIndicator from '../components/PlayingIndicator';
 
 interface HomeProps {
   recentSongs: Song[];
-  onPlaySong: (song: Song) => void;
+  onPlaySong: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying: boolean;
   onNavigate: (view: NavigationState['view'], id?: string) => void;
@@ -100,7 +100,7 @@ const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isP
               return (
                 <div 
                   key={song.id} 
-                  onClick={() => onPlaySong(song)}
+                  onClick={() => onPlaySong(song, recentSongs)}
                   className={`group grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_2fr_1fr_auto_auto] items-center gap-6 p-4 rounded-2xl transition-all cursor-pointer hover:bg-white/5 ${isCurrent ? 'bg-white/10' : ''}`}
                 >
                   <div className="w-10 flex justify-center text-slate-500 font-medium text-base">

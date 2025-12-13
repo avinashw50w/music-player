@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Shuffle, Heart, Maximize2, VolumeX } from 'lucide-react';
 import { Song, NavigationState } from '../types';
+import { ProgressBar } from './ProgressBar';
 
 interface PlayerBarProps {
   currentSong: Song | null;
@@ -43,8 +44,6 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   
   if (!currentSong) return null;
 
-  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
-
   return (
     <div className="h-28 bg-black/40 backdrop-blur-2xl px-8 flex items-center justify-between z-[100] w-full shadow-2xl border-t border-white/5 flex-shrink-0 relative">
       
@@ -69,13 +68,13 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
         <div className="overflow-hidden min-w-0">
           <h4 
             onClick={() => onNavigate('song_details', currentSong.id)}
-            className="text-white text-lg font-semibold truncate cursor-pointer hover:underline hover:text-indigo-400 transition-colors"
+            className="text-white text-lg font-semibold truncate cursor-pointer hover:underline hover:text-indigo-400 transition-colors w-fit"
           >
             {currentSong.title}
           </h4>
           <p 
             onClick={() => onNavigate('artist_details', currentSong.artistId || 'ar1')} 
-            className="text-slate-400 text-sm truncate hover:text-white cursor-pointer transition-colors"
+            className="text-slate-400 text-sm truncate hover:text-white cursor-pointer transition-colors w-fit"
           >
             {currentSong.artist}
           </p>
@@ -117,21 +116,11 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
         
         <div className="w-full flex items-center gap-4 text-sm text-slate-500 font-medium select-none">
           <span className="tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
-          <div 
-            className="flex-1 h-1.5 bg-white/10 rounded-full cursor-pointer relative group"
-            onClick={(e) => {
-               const rect = e.currentTarget.getBoundingClientRect();
-               const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-               onSeek(percent * duration);
-            }}
-          >
-            <div 
-              className="absolute h-full bg-indigo-500 rounded-full group-hover:bg-indigo-400 transition-colors pointer-events-none" 
-              style={{ width: `${progressPercent}%` }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity transform scale-125"></div>
-            </div>
-          </div>
+          <ProgressBar 
+            currentTime={currentTime} 
+            duration={duration} 
+            onSeek={onSeek} 
+          />
           <span className="tabular-nums w-10">{formatTime(duration) || currentSong.duration}</span>
         </div>
       </div>

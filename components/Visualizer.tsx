@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Play, Pause, SkipBack, SkipForward, ChevronDown } from 'lucide-react';
 import { Song } from '../types';
-import Wavis from '../lib/waviz';
+import { ProgressBar } from './ProgressBar';
 
 interface VisualizerProps {
     currentSong: Song;
     isPlaying: boolean;
     onClose: () => void;
-    wavis: Wavis;
+    wavis: any; // Using any for the Wavis class instance
     onPlayPause: () => void;
     onNext: () => void;
     onPrev: () => void;
@@ -43,9 +43,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     const [showControls, setShowControls] = useState(true);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-    // const visualizers = ['bars', 'wave', 'circle', 'dots', 'shockwave', 'album cover', 'none'];
-    const visualizers = wavis.getVisualizers();
+    const [visualizerOptions, setVisualizerOptions] = useState<any[]>([]);
 
     useEffect(() => {
         const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none';
@@ -58,16 +56,26 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             wavis.unmount();
         }
 
-        // Cleanup isn't strictly necessary here as Wavis handles re-mounts gracefully,
-        // but unmounting on actual component unmount is handled in App if needed,
-        // or effectively by wavis.unmount() calls when conditions change.
+        // Get visualizers from original Wavis class (returns array of strings)
+        if (wavis && wavis.getVisualizers) {
+            const presets = wavis.getVisualizers();
+            // Map strings to object format for dropdown
+            const formattedPresets = presets.map((p: string) => ({
+                name: p,
+                displayName: p.charAt(0).toUpperCase() + p.slice(1),
+                type: 'custom'
+            }));
+            setVisualizerOptions(formattedPresets);
+        }
         
     }, [activeVisualizer, wavis]);
 
     const handleMouseMove = () => {
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-        controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
+        controlsTimeoutRef.current = setTimeout(() => {
+            if (!isDropdownOpen) setShowControls(false);
+        }, 3000);
     };
 
     useEffect(() => {
@@ -78,9 +86,14 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             window.removeEventListener('mousemove', handleMouseMove);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
-    }, []);
+    }, [isDropdownOpen]); // Re-bind if dropdown state changes to update closure in handleMouseMove
 
-    const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+    // Combine custom visualizers with static modes
+    const allOptions = [
+        ...visualizerOptions,
+        { name: 'album cover', displayName: 'Album Cover', type: 'static' },
+        { name: 'none', displayName: 'None', type: 'static' }
+    ];
 
     return (
         <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden">
@@ -109,12 +122,12 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
             {/* Controls Overlay */}
             <div 
-                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 20%, transparent 80%, rgba(0,0,0,0.8))' }}
             >
                 {/* Header */}
                 <div className="flex justify-between items-start relative z-50">
-                    <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 flex items-center gap-2">
+                    <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 flex items-center gap-2 pointer-events-auto">
                         <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Visualizer</span>
                         <div className="w-[1px] h-3 bg-white/20"></div>
                         <div className="relative">
@@ -122,7 +135,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                 onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
                                 className="flex items-center gap-1 text-white text-sm font-bold hover:text-indigo-400 transition-colors uppercase"
                             >
-                                {activeVisualizer} <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                                {activeVisualizer.replace(/_/g, ' ')} <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
                             {/* Dropdown */}
                             {isDropdownOpen && (
@@ -131,15 +144,15 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                         className="fixed inset-0 z-40" 
                                         onClick={() => setIsDropdownOpen(false)} 
                                     ></div>
-                                    <div className="absolute top-full left-0 mt-4 w-48 bg-[#1c1c1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
-                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                                            {visualizers.map(v => (
+                                    <div className="absolute top-full left-0 mt-4 w-64 bg-[#1c1c1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                                        <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                                            {allOptions.map(v => (
                                                 <button
-                                                    key={v}
-                                                    onClick={() => { onVisualizerChange(v); setIsDropdownOpen(false); }}
-                                                    className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/10 transition-colors capitalize border-b border-white/5 last:border-0 ${activeVisualizer === v ? 'text-indigo-400 bg-white/5' : 'text-slate-300'}`}
+                                                    key={v.name}
+                                                    onClick={() => { onVisualizerChange(v.name); setIsDropdownOpen(false); }}
+                                                    className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/10 transition-colors capitalize border-b border-white/5 last:border-0 ${activeVisualizer === v.name ? 'text-indigo-400 bg-white/5' : 'text-slate-300'}`}
                                                 >
-                                                    {v}
+                                                    {v.displayName}
                                                 </button>
                                             ))}
                                         </div>
@@ -150,37 +163,28 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors backdrop-blur-md"
+                        className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors backdrop-blur-md pointer-events-auto"
                     >
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
                 {/* Footer Controls */}
-                <div className="w-full max-w-3xl mx-auto space-y-6">
+                <div className="w-full max-w-3xl mx-auto space-y-6 pointer-events-auto">
                     <div className="text-center space-y-2">
-                        <h1 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">{currentSong.title}</h1>
+                        <h1 className="text-4xl font-bold text-white tracking-tight drop-shadow-lg">{currentSong.title}</h1>
                         <p className="text-xl text-indigo-300 font-medium drop-shadow-md">{currentSong.artist} • <span className="text-slate-400">{currentSong.album}</span></p>
                     </div>
 
                     <div className="flex items-center gap-4 w-full">
-                        <span className="text-xs font-bold text-slate-400 tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
-                        <div 
-                            className="flex-1 h-1.5 bg-white/20 rounded-full cursor-pointer relative group"
-                            onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                                onSeek(percent * duration);
-                            }}
-                        >
-                            <div 
-                                className="absolute h-full bg-indigo-500 rounded-full group-hover:bg-indigo-400 transition-colors" 
-                                style={{ width: `${progressPercent}%` }}
-                            >
-                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md transform scale-0 group-hover:scale-125 transition-transform"></div>
-                            </div>
-                        </div>
-                        <span className="text-xs font-bold text-slate-400 tabular-nums w-10">{formatTime(duration)}</span>
+                        <span className="text-sm font-bold text-slate-400 tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
+                        <ProgressBar 
+                            currentTime={currentTime} 
+                            duration={duration} 
+                            onSeek={onSeek} 
+                            className="bg-white/20"
+                        />
+                        <span className="text-sm font-bold text-slate-400 tabular-nums w-10">{formatTime(duration)}</span>
                     </div>
 
                     <div className="flex items-center justify-center gap-10">

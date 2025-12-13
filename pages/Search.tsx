@@ -6,7 +6,7 @@ interface SearchProps {
   songs: Song[];
   albums: Album[];
   artists: Artist[];
-  onPlaySong: (song: Song) => void;
+  onPlaySong: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying: boolean;
   onNavigate: (view: NavigationState['view'], id?: string) => void;
@@ -144,7 +144,7 @@ const Search: React.FC<SearchProps> = ({ songs, albums, artists, onPlaySong, onN
                   {filteredSongs.map(song => (
                     <div 
                       key={song.id}
-                      onClick={() => { addToRecent(song.title); onPlaySong(song); }}
+                      onClick={() => { addToRecent(song.title); onPlaySong(song, filteredSongs); }}
                       className="flex items-center gap-5 p-4 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 transition-colors"
                     >
                       <img src={song.coverUrl} className="w-14 h-14 rounded-xl object-cover" alt={song.title} />

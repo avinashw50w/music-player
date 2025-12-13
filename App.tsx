@@ -41,7 +41,7 @@ const App: React.FC = () => {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showVisualizer, setShowVisualizer] = useState(false);
-  const [activeVisualizer, setActiveVisualizer] = useState('bars');
+  const [activeVisualizer, setActiveVisualizer] = useState('ncs_waveform');
 
   // Scanning State (Lifted from Browse)
   const [scanStatus, setScanStatus] = useState<api.ScanStatus | null>(null);

@@ -8,7 +8,7 @@ interface FullListProps {
   items: Song[] | Album[] | Artist[] | Playlist[];
   onBack: () => void;
   onNavigate: (view: NavigationState['view'], id?: string) => void;
-  onPlaySong?: (song: Song) => void;
+  onPlaySong?: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying?: boolean;
   onToggleFavorite?: (id: string) => void;
@@ -38,16 +38,17 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
   const renderContent = () => {
     switch (type) {
       case 'songs':
+        const songItems = items as Song[];
         return (
           <div className="space-y-1">
-            {(items as Song[]).map((song, i) => (
+            {songItems.map((song, i) => (
                <SongListItem 
                   key={song.id}
                   song={song}
                   index={i}
                   currentSongId={currentSongId}
                   isPlaying={!!isPlaying}
-                  onPlay={() => onPlaySong?.(song)}
+                  onPlay={() => onPlaySong?.(song, songItems)}
                   onNavigate={onNavigate}
                   onToggleFavorite={onToggleFavorite || (() => {})}
                   onAddToPlaylist={onAddToPlaylist || (() => {})}
