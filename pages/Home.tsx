@@ -37,7 +37,7 @@ const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isP
             </div>
           </div>
           <img 
-            src="https://images.unsplash.com/photo-1487180144351-b8472da7d4f1?w=400&q=80" 
+            src="https://images.unsplash.com/photo-1505672984986-b7c468c7a134?q=80&w=400" 
             className="absolute bottom-0 right-0 w-56 h-64 object-cover object-center opacity-60 mix-blend-overlay group-hover:scale-110 transition-transform duration-500 ease-out" 
             style={{ maskImage: 'linear-gradient(to right, transparent, black)' }}
             alt="Albums" 

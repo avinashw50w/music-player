@@ -24,7 +24,7 @@ interface DetailProps {
   onNavigate?: (view: NavigationState['view'], id?: string) => void;
 }
 
-export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums = [], artists = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist, onNavigate }) => {
+export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums = [], artists = [], currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onUpdateArtist, onAddToPlaylist, onNavigate }) => {
   const artist = artists.find(a => a.id === id) || artists[0];
   const [isEditing, setIsEditing] = useState(false);
 
@@ -109,6 +109,8 @@ export const ArtistDetails: React.FC<DetailProps> = ({ id, onBack, songs, albums
         isPlaying={isPlaying}
         onPlaySong={onPlaySong}
         onToggleFavorite={onToggleFavorite}
+        onAddToPlaylist={onAddToPlaylist}
+        onNavigate={onNavigate || (() => {})}
         showHeader={false}
       />
 

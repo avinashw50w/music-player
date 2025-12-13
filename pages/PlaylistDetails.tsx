@@ -71,6 +71,8 @@ export const PlaylistDetails: React.FC<any> = (props) => {
             isEditable={true}
             onRemoveSong={(songId) => onRemoveSong(playlist.id, songId)}
             onReorder={(from, to) => onReorderSongs(playlist.id, from, to)}
+            onAddToPlaylist={props.onAddToPlaylist}
+            onNavigate={props.onNavigate}
           />
         )}
       </div>

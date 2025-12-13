@@ -1,7 +1,7 @@
 import React from 'react';
-import { ArrowLeft, Play, Pause, Music, Disc, Mic2, ListMusic } from 'lucide-react';
+import { ArrowLeft, Play, ListMusic } from 'lucide-react';
 import { Song, Album, Artist, Playlist, NavigationState } from '../types';
-import PlayingIndicator from '../components/PlayingIndicator';
+import { SongListItem } from '../components/SongListItem';
 
 interface FullListProps {
   type: 'songs' | 'albums' | 'artists' | 'playlists';
@@ -11,6 +11,8 @@ interface FullListProps {
   onPlaySong?: (song: Song) => void;
   currentSongId?: string;
   isPlaying?: boolean;
+  onToggleFavorite?: (id: string) => void;
+  onAddToPlaylist?: (song: Song) => void;
 }
 
 const BackButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
@@ -22,7 +24,7 @@ const BackButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
     </button>
   );
 
-const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, onPlaySong, currentSongId, isPlaying }) => {
+const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist }) => {
   const getTitle = () => {
     switch(type) {
       case 'songs': return 'All Songs';
@@ -38,38 +40,19 @@ const FullList: React.FC<FullListProps> = ({ type, items, onBack, onNavigate, on
       case 'songs':
         return (
           <div className="space-y-1">
-            {(items as Song[]).map((song) => {
-               const isCurrent = currentSongId === song.id;
-               const isCurrentPlaying = isCurrent && isPlaying;
-               return (
-                <div 
-                  key={song.id} 
-                  onClick={() => onPlaySong?.(song)}
-                  className={`group flex items-center justify-between p-3 rounded-2xl transition-colors cursor-pointer ${isCurrent ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                >
-                  <div className="flex items-center gap-5 min-w-0">
-                    <div className="relative w-14 h-14 flex-shrink-0">
-                      <img src={song.coverUrl} alt={song.title} className="w-full h-full rounded-2xl object-cover shadow-lg" />
-                      {isCurrentPlaying && (
-                         <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                           <PlayingIndicator />
-                         </div>
-                      )}
-                      {!isCurrentPlaying && (
-                         <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]">
-                            <Play className="w-6 h-6 text-white fill-current ml-1" />
-                         </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`font-bold text-lg mb-1 truncate ${isCurrent ? 'text-indigo-400' : 'text-white'}`}>{song.title}</h4>
-                      <p className="text-slate-500 text-sm font-medium truncate">{song.artist} • {song.album}</p>
-                    </div>
-                  </div>
-                  <div className="text-slate-500 text-sm font-medium tabular-nums pl-4">{song.duration}</div>
-                </div>
-               );
-            })}
+            {(items as Song[]).map((song, i) => (
+               <SongListItem 
+                  key={song.id}
+                  song={song}
+                  index={i}
+                  currentSongId={currentSongId}
+                  isPlaying={!!isPlaying}
+                  onPlay={() => onPlaySong?.(song)}
+                  onNavigate={onNavigate}
+                  onToggleFavorite={onToggleFavorite || (() => {})}
+                  onAddToPlaylist={onAddToPlaylist || (() => {})}
+               />
+            ))}
           </div>
         );
       

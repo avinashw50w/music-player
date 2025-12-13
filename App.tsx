@@ -339,6 +339,7 @@ const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
             onAddToPlaylist={handleAddToPlaylist}
             onUpdateAlbum={onUpdateAlbum}
+            onNavigate={handleNavigate}
         />;
       case 'artist_details':
         return <ArtistDetails 
@@ -396,6 +397,8 @@ const App: React.FC = () => {
                  
                  await api.reorderPlaylistSongs(pid, newOrder);
             }}
+            onNavigate={handleNavigate}
+            onAddToPlaylist={handleAddToPlaylist}
         />;
       case 'song_details':
          return <SongDetails
@@ -412,7 +415,7 @@ const App: React.FC = () => {
             onNavigate={handleNavigate}
          />;
        case 'all_songs':
-          return <FullList type="songs" items={songs} onBack={handleBack} onNavigate={handleNavigate} onPlaySong={handlePlaySong} currentSongId={currentSong?.id} isPlaying={isPlaying} />;
+          return <FullList type="songs" items={songs} onBack={handleBack} onNavigate={handleNavigate} onPlaySong={handlePlaySong} currentSongId={currentSong?.id} isPlaying={isPlaying} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />;
        case 'all_albums':
           return <FullList type="albums" items={albums} onBack={handleBack} onNavigate={handleNavigate} />;
        case 'all_artists':
