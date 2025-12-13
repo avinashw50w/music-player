@@ -102,7 +102,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
          </div>
          <div className="flex-1 flex flex-col items-start min-w-0 overflow-hidden">
             <span 
-                className={`font-semibold text-base truncate w-full hover:underline cursor-pointer ${isCurrent ? 'text-indigo-400' : 'text-white'}`}
+                className={`font-semibold text-base truncate max-w-full hover:underline cursor-pointer ${isCurrent ? 'text-indigo-400' : 'text-white'}`}
                 title={song.title}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -113,7 +113,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
             </span>
             <div className="flex items-center text-sm text-slate-500 w-full mt-0.5">
                 <span 
-                    className="hover:text-white hover:underline cursor-pointer transition-colors truncate w-full"
+                    className="hover:text-white hover:underline cursor-pointer transition-colors truncate max-w-full"
                     onClick={(e) => {
                         e.stopPropagation();
                         if (song.artistId) onNavigate('artist_details', song.artistId);
@@ -129,7 +129,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
       <div className="hidden md:flex items-center min-w-0 w-full overflow-hidden">
          {showAlbum && (
              <span 
-                className="text-slate-400 text-sm font-medium truncate w-full hover:text-white hover:underline cursor-pointer transition-colors"
+                className="text-slate-400 text-sm font-medium truncate max-w-full hover:text-white hover:underline cursor-pointer transition-colors"
                 onClick={(e) => {
                     e.stopPropagation();
                     if (song.albumId) onNavigate('album_details', song.albumId);
