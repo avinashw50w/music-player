@@ -27,6 +27,14 @@ const App: React.FC = () => {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   
+  // Loading States
+  const [isLoading, setIsLoading] = useState({
+      songs: false,
+      albums: false,
+      artists: false,
+      playlists: false
+  });
+
   // Recently Played State
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
 
@@ -86,10 +94,14 @@ const App: React.FC = () => {
 
     if (playlists.length === 0 && !isFetching.current.playlists) {
         isFetching.current.playlists = true;
+        setIsLoading(prev => ({ ...prev, playlists: true }));
         api.getPlaylists()
             .then(setPlaylists)
             .catch(err => console.error("Failed to fetch playlists", err))
-            .finally(() => { isFetching.current.playlists = false; });
+            .finally(() => { 
+                isFetching.current.playlists = false; 
+                setIsLoading(prev => ({ ...prev, playlists: false }));
+            });
     }
   }, []);
 
@@ -100,31 +112,43 @@ const App: React.FC = () => {
     // Fetch songs for Home, Browse, or Song Library (NOT Favorites anymore, it fetches its own)
     if ((path === '/' || path === '/browse' || path === '/library/songs') && songs.length === 0 && !isFetching.current.songs) {
         isFetching.current.songs = true;
+        setIsLoading(prev => ({ ...prev, songs: true }));
         api.getSongs(PAGE_LIMIT, 0).then(data => {
             setSongs(data);
             setHasMore(prev => ({ ...prev, songs: data.length === PAGE_LIMIT }));
         }).catch(err => console.error("Failed to fetch songs", err))
-          .finally(() => { isFetching.current.songs = false; });
+          .finally(() => { 
+              isFetching.current.songs = false; 
+              setIsLoading(prev => ({ ...prev, songs: false }));
+          });
     }
 
     // Fetch albums for Browse or Album Library
     if ((path === '/browse' || path === '/library/albums') && albums.length === 0 && !isFetching.current.albums) {
         isFetching.current.albums = true;
+        setIsLoading(prev => ({ ...prev, albums: true }));
         api.getAlbums(PAGE_LIMIT, 0).then(data => {
             setAlbums(data);
             setHasMore(prev => ({ ...prev, albums: data.length === PAGE_LIMIT }));
         }).catch(err => console.error("Failed to fetch albums", err))
-          .finally(() => { isFetching.current.albums = false; });
+          .finally(() => { 
+              isFetching.current.albums = false; 
+              setIsLoading(prev => ({ ...prev, albums: false }));
+          });
     }
 
     // Fetch artists for Browse or Artist Library
     if ((path === '/browse' || path === '/library/artists') && artists.length === 0 && !isFetching.current.artists) {
         isFetching.current.artists = true;
+        setIsLoading(prev => ({ ...prev, artists: true }));
         api.getArtists(PAGE_LIMIT, 0).then(data => {
             setArtists(data);
             setHasMore(prev => ({ ...prev, artists: data.length === PAGE_LIMIT }));
         }).catch(err => console.error("Failed to fetch artists", err))
-          .finally(() => { isFetching.current.artists = false; });
+          .finally(() => { 
+              isFetching.current.artists = false; 
+              setIsLoading(prev => ({ ...prev, artists: false }));
+          });
     }
   }, [location.pathname]); // Re-run when path changes
 
@@ -266,7 +290,11 @@ const App: React.FC = () => {
 
             // Playlist Events
             else if (type === 'playlist:create') {
-                setPlaylists(prev => [payload, ...prev]);
+                setPlaylists(prev => {
+                    const exists = prev.find(p => p.id === payload.id);
+                    if (exists) return prev;
+                    return [payload, ...prev];
+                });
             } else if (type === 'playlist:update') {
                 setPlaylists(prev => prev.map(p => p.id === payload.id ? payload : p));
             } else if (type === 'playlist:delete') {
@@ -744,6 +772,7 @@ const App: React.FC = () => {
                         albums={albums}
                         artists={artists}
                         playlists={playlists}
+                        isLoadingMap={isLoading}
                         onPlaySong={handlePlaySong} 
                         currentSongId={currentSong?.id} 
                         isPlaying={isPlaying} 

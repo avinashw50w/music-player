@@ -7,7 +7,7 @@ import { BackButton } from '../components/BackButton';
 import { useNavigate, useParams } from 'react-router-dom';
 
 interface FullListProps {
-  items?: Song[] | Album[] | Artist[] | Playlist[]; // Made optional, as we might fetch
+  items?: Song[] | Album[] | Artist[] | Playlist[]; 
   onPlaySong?: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying?: boolean;
@@ -16,16 +16,36 @@ interface FullListProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   onSearch?: (query: string) => void;
-  // Pass correct data from parent
   songs: Song[];
   albums: Album[];
   artists: Artist[];
   playlists: Playlist[];
+  isLoadingMap: { songs: boolean; albums: boolean; artists: boolean; playlists: boolean };
 }
+
+const SkeletonRow = () => (
+  <div className="flex items-center gap-4 px-4 py-3 rounded-xl border border-transparent">
+     <div className="w-10 h-6 bg-white/5 rounded animate-pulse" /> {/* Index */}
+     <div className="w-12 h-12 rounded-lg bg-white/10 animate-pulse flex-shrink-0" /> {/* Image */}
+     <div className="flex-1 space-y-2">
+        <div className="h-4 w-48 bg-white/10 rounded animate-pulse" />
+        <div className="h-3 w-32 bg-white/5 rounded animate-pulse" />
+     </div>
+     <div className="w-12 h-4 bg-white/5 rounded animate-pulse" /> {/* Time */}
+  </div>
+);
+
+const SkeletonCard = () => (
+  <div className="bg-white/5 p-5 rounded-[2rem] border border-white/5">
+    <div className="w-full aspect-square rounded-2xl bg-white/10 mb-4 animate-pulse" />
+    <div className="h-5 w-3/4 bg-white/10 rounded mb-2 animate-pulse" />
+    <div className="h-4 w-1/2 bg-white/5 rounded animate-pulse" />
+  </div>
+);
 
 const FullList: React.FC<FullListProps> = ({ 
     onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist, onLoadMore, hasMore, onSearch,
-    songs, albums, artists, playlists
+    songs, albums, artists, playlists, isLoadingMap
 }) => {
   const { type } = useParams<{ type: string }>(); // 'songs', 'albums', 'artists', 'playlists'
   const navigate = useNavigate();
@@ -34,12 +54,14 @@ const FullList: React.FC<FullListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const isFirstRun = useRef(true);
   
-  // Resolve items based on URL param 'type'
+  // Resolve items and loading state based on URL param 'type'
   let items: any[] = [];
-  if (type === 'songs') items = songs;
-  else if (type === 'albums') items = albums;
-  else if (type === 'artists') items = artists;
-  else if (type === 'playlists') items = playlists;
+  let isLoading = false;
+
+  if (type === 'songs') { items = songs; isLoading = isLoadingMap.songs; }
+  else if (type === 'albums') { items = albums; isLoading = isLoadingMap.albums; }
+  else if (type === 'artists') { items = artists; isLoading = isLoadingMap.artists; }
+  else if (type === 'playlists') { items = playlists; isLoading = isLoadingMap.playlists; }
 
   // Use a ref for onSearch to avoid effect re-triggering when the function prop changes
   const onSearchRef = useRef(onSearch);
@@ -97,6 +119,23 @@ const FullList: React.FC<FullListProps> = ({
   };
 
   const renderContent = () => {
+    // Show skeleton if loading and no items yet
+    if (isLoading && items.length === 0) {
+        if (type === 'songs') {
+            return (
+                <div className="space-y-1">
+                    {[...Array(12)].map((_, i) => <SkeletonRow key={i} />)}
+                </div>
+            );
+        } else {
+            return (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    {[...Array(10)].map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+            );
+        }
+    }
+
     if (items.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500">
