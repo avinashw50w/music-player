@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
 import { fileURLToPath } from 'url';
+import { broadcast } from '../services/sse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,23 @@ const transformPlaylist = (row) => ({
     createdAt: row.created_at,
     isFavorite: Boolean(row.is_favorite)
 });
+
+// Helper to get full playlist with song IDs for broadcast
+const getFullPlaylist = async (id) => {
+    const playlist = await db('playlists').where({ id }).first();
+    if (!playlist) return null;
+    
+    const songs = await db('playlist_songs')
+        .where({ playlist_id: id })
+        .orderBy('position', 'asc')
+        .select('song_id');
+
+    return {
+        ...transformPlaylist(playlist),
+        songIds: songs.map(s => s.song_id),
+        songCount: songs.length
+    };
+};
 
 // GET all playlists
 router.get('/', async (req, res, next) => {
@@ -131,12 +149,9 @@ router.post('/', async (req, res, next) => {
             is_favorite: false
         });
 
-        const playlist = await db('playlists').where({ id }).first();
-        res.status(201).json({
-            ...transformPlaylist(playlist),
-            songIds: [],
-            songCount: 0
-        });
+        const playlist = await getFullPlaylist(id);
+        broadcast('playlist:create', playlist);
+        res.status(201).json(playlist);
     } catch (err) {
         next(err);
     }
@@ -152,11 +167,12 @@ router.put('/:id', async (req, res, next) => {
 
         await db('playlists').where({ id: req.params.id }).update(updates);
 
-        const playlist = await db('playlists').where({ id: req.params.id }).first();
+        const playlist = await getFullPlaylist(req.params.id);
         if (!playlist) {
             return res.status(404).json({ error: 'Playlist not found' });
         }
-        res.json(transformPlaylist(playlist));
+        broadcast('playlist:update', playlist);
+        res.json(playlist);
     } catch (err) {
         next(err);
     }
@@ -174,8 +190,9 @@ router.patch('/:id/favorite', async (req, res, next) => {
             is_favorite: !playlist.is_favorite
         });
 
-        const updated = await db('playlists').where({ id: req.params.id }).first();
-        res.json(transformPlaylist(updated));
+        const updated = await getFullPlaylist(req.params.id);
+        broadcast('playlist:update', updated);
+        res.json(updated);
     } catch (err) {
         next(err);
     }
@@ -200,7 +217,8 @@ router.delete('/:id', async (req, res, next) => {
                  if (err && err.code !== 'ENOENT') console.error('Failed to delete playlist image:', err);
              });
         }
-
+        
+        broadcast('playlist:delete', { id: req.params.id });
         res.json({ success: true });
     } catch (err) {
         next(err);
@@ -233,6 +251,8 @@ router.post('/:id/songs', async (req, res, next) => {
             position: (maxPos?.max || 0) + 1
         });
 
+        const playlist = await getFullPlaylist(req.params.id);
+        broadcast('playlist:update', playlist);
         res.json({ success: true });
     } catch (err) {
         next(err);
@@ -246,6 +266,8 @@ router.delete('/:id/songs/:songId', async (req, res, next) => {
             .where({ playlist_id: req.params.id, song_id: req.params.songId })
             .del();
 
+        const playlist = await getFullPlaylist(req.params.id);
+        broadcast('playlist:update', playlist);
         res.json({ success: true });
     } catch (err) {
         next(err);
@@ -266,6 +288,8 @@ router.put('/:id/reorder', async (req, res, next) => {
             )
         );
 
+        const playlist = await getFullPlaylist(req.params.id);
+        broadcast('playlist:update', playlist);
         res.json({ success: true });
     } catch (err) {
         next(err);

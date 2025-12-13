@@ -85,7 +85,7 @@ export const SongListItem: React.FC<SongListItemProps> = ({
          </div>
          <div className="min-w-0 flex-1">
             <h4 
-                className={`font-bold text-base truncate hover:underline cursor-pointer ${isCurrent ? 'text-indigo-400' : 'text-white'}`}
+                className={`font-semibold text-base truncate hover:underline cursor-pointer ${isCurrent ? 'text-indigo-400' : 'text-white'}`}
                 onClick={(e) => {
                     e.stopPropagation();
                     onNavigate('song_details', song.id);

@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { broadcast } from '../services/sse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,7 +100,9 @@ router.post('/', async (req, res, next) => {
         });
 
         const artist = await db('artists').where({ id }).first();
-        res.status(201).json(transformArtist(artist));
+        const transformed = transformArtist(artist);
+        broadcast('artist:update', transformed);
+        res.status(201).json(transformed);
     } catch (err) {
         next(err);
     }
@@ -119,7 +122,9 @@ router.put('/:id', async (req, res, next) => {
         if (!artist) {
             return res.status(404).json({ error: 'Artist not found' });
         }
-        res.json(transformArtist(artist));
+        const transformed = transformArtist(artist);
+        broadcast('artist:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -142,7 +147,9 @@ router.patch('/:id/avatar', upload.single('avatar'), async (req, res, next) => {
         if (!artist) {
             return res.status(404).json({ error: 'Artist not found' });
         }
-        res.json(transformArtist(artist));
+        const transformed = transformArtist(artist);
+        broadcast('artist:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -161,7 +168,9 @@ router.patch('/:id/favorite', async (req, res, next) => {
         });
 
         const updated = await db('artists').where({ id: req.params.id }).first();
-        res.json(transformArtist(updated));
+        const transformed = transformArtist(updated);
+        broadcast('artist:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }

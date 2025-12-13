@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { broadcast } from '../services/sse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,7 +107,9 @@ router.post('/', async (req, res, next) => {
         });
 
         const album = await db('albums').where({ id }).first();
-        res.status(201).json(transformAlbum(album));
+        const transformed = transformAlbum(album);
+        broadcast('album:update', transformed);
+        res.status(201).json(transformed);
     } catch (err) {
         next(err);
     }
@@ -130,7 +133,9 @@ router.put('/:id', async (req, res, next) => {
         if (!album) {
             return res.status(404).json({ error: 'Album not found' });
         }
-        res.json(transformAlbum(album));
+        const transformed = transformAlbum(album);
+        broadcast('album:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -153,7 +158,9 @@ router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
         if (!album) {
             return res.status(404).json({ error: 'Album not found' });
         }
-        res.json(transformAlbum(album));
+        const transformed = transformAlbum(album);
+        broadcast('album:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -172,7 +179,9 @@ router.patch('/:id/favorite', async (req, res, next) => {
         });
 
         const updated = await db('albums').where({ id: req.params.id }).first();
-        res.json(transformAlbum(updated));
+        const transformed = transformAlbum(updated);
+        broadcast('album:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -185,6 +194,7 @@ router.delete('/:id', async (req, res, next) => {
         if (!deleted) {
             return res.status(404).json({ error: 'Album not found' });
         }
+        broadcast('album:delete', { id: req.params.id });
         res.json({ success: true });
     } catch (err) {
         next(err);

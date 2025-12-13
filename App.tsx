@@ -42,6 +42,11 @@ const App: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showVisualizer, setShowVisualizer] = useState(false);
   const [activeVisualizer, setActiveVisualizer] = useState('bars');
+
+  // Scanning State (Lifted from Browse)
+  const [scanStatus, setScanStatus] = useState<api.ScanStatus | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const wavisRef = useRef<Wavis | null>(null);
@@ -49,6 +54,95 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Global SSE Listener
+  useEffect(() => {
+    const eventSource = new EventSource('/api/library/events');
+
+    eventSource.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            const { type, payload } = data;
+
+            // Scanning Events
+            if (type === 'scan:status' || type === 'scan:progress' || type === 'scan:start') {
+                setScanStatus(payload);
+                setIsScanning(payload.isScanning);
+            } else if (type === 'scan:complete') {
+                setScanStatus(payload);
+                setIsScanning(false);
+                if (payload.totalFound > 0) {
+                     fetchData(); // Refresh all data when scan completes
+                }
+            } else if (type === 'scan:error') {
+                setScanStatus(payload);
+                setIsScanning(false);
+                setScanError(payload.error || 'Unknown error occurred');
+            }
+            
+            // Song Events
+            else if (type === 'song:update') {
+                setSongs(prev => {
+                    const exists = prev.find(s => s.id === payload.id);
+                    if (exists) {
+                        return prev.map(s => s.id === payload.id ? payload : s);
+                    }
+                    return [payload, ...prev]; // Handle new song creation via update if not strictly separate
+                });
+                if (currentSong?.id === payload.id) {
+                    setCurrentSong(payload);
+                }
+            } else if (type === 'song:delete') {
+                setSongs(prev => prev.filter(s => s.id !== payload.id));
+                if (currentSong?.id === payload.id) {
+                    // Optionally stop playback or skip to next
+                    setIsPlaying(false);
+                    setCurrentSong(null);
+                }
+            }
+
+            // Album Events
+            else if (type === 'album:update') {
+                 setAlbums(prev => {
+                    const exists = prev.find(a => a.id === payload.id);
+                    if (exists) return prev.map(a => a.id === payload.id ? payload : a);
+                    return [payload, ...prev];
+                });
+            } else if (type === 'album:delete') {
+                setAlbums(prev => prev.filter(a => a.id !== payload.id));
+            }
+
+            // Artist Events
+            else if (type === 'artist:update') {
+                 setArtists(prev => {
+                    const exists = prev.find(a => a.id === payload.id);
+                    if (exists) return prev.map(a => a.id === payload.id ? payload : a);
+                    return [payload, ...prev];
+                });
+            }
+
+            // Playlist Events
+            else if (type === 'playlist:create') {
+                setPlaylists(prev => [payload, ...prev]);
+            } else if (type === 'playlist:update') {
+                setPlaylists(prev => prev.map(p => p.id === payload.id ? payload : p));
+            } else if (type === 'playlist:delete') {
+                setPlaylists(prev => prev.filter(p => p.id !== payload.id));
+            }
+
+        } catch (e) {
+            console.error('Error parsing SSE message', e);
+        }
+    };
+
+    eventSource.onerror = (e) => {
+         // console.debug('SSE connection error', e);
+    };
+
+    return () => {
+        eventSource.close();
+    };
+  }, [currentSong]); // re-bind only if currentSong changes (rarely needed actually, but safe)
 
   // Initialize Wavis once audioRef is available
   useEffect(() => {
@@ -228,9 +322,14 @@ const App: React.FC = () => {
   };
 
   const handleToggleFavorite = async (id: string) => {
+    // Optimistic updates are nice, but since we have SSE, 
+    // we can rely on the server broadcast OR keep optimistic updates for instant feedback.
+    // I'll keep optimistic updates because SSE might have a tiny delay.
+    
     // Check Songs
     const song = songs.find(s => s.id === id);
     if (song) {
+        // Optimistic update
         const newStatus = !song.isFavorite;
         setSongs(prevSongs => prevSongs.map(s => s.id === id ? { ...s, isFavorite: newStatus } : s));
         if (currentSong?.id === id) {
@@ -270,8 +369,11 @@ const App: React.FC = () => {
 
   const handleCreatePlaylist = async (name: string) => {
       try {
+          // SSE will update the list, but we need the ID immediately for song adding
           const newPlaylist = await api.createPlaylist(name);
-          setPlaylists([newPlaylist, ...playlists]);
+          // Manually update for immediate interaction if needed, though SSE is fast
+          // setPlaylists([newPlaylist, ...playlists]); 
+          
           setShowCreatePlaylistModal(false);
           // If we were adding a song, add it now to the new playlist
           if (songToAdd) {
@@ -296,12 +398,7 @@ const App: React.FC = () => {
       if (!songToAdd) return;
       try {
           await api.addSongToPlaylist(playlistId, songToAdd.id);
-          setPlaylists(prev => prev.map(p => {
-              if (p.id === playlistId) {
-                  return { ...p, songIds: [...p.songIds, songToAdd.id], songCount: (p.songCount || 0) + 1 };
-              }
-              return p;
-          }));
+          // SSE handles the state update for the playlist song count/Ids
           setShowAddToPlaylistModal(false);
           setSongToAdd(null);
       } catch (e) {
@@ -310,10 +407,16 @@ const App: React.FC = () => {
   };
 
   const handleImportSongs = (newSongs: Song[]) => {
-      setSongs(prev => [...newSongs, ...prev]);
-      fetchData();
+      // Logic handled by SSE mostly, but direct file upload might return songs immediately
+      // We can merge them if they aren't already there
+      setSongs(prev => {
+          const existingIds = new Set(prev.map(s => s.id));
+          const uniqueNew = newSongs.filter(s => !existingIds.has(s.id));
+          return [...uniqueNew, ...prev];
+      });
   };
 
+  // State update handlers for detail views (mostly redundant now with SSE, but kept for immediate feedback if used)
   const onUpdateSong = (updated: Song) => {
       setSongs(prev => prev.map(s => s.id === updated.id ? updated : s));
       if (currentSong?.id === updated.id) setCurrentSong(updated);
@@ -360,6 +463,12 @@ const App: React.FC = () => {
             artists={artists}
             songs={songs}
             playlists={playlists}
+            // Pass scan state
+            scanStatus={scanStatus}
+            isScanning={isScanning}
+            scanError={scanError}
+            setScanError={setScanError}
+            setIsScanning={setIsScanning}
         />;
       case 'favorites':
         return <Favorites 
@@ -418,32 +527,28 @@ const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
             onDeletePlaylist={async (id: string) => {
                 await api.deletePlaylist(id);
-                setPlaylists(prev => prev.filter(p => p.id !== id));
+                // SSE handles state update
                 handleBack();
             }}
             onRenamePlaylist={async (id: string, name: string) => {
-                const updated = await api.renamePlaylist(id, name);
-                setPlaylists(prev => prev.map(p => p.id === id ? updated : p));
+                await api.renamePlaylist(id, name);
+                // SSE handles state update
             }}
             onRemoveSong={async (pid: string, sid: string) => {
                 await api.removeSongFromPlaylist(pid, sid);
-                 setPlaylists(prev => prev.map(p => {
-                    if (p.id === pid) {
-                        return { ...p, songIds: p.songIds.filter(id => id !== sid), songCount: (p.songCount || 0) - 1 };
-                    }
-                    return p;
-                }));
+                // SSE handles state update
             }}
             onReorderSongs={async (pid: string, from: number, to: number) => {
+                 // Optimistic update for UI smoothness (reordering feels laggy otherwise)
                  const pl = playlists.find(p => p.id === pid);
-                 if (!pl) return;
-                 const newOrder = [...pl.songIds];
-                 const [moved] = newOrder.splice(from, 1);
-                 newOrder.splice(to, 0, moved);
-                 
-                 setPlaylists(prev => prev.map(p => p.id === pid ? { ...p, songIds: newOrder } : p));
-                 
-                 await api.reorderPlaylistSongs(pid, newOrder);
+                 if (pl) {
+                     const newOrder = [...pl.songIds];
+                     const [moved] = newOrder.splice(from, 1);
+                     newOrder.splice(to, 0, moved);
+                     setPlaylists(prev => prev.map(p => p.id === pid ? { ...p, songIds: newOrder } : p));
+                     
+                     await api.reorderPlaylistSongs(pid, newOrder);
+                 }
             }}
             onNavigate={handleNavigate}
             onAddToPlaylist={handleAddToPlaylist}

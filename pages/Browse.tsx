@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FolderOpen, ArrowRight, Music, Play, Pause, ListMusic, RefreshCw, FolderSearch, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { FolderOpen, ArrowRight, Music, Play, Pause, ListMusic, RefreshCw, FolderSearch } from 'lucide-react';
 import { Song, Album, Artist, NavigationState, Playlist } from '../types';
 import PlayingIndicator from '../components/PlayingIndicator';
-import { scanLibrary, getLibraryStatus, refreshLibrary, ScanStatus } from '../services/api';
+import { scanLibrary, refreshLibrary, ScanStatus } from '../services/api';
 
 interface BrowseProps {
   onImportSongs: (songs: Song[]) => void;
@@ -14,6 +14,12 @@ interface BrowseProps {
   artists: Artist[];
   songs: Song[];
   playlists: Playlist[];
+  // Scan props from App
+  scanStatus: ScanStatus | null;
+  isScanning: boolean;
+  scanError: string | null;
+  setScanError: (err: string | null) => void;
+  setIsScanning: (scanning: boolean) => void;
 }
 
 const Browse: React.FC<BrowseProps> = ({
@@ -25,39 +31,18 @@ const Browse: React.FC<BrowseProps> = ({
   albums,
   artists,
   songs,
-  playlists
+  playlists,
+  scanStatus,
+  isScanning,
+  scanError,
+  setScanError,
+  setIsScanning
 }) => {
   const [scanPath, setScanPath] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
-  const [scanError, setScanError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
-  // Poll for scan status
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isScanning) {
-      interval = setInterval(async () => {
-        try {
-          const status = await getLibraryStatus();
-          setScanStatus(status);
-          if (!status.isScanning) {
-            setIsScanning(false);
-            if (status.totalFound > 0) {
-                 // Trigger a reload of data in parent
-                 // Hacky way: import empty array then refresh happens elsewhere? 
-                 // Ideally onImportSongs calls fetchData
-                 onImportSongs([]); 
-            }
-          }
-        } catch (e) {
-          console.error("Poll failed", e);
-        }
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isScanning, onImportSongs]);
+  // SSE Logic moved to App.tsx
 
   const handleScan = async () => {
     if (!scanPath.trim()) return;

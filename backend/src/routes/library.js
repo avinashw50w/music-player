@@ -4,6 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../config/database.js';
 import { extractMetadata, generateWaveform, extractCoverArt } from '../services/audioService.js';
+import { addClient, removeClient, broadcast, updateScanStatus, currentScanStatus } from '../services/sse.js';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,14 +12,21 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-let scanStatus = {
-    isScanning: false,
-    progress: 0,
-    currentFile: '',
-    totalFound: 0,
-    processed: 0,
-    error: null
-};
+// SSE Endpoint
+router.get('/events', (req, res) => {
+    const headers = {
+        'Content-Type': 'text/event-stream',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
+    };
+    res.writeHead(200, headers);
+
+    const clientId = addClient(res);
+
+    req.on('close', () => {
+        removeClient(clientId);
+    });
+});
 
 // Recursively walk directory
 async function* walk(dir) {
@@ -42,27 +50,30 @@ router.post('/scan', async (req, res) => {
         return res.status(400).json({ error: 'Path is required' });
     }
 
-    if (scanStatus.isScanning) {
+    if (currentScanStatus.isScanning) {
         return res.status(409).json({ error: 'Scan already in progress' });
     }
 
     // Reset status
-    scanStatus = {
+    updateScanStatus({
         isScanning: true,
         progress: 0,
         currentFile: 'Starting scan...',
         totalFound: 0,
         processed: 0,
         error: null
-    };
+    });
 
+    broadcast('scan:start', currentScanStatus);
     res.json({ success: true, message: 'Scan started' });
 
     // Process scan asynchronously
     (async () => {
         try {
             // 1. Count files first for progress
-            scanStatus.currentFile = 'Counting files...';
+            updateScanStatus({ currentFile: 'Counting files...' });
+            broadcast('scan:progress', currentScanStatus);
+            
             const audioExtensions = ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma'];
             let audioFiles = [];
 
@@ -73,21 +84,29 @@ router.post('/scan', async (req, res) => {
                 }
             }
 
-            scanStatus.totalFound = audioFiles.length;
+            updateScanStatus({ totalFound: audioFiles.length });
             
-            if (scanStatus.totalFound === 0) {
-                scanStatus.isScanning = false;
-                scanStatus.currentFile = 'No audio files found';
-                scanStatus.progress = 100;
+            if (currentScanStatus.totalFound === 0) {
+                updateScanStatus({
+                    isScanning: false,
+                    currentFile: 'No audio files found',
+                    progress: 100
+                });
+                broadcast('scan:complete', currentScanStatus);
                 return;
             }
 
             // 2. Process files
             for (let i = 0; i < audioFiles.length; i++) {
                 const filePath = audioFiles[i];
-                scanStatus.currentFile = path.basename(filePath);
-                scanStatus.processed = i + 1;
-                scanStatus.progress = Math.round(((i + 1) / scanStatus.totalFound) * 100);
+                updateScanStatus({
+                    currentFile: path.basename(filePath),
+                    processed: i + 1,
+                    progress: Math.round(((i + 1) / currentScanStatus.totalFound) * 100)
+                });
+
+                // Broadcast progress every file
+                broadcast('scan:progress', currentScanStatus);
 
                 try {
                     // Check if file already exists in DB (by exact path)
@@ -174,18 +193,22 @@ router.post('/scan', async (req, res) => {
                 }
             }
 
-            scanStatus.isScanning = false;
+            updateScanStatus({ isScanning: false });
+            broadcast('scan:complete', currentScanStatus);
         } catch (err) {
             console.error('Scan failed:', err);
-            scanStatus.error = err.message;
-            scanStatus.isScanning = false;
+            updateScanStatus({
+                error: err.message,
+                isScanning: false
+            });
+            broadcast('scan:error', currentScanStatus);
         }
     })();
 });
 
 // GET scan status
 router.get('/status', (req, res) => {
-    res.json(scanStatus);
+    res.json(currentScanStatus);
 });
 
 // POST refresh library
@@ -203,12 +226,10 @@ router.post('/refresh', async (req, res, next) => {
                     await db('songs').where({ id: song.id }).del();
                     console.log(`Removed missing song: ${song.title} (${song.file_path})`);
                     removedCount++;
+                    broadcast('song:delete', { id: song.id });
                 }
             }
         }
-
-        // Cleanup empty albums/artists is optional but recommended.
-        // For now, strict song removal satisfies "remove all entries of the songs"
         
         res.json({ success: true, removedCount, message: `Library refreshed. Removed ${removedCount} missing songs.` });
     } catch (err) {

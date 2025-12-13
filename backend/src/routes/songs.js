@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { broadcast } from '../services/sse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,9 +40,7 @@ const transformSong = (row) => ({
     duration: row.duration,
     durationSeconds: row.duration_seconds,
     coverUrl: row.cover_url,
-    // Use the stream endpoint for file playback
     fileUrl: row.file_path ? `/api/songs/${row.id}/stream` : null,
-    // Parse JSON string genre, fallback to array of string
     genre: (() => { 
         try { 
             return JSON.parse(row.genre); 
@@ -114,7 +113,9 @@ router.post('/', async (req, res, next) => {
         });
 
         const song = await db('songs').where({ id }).first();
-        res.status(201).json(transformSong(song));
+        const transformed = transformSong(song);
+        broadcast('song:update', transformed); // Treat create as update for list syncing
+        res.status(201).json(transformed);
     } catch (err) {
         next(err);
     }
@@ -140,7 +141,9 @@ router.put('/:id', async (req, res, next) => {
         if (!song) {
             return res.status(404).json({ error: 'Song not found' });
         }
-        res.json(transformSong(song));
+        const transformed = transformSong(song);
+        broadcast('song:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -159,7 +162,9 @@ router.patch('/:id/favorite', async (req, res, next) => {
         });
 
         const updated = await db('songs').where({ id: req.params.id }).first();
-        res.json(transformSong(updated));
+        const transformed = transformSong(updated);
+        broadcast('song:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -176,7 +181,9 @@ router.patch('/:id/lyrics', async (req, res, next) => {
         if (!song) {
             return res.status(404).json({ error: 'Song not found' });
         }
-        res.json(transformSong(song));
+        const transformed = transformSong(song);
+        broadcast('song:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -199,7 +206,9 @@ router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
         if (!song) {
             return res.status(404).json({ error: 'Song not found' });
         }
-        res.json(transformSong(song));
+        const transformed = transformSong(song);
+        broadcast('song:update', transformed);
+        res.json(transformed);
     } catch (err) {
         next(err);
     }
@@ -212,6 +221,7 @@ router.delete('/:id', async (req, res, next) => {
         if (!deleted) {
             return res.status(404).json({ error: 'Song not found' });
         }
+        broadcast('song:delete', { id: req.params.id });
         res.json({ success: true });
     } catch (err) {
         next(err);
