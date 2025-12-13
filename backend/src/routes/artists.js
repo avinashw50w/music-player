@@ -1,3 +1,4 @@
+
 import express from 'express';
 import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -41,7 +42,21 @@ const transformArtist = (row) => ({
 // GET all artists
 router.get('/', async (req, res, next) => {
     try {
-        const artists = await db('artists').select('*').orderBy('name', 'asc');
+        const { limit, offset, search } = req.query;
+        let query = db('artists').select('*').orderBy('name', 'asc');
+
+        if (search) {
+            query = query.where('name', 'like', `%${search}%`);
+        }
+
+        if (limit) {
+            query = query.limit(parseInt(limit));
+        }
+        if (offset) {
+            query = query.offset(parseInt(offset));
+        }
+
+        const artists = await query;
         res.json(artists.map(transformArtist));
     } catch (err) {
         next(err);

@@ -1,3 +1,4 @@
+
 export interface Song {
   id: string;
   title: string;
@@ -13,7 +14,6 @@ export interface Song {
   lyrics?: string;
   bitrate?: number;
   format?: string;
-  waveformData?: number[];
 }
 
 export interface Album {

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Song, NavigationState } from '../types';
 import { Play, Pause, Heart, ListPlus, GripVertical, Trash2 } from 'lucide-react';
@@ -20,7 +21,7 @@ interface SongListItemProps {
   showAlbum?: boolean;
 }
 
-export const SongListItem: React.FC<SongListItemProps> = ({
+const SongListItemComponent: React.FC<SongListItemProps> = ({
   song,
   index,
   currentSongId,
@@ -51,7 +52,7 @@ export const SongListItem: React.FC<SongListItemProps> = ({
       `}
     >
       {/* 1. Index / Play / Pause / Visualizer */}
-      <div className="w-8 md:w-10 flex justify-center items-center text-slate-500 font-medium text-base relative">
+      <div className="w-8 md:w-10 flex justify-center items-center text-slate-500 font-medium text-base relative flex-shrink-0">
          {isEditable ? (
              <button 
                 className="cursor-grab active:cursor-grabbing p-2 text-slate-600 hover:text-slate-300 -ml-2" 
@@ -91,7 +92,7 @@ export const SongListItem: React.FC<SongListItemProps> = ({
       </div>
 
       {/* 2. Cover + Title + Artist */}
-      <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center gap-4 min-w-0 w-full overflow-hidden">
          <div className="relative w-12 h-12 flex-shrink-0 group/cover">
              <img 
                 src={song.coverUrl} 
@@ -99,9 +100,10 @@ export const SongListItem: React.FC<SongListItemProps> = ({
                 className={`w-full h-full rounded-lg object-cover shadow-sm transition-opacity ${isCurrent ? 'opacity-80' : ''}`} 
              />
          </div>
-         <div className="min-w-0 flex-1 flex flex-col items-start">
+         <div className="flex-1 flex flex-col items-start min-w-0 overflow-hidden">
             <span 
-                className={`font-semibold text-base truncate hover:underline cursor-pointer ${isCurrent ? 'text-indigo-400' : 'text-white'}`}
+                className={`font-semibold text-base truncate w-full hover:underline cursor-pointer ${isCurrent ? 'text-indigo-400' : 'text-white'}`}
+                title={song.title}
                 onClick={(e) => {
                     e.stopPropagation();
                     onNavigate('song_details', song.id);
@@ -109,9 +111,9 @@ export const SongListItem: React.FC<SongListItemProps> = ({
             >
                 {song.title}
             </span>
-            <div className="flex items-center text-sm text-slate-500 truncate mt-0.5">
+            <div className="flex items-center text-sm text-slate-500 w-full mt-0.5">
                 <span 
-                    className="hover:text-white hover:underline cursor-pointer transition-colors"
+                    className="hover:text-white hover:underline cursor-pointer transition-colors truncate w-full"
                     onClick={(e) => {
                         e.stopPropagation();
                         if (song.artistId) onNavigate('artist_details', song.artistId);
@@ -124,10 +126,10 @@ export const SongListItem: React.FC<SongListItemProps> = ({
       </div>
 
       {/* 3. Album */}
-      <div className="hidden md:flex items-center min-w-0">
+      <div className="hidden md:flex items-center min-w-0 w-full overflow-hidden">
          {showAlbum && (
              <span 
-                className="text-slate-400 text-sm font-medium truncate hover:text-white hover:underline cursor-pointer transition-colors"
+                className="text-slate-400 text-sm font-medium truncate w-full hover:text-white hover:underline cursor-pointer transition-colors"
                 onClick={(e) => {
                     e.stopPropagation();
                     if (song.albumId) onNavigate('album_details', song.albumId);
@@ -139,7 +141,7 @@ export const SongListItem: React.FC<SongListItemProps> = ({
       </div>
 
       {/* 4. Actions + Duration */}
-      <div className="flex items-center justify-end gap-1 md:gap-3">
+      <div className="flex items-center justify-end gap-1 md:gap-3 flex-shrink-0 ml-auto">
          {/* Heart */}
          {!isEditable && (
              <button 
@@ -178,3 +180,17 @@ export const SongListItem: React.FC<SongListItemProps> = ({
     </div>
   );
 };
+
+export const SongListItem = React.memo(SongListItemComponent, (prev, next) => {
+    // Custom comparison to avoid re-renders when function props change (since they are anonymous in parent)
+    // We only care if data relevant to this specific row changes
+    return (
+        prev.song.id === next.song.id &&
+        prev.song.title === next.song.title &&
+        prev.song.isFavorite === next.song.isFavorite &&
+        prev.index === next.index &&
+        prev.currentSongId === next.currentSongId &&
+        prev.isPlaying === next.isPlaying &&
+        prev.isEditable === next.isEditable
+    );
+});

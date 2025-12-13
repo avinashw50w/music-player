@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
@@ -24,6 +25,16 @@ const App: React.FC = () => {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   
+  // Pagination State
+  const [hasMore, setHasMore] = useState({ songs: true, albums: true, artists: true });
+  const [loadingMore, setLoadingMore] = useState({ songs: false, albums: false, artists: false });
+  // Search state for lists
+  const [listQueries, setListQueries] = useState({ songs: '', albums: '', artists: '' });
+  const PAGE_LIMIT = 50;
+  
+  // Abort Controllers
+  const searchAbortControllers = useRef<{ [key: string]: AbortController }>({});
+  
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -49,11 +60,102 @@ const App: React.FC = () => {
   const [scanError, setScanError] = useState<string | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const wavisRef = useRef<Wavis | null>(null);
+  const wavisRef = useRef<any>(null);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const fetchData = async () => {
+    try {
+      const [s, a, ar, p] = await Promise.all([
+        api.getSongs(PAGE_LIMIT, 0),
+        api.getAlbums(PAGE_LIMIT, 0),
+        api.getArtists(PAGE_LIMIT, 0),
+        api.getPlaylists()
+      ]);
+      setSongs(s);
+      setAlbums(a);
+      setArtists(ar);
+      setPlaylists(p);
+      
+      setHasMore({
+          songs: s.length === PAGE_LIMIT,
+          albums: a.length === PAGE_LIMIT,
+          artists: ar.length === PAGE_LIMIT
+      });
+    } catch (err) {
+      console.error("Failed to fetch initial data", err);
+    }
+  };
+
+  const handleListSearch = async (type: 'songs' | 'albums' | 'artists', query: string) => {
+      setListQueries(prev => ({ ...prev, [type]: query }));
+      // Reset hasMore when searching
+      setHasMore(prev => ({ ...prev, [type]: true }));
+      
+      // Cancel previous request if exists
+      if (searchAbortControllers.current[type]) {
+          searchAbortControllers.current[type].abort();
+      }
+      
+      // Create new controller
+      const controller = new AbortController();
+      searchAbortControllers.current[type] = controller;
+      
+      try {
+          if (type === 'songs') {
+              const res = await api.getSongs(PAGE_LIMIT, 0, query, controller.signal);
+              setSongs(res);
+              setHasMore(prev => ({ ...prev, songs: res.length === PAGE_LIMIT }));
+          } else if (type === 'albums') {
+              const res = await api.getAlbums(PAGE_LIMIT, 0, query, controller.signal);
+              setAlbums(res);
+              setHasMore(prev => ({ ...prev, albums: res.length === PAGE_LIMIT }));
+          } else if (type === 'artists') {
+              const res = await api.getArtists(PAGE_LIMIT, 0, query, controller.signal);
+              setArtists(res);
+              setHasMore(prev => ({ ...prev, artists: res.length === PAGE_LIMIT }));
+          }
+      } catch (e: any) {
+          if (e.name !== 'AbortError') {
+              console.error(`Error searching ${type}:`, e);
+          }
+      }
+  };
+
+  const handleLoadMoreSongs = async () => {
+      if (loadingMore.songs || !hasMore.songs) return;
+      setLoadingMore(prev => ({ ...prev, songs: true }));
+      try {
+          const newSongs = await api.getSongs(PAGE_LIMIT, songs.length, listQueries.songs);
+          if (newSongs.length < PAGE_LIMIT) setHasMore(prev => ({ ...prev, songs: false }));
+          setSongs(prev => [...prev, ...newSongs]);
+      } catch (e) { console.error(e); }
+      setLoadingMore(prev => ({ ...prev, songs: false }));
+  };
+
+  const handleLoadMoreAlbums = async () => {
+      if (loadingMore.albums || !hasMore.albums) return;
+      setLoadingMore(prev => ({ ...prev, albums: true }));
+      try {
+          const newAlbums = await api.getAlbums(PAGE_LIMIT, albums.length, listQueries.albums);
+          if (newAlbums.length < PAGE_LIMIT) setHasMore(prev => ({ ...prev, albums: false }));
+          setAlbums(prev => [...prev, ...newAlbums]);
+      } catch (e) { console.error(e); }
+      setLoadingMore(prev => ({ ...prev, albums: false }));
+  };
+
+  const handleLoadMoreArtists = async () => {
+      if (loadingMore.artists || !hasMore.artists) return;
+      setLoadingMore(prev => ({ ...prev, artists: true }));
+      try {
+          const newArtists = await api.getArtists(PAGE_LIMIT, artists.length, listQueries.artists);
+          if (newArtists.length < PAGE_LIMIT) setHasMore(prev => ({ ...prev, artists: false }));
+          setArtists(prev => [...prev, ...newArtists]);
+      } catch (e) { console.error(e); }
+      setLoadingMore(prev => ({ ...prev, artists: false }));
+  };
 
   // Global SSE Listener
   useEffect(() => {
@@ -95,7 +197,6 @@ const App: React.FC = () => {
             } else if (type === 'song:delete') {
                 setSongs(prev => prev.filter(s => s.id !== payload.id));
                 if (currentSong?.id === payload.id) {
-                    // Optionally stop playback or skip to next
                     setIsPlaying(false);
                     setCurrentSong(null);
                 }
@@ -142,11 +243,12 @@ const App: React.FC = () => {
     return () => {
         eventSource.close();
     };
-  }, [currentSong]); // re-bind only if currentSong changes (rarely needed actually, but safe)
+  }, [currentSong]); 
 
   // Initialize Wavis once audioRef is available
   useEffect(() => {
       if (audioRef.current && !wavisRef.current) {
+          // Instantiate original Wavis class
           wavisRef.current = new Wavis(audioRef.current);
       }
   }, []);
@@ -187,16 +289,23 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentSong, playbackQueue, showVisualizer]); 
 
+  const playAudio = async () => {
+    if (!audioRef.current || !currentSong) return;
+    try {
+        await audioRef.current.play();
+    } catch (err: any) {
+        if (err.name !== 'AbortError') {
+             console.error("Playback failed", err);
+             // Optionally set error toast here if needed
+        }
+    }
+  };
+
   useEffect(() => {
     if (audioRef.current) {
         if (isPlaying) {
-            // Reset error on play attempt
             setPlaybackError(null);
-            audioRef.current.play().catch(e => {
-                console.error("Playback failed", e);
-                // Note: Standard play interruptions shouldn't trigger full UI errors usually,
-                // but real load errors are handled by onError on the audio tag.
-            });
+            playAudio();
         } else {
             audioRef.current.pause();
         }
@@ -209,27 +318,9 @@ const App: React.FC = () => {
     }
   }, [volume]);
 
-  const fetchData = async () => {
-    try {
-      const [s, a, ar, p] = await Promise.all([
-        api.getSongs(),
-        api.getAlbums(),
-        api.getArtists(),
-        api.getPlaylists()
-      ]);
-      setSongs(s);
-      setAlbums(a);
-      setArtists(ar);
-      setPlaylists(p);
-    } catch (err) {
-      console.error("Failed to fetch initial data", err);
-    }
-  };
-
   const handleNavigate = (view: ViewType, entityId?: string) => {
     setNavHistory(prev => [...prev, navState]);
     setNavState({ view, entityId });
-    // Close visualizer on navigation
     setShowVisualizer(false);
   };
 
@@ -244,16 +335,24 @@ const App: React.FC = () => {
   };
 
   const handlePlaySong = (song: Song, context?: Song[]) => {
+    // If playing the exact same song, toggle play/pause
     if (currentSong?.id === song.id) {
         setIsPlaying(!isPlaying);
     } else {
+        // If it's a different song, or context implies a change
+        // We force reset current time before changing source to ensure clean slate
+        if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+        }
+        setCurrentTime(0);
         setCurrentSong(song);
         setIsPlaying(true);
-        setPlaybackError(null); // Clear previous errors
+        setPlaybackError(null); 
+        
         if (context) {
             setPlaybackQueue(context);
         } else {
-            setPlaybackQueue([song]); // Fallback
+            setPlaybackQueue([song]); 
         }
     }
   };
@@ -310,10 +409,9 @@ const App: React.FC = () => {
   const handleRefreshLibrary = async () => {
       setIsRefreshing(true);
       try {
-          const res = await api.refreshLibrary();
+          await api.refreshLibrary();
           setPlaybackError(null);
           await fetchData();
-          // Optional: You could show a success toast here
       } catch (e) {
           console.error(e);
       } finally {
@@ -322,46 +420,47 @@ const App: React.FC = () => {
   };
 
   const handleToggleFavorite = async (id: string) => {
-    // Optimistic updates are nice, but since we have SSE, 
-    // we can rely on the server broadcast OR keep optimistic updates for instant feedback.
-    // I'll keep optimistic updates because SSE might have a tiny delay.
-    
-    // Check Songs
-    const song = songs.find(s => s.id === id);
-    if (song) {
-        // Optimistic update
-        const newStatus = !song.isFavorite;
-        setSongs(prevSongs => prevSongs.map(s => s.id === id ? { ...s, isFavorite: newStatus } : s));
-        if (currentSong?.id === id) {
-          setCurrentSong(prev => prev ? { ...prev, isFavorite: newStatus } : null);
-        }
+    let isSong = false;
+
+    // 1. Check if it is the currently playing song (might be searched and not in global list)
+    if (currentSong?.id === id) {
+        isSong = true;
+        const newStatus = !currentSong.isFavorite;
+        setCurrentSong(prev => prev ? { ...prev, isFavorite: newStatus } : null);
+    }
+
+    // 2. Check if it is in the global songs list
+    const songIndex = songs.findIndex(s => s.id === id);
+    if (songIndex !== -1) {
+        isSong = true;
+        setSongs(prev => prev.map((s, i) => i === songIndex ? { ...s, isFavorite: !s.isFavorite } : s));
+    }
+
+    if (isSong) {
         try { await api.toggleSongFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
 
-    // Check Albums
-    const album = albums.find(a => a.id === id);
-    if (album) {
-        const newStatus = !album.isFavorite;
-        setAlbums(prev => prev.map(a => a.id === id ? { ...a, isFavorite: newStatus } : a));
+    // 3. Check Albums
+    const albumIndex = albums.findIndex(a => a.id === id);
+    if (albumIndex !== -1) {
+        setAlbums(prev => prev.map((a, i) => i === albumIndex ? { ...a, isFavorite: !a.isFavorite } : a));
         try { await api.toggleAlbumFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
 
-    // Check Artists
-    const artist = artists.find(a => a.id === id);
-    if (artist) {
-        const newStatus = !artist.isFavorite;
-        setArtists(prev => prev.map(a => a.id === id ? { ...a, isFavorite: newStatus } : a));
+    // 4. Check Artists
+    const artistIndex = artists.findIndex(a => a.id === id);
+    if (artistIndex !== -1) {
+        setArtists(prev => prev.map((a, i) => i === artistIndex ? { ...a, isFavorite: !a.isFavorite } : a));
         try { await api.toggleArtistFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
     
-    // Check Playlists
-    const playlist = playlists.find(p => p.id === id);
-    if (playlist) {
-        const newStatus = !playlist.isFavorite;
-        setPlaylists(prev => prev.map(p => p.id === id ? { ...p, isFavorite: newStatus } : p));
+    // 5. Check Playlists
+    const playlistIndex = playlists.findIndex(p => p.id === id);
+    if (playlistIndex !== -1) {
+        setPlaylists(prev => prev.map((p, i) => i === playlistIndex ? { ...p, isFavorite: !p.isFavorite } : p));
         try { await api.togglePlaylistFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
@@ -369,13 +468,8 @@ const App: React.FC = () => {
 
   const handleCreatePlaylist = async (name: string) => {
       try {
-          // SSE will update the list, but we need the ID immediately for song adding
           const newPlaylist = await api.createPlaylist(name);
-          // Manually update for immediate interaction if needed, though SSE is fast
-          // setPlaylists([newPlaylist, ...playlists]); 
-          
           setShowCreatePlaylistModal(false);
-          // If we were adding a song, add it now to the new playlist
           if (songToAdd) {
              handleConfirmAddToPlaylist(newPlaylist.id);
           }
@@ -398,7 +492,6 @@ const App: React.FC = () => {
       if (!songToAdd) return;
       try {
           await api.addSongToPlaylist(playlistId, songToAdd.id);
-          // SSE handles the state update for the playlist song count/Ids
           setShowAddToPlaylistModal(false);
           setSongToAdd(null);
       } catch (e) {
@@ -407,8 +500,6 @@ const App: React.FC = () => {
   };
 
   const handleImportSongs = (newSongs: Song[]) => {
-      // Logic handled by SSE mostly, but direct file upload might return songs immediately
-      // We can merge them if they aren't already there
       setSongs(prev => {
           const existingIds = new Set(prev.map(s => s.id));
           const uniqueNew = newSongs.filter(s => !existingIds.has(s.id));
@@ -416,7 +507,6 @@ const App: React.FC = () => {
       });
   };
 
-  // State update handlers for detail views (mostly redundant now with SSE, but kept for immediate feedback if used)
   const onUpdateSong = (updated: Song) => {
       setSongs(prev => prev.map(s => s.id === updated.id ? updated : s));
       if (currentSong?.id === updated.id) setCurrentSong(updated);
@@ -527,19 +617,15 @@ const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
             onDeletePlaylist={async (id: string) => {
                 await api.deletePlaylist(id);
-                // SSE handles state update
                 handleBack();
             }}
             onRenamePlaylist={async (id: string, name: string) => {
                 await api.renamePlaylist(id, name);
-                // SSE handles state update
             }}
             onRemoveSong={async (pid: string, sid: string) => {
                 await api.removeSongFromPlaylist(pid, sid);
-                // SSE handles state update
             }}
             onReorderSongs={async (pid: string, from: number, to: number) => {
-                 // Optimistic update for UI smoothness (reordering feels laggy otherwise)
                  const pl = playlists.find(p => p.id === pid);
                  if (pl) {
                      const newOrder = [...pl.songIds];
@@ -568,11 +654,40 @@ const App: React.FC = () => {
             onNavigate={handleNavigate}
          />;
        case 'all_songs':
-          return <FullList type="songs" items={songs} onBack={handleBack} onNavigate={handleNavigate} onPlaySong={handlePlaySong} currentSongId={currentSong?.id} isPlaying={isPlaying} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />;
+          return <FullList 
+                type="songs" 
+                items={songs} 
+                onBack={handleBack} 
+                onNavigate={handleNavigate} 
+                onPlaySong={handlePlaySong} 
+                currentSongId={currentSong?.id} 
+                isPlaying={isPlaying} 
+                onToggleFavorite={handleToggleFavorite} 
+                onAddToPlaylist={handleAddToPlaylist}
+                onLoadMore={handleLoadMoreSongs}
+                hasMore={hasMore.songs}
+                onSearch={(q) => handleListSearch('songs', q)}
+            />;
        case 'all_albums':
-          return <FullList type="albums" items={albums} onBack={handleBack} onNavigate={handleNavigate} />;
+          return <FullList 
+                type="albums" 
+                items={albums} 
+                onBack={handleBack} 
+                onNavigate={handleNavigate} 
+                onLoadMore={handleLoadMoreAlbums}
+                hasMore={hasMore.albums}
+                onSearch={(q) => handleListSearch('albums', q)}
+            />;
        case 'all_artists':
-          return <FullList type="artists" items={artists} onBack={handleBack} onNavigate={handleNavigate} />;
+          return <FullList 
+                type="artists" 
+                items={artists} 
+                onBack={handleBack} 
+                onNavigate={handleNavigate} 
+                onLoadMore={handleLoadMoreArtists}
+                hasMore={hasMore.artists}
+                onSearch={(q) => handleListSearch('artists', q)}
+            />;
        case 'all_playlists':
           return <FullList type="playlists" items={playlists} onBack={handleBack} onNavigate={handleNavigate} />;
       default:

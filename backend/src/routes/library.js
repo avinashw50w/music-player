@@ -1,9 +1,10 @@
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../config/database.js';
-import { extractMetadata, generateWaveform, extractCoverArt } from '../services/audioService.js';
+import { extractMetadata, extractCoverArt } from '../services/audioService.js';
 import { addClient, removeClient, broadcast, updateScanStatus, currentScanStatus } from '../services/sse.js';
 import { fileURLToPath } from 'url';
 
@@ -114,7 +115,6 @@ router.post('/scan', async (req, res) => {
                     if (existing) continue;
 
                     const metadata = await extractMetadata(filePath);
-                    const waveform = await generateWaveform(filePath);
                     
                     const songId = uuidv4();
                     
@@ -184,8 +184,7 @@ router.post('/scan', async (req, res) => {
                         genre: JSON.stringify(metadata.genre),
                         is_favorite: false,
                         bitrate: metadata.bitrate,
-                        format: metadata.format,
-                        waveform_data: JSON.stringify(waveform)
+                        format: metadata.format
                     });
 
                 } catch (err) {

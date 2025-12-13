@@ -1,3 +1,4 @@
+
 import db from './database.js';
 import { fileURLToPath } from 'url';
 import process from 'process';
@@ -51,7 +52,6 @@ export async function migrate() {
             table.text('lyrics');
             table.integer('bitrate');
             table.string('format');
-            table.text('waveform_data');
             table.timestamp('created_at').defaultTo(db.fn.now());
         });
     }

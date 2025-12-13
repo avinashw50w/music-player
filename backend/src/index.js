@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -92,6 +93,7 @@ app.get('/api/search', async (req, res, next) => {
                 album: s.album_name,
                 duration: s.duration,
                 coverUrl: s.cover_url,
+                fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null,
                 genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite)
             })),

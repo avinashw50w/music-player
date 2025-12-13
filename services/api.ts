@@ -1,3 +1,4 @@
+
 import { Song, Album, Artist, Playlist } from '../types';
 
 const API_BASE_URL = '/api';
@@ -27,9 +28,26 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
+// Search
+export interface SearchResults {
+    songs: Song[];
+    albums: Album[];
+    artists: Artist[];
+}
+
+export async function search(query: string, signal?: AbortSignal): Promise<SearchResults> {
+    const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`, { signal });
+    return handleResponse<SearchResults>(response);
+}
+
 // Songs
-export async function getSongs(): Promise<Song[]> {
-  const response = await fetch(`${API_BASE_URL}/songs`);
+export async function getSongs(limit?: number, offset?: number, search?: string, signal?: AbortSignal): Promise<Song[]> {
+  const params = new URLSearchParams();
+  if (limit !== undefined) params.append('limit', limit.toString());
+  if (offset !== undefined) params.append('offset', offset.toString());
+  if (search) params.append('search', search);
+  
+  const response = await fetch(`${API_BASE_URL}/songs?${params.toString()}`, { signal });
   return handleResponse<Song[]>(response);
 }
 
@@ -68,9 +86,19 @@ export async function updateSongCover(id: string, file: File): Promise<Song> {
 
 
 // Albums
-export async function getAlbums(): Promise<Album[]> {
-  const response = await fetch(`${API_BASE_URL}/albums`);
+export async function getAlbums(limit?: number, offset?: number, search?: string, signal?: AbortSignal): Promise<Album[]> {
+  const params = new URLSearchParams();
+  if (limit !== undefined) params.append('limit', limit.toString());
+  if (offset !== undefined) params.append('offset', offset.toString());
+  if (search) params.append('search', search);
+
+  const response = await fetch(`${API_BASE_URL}/albums?${params.toString()}`, { signal });
   return handleResponse<Album[]>(response);
+}
+
+export async function getAlbum(id: string): Promise<Album & { songs: Song[] }> {
+    const response = await fetch(`${API_BASE_URL}/albums/${id}`);
+    return handleResponse<Album & { songs: Song[] }>(response);
 }
 
 export async function toggleAlbumFavorite(id: string): Promise<Album> {
@@ -98,8 +126,13 @@ export async function updateAlbumCover(id: string, file: File): Promise<Album> {
 }
 
 // Artists
-export async function getArtists(): Promise<Artist[]> {
-  const response = await fetch(`${API_BASE_URL}/artists`);
+export async function getArtists(limit?: number, offset?: number, search?: string, signal?: AbortSignal): Promise<Artist[]> {
+  const params = new URLSearchParams();
+  if (limit !== undefined) params.append('limit', limit.toString());
+  if (offset !== undefined) params.append('offset', offset.toString());
+  if (search) params.append('search', search);
+
+  const response = await fetch(`${API_BASE_URL}/artists?${params.toString()}`, { signal });
   return handleResponse<Artist[]>(response);
 }
 

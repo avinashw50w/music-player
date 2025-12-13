@@ -1,3 +1,4 @@
+
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import { promisify } from 'util';
@@ -48,58 +49,6 @@ export async function extractMetadata(filePath) {
             });
         });
     });
-}
-
-/**
- * Generate waveform data for audio visualization
- * Returns an array of amplitude values
- */
-export async function generateWaveform(filePath, samples = 100) {
-    return new Promise((resolve, reject) => {
-        const amplitudes = [];
-
-        ffmpeg(filePath)
-            .audioFilters(`aresample=8000,asetnsamples=${samples}`)
-            .format('null')
-            .on('stderr', (line) => {
-                // Parse audio levels from stderr
-                const match = line.match(/\[Parsed[^\]]+\]\s*(-?\d+\.?\d*)/);
-                if (match) {
-                    amplitudes.push(Math.abs(parseFloat(match[1])));
-                }
-            })
-            .on('error', (err) => {
-                // If waveform generation fails, return mock data
-                console.warn('Waveform generation failed:', err.message);
-                resolve(generateMockWaveform(samples));
-            })
-            .on('end', () => {
-                if (amplitudes.length === 0) {
-                    resolve(generateMockWaveform(samples));
-                } else {
-                    // Normalize amplitudes to 0-1 range
-                    const max = Math.max(...amplitudes);
-                    const normalized = amplitudes.map(a => max > 0 ? a / max : 0);
-                    resolve(normalized);
-                }
-            })
-            .output('/dev/null')
-            .run();
-    });
-}
-
-/**
- * Generate mock waveform data for fallback
- */
-function generateMockWaveform(samples = 100) {
-    const waveform = [];
-    for (let i = 0; i < samples; i++) {
-        // Create a smooth sine-like pattern with some randomness
-        const base = Math.sin(i / samples * Math.PI * 4) * 0.5 + 0.5;
-        const random = Math.random() * 0.3;
-        waveform.push(Math.min(1, Math.max(0, base + random)));
-    }
-    return waveform;
 }
 
 /**

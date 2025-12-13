@@ -1,10 +1,11 @@
+
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../config/database.js';
-import { extractMetadata, generateWaveform } from '../services/audioService.js';
+import { extractMetadata } from '../services/audioService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,9 +67,6 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
             try {
                 // Extract metadata
                 const metadata = await extractMetadata(filePath);
-
-                // Generate waveform data
-                const waveform = await generateWaveform(filePath);
 
                 const songId = uuidv4();
 
@@ -134,8 +132,7 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
                     genre: JSON.stringify(metadata.genre), // Store as JSON
                     is_favorite: false,
                     bitrate: metadata.bitrate,
-                    format: metadata.format,
-                    waveform_data: JSON.stringify(waveform)
+                    format: metadata.format
                 });
 
                 songs.push({
@@ -183,7 +180,6 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
 
             try {
                 const metadata = await extractMetadata(filePath);
-                const waveform = await generateWaveform(filePath);
 
                 const songId = uuidv4();
 
@@ -245,8 +241,7 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
                     genre: JSON.stringify(metadata.genre), // Store as JSON
                     is_favorite: false,
                     bitrate: metadata.bitrate,
-                    format: metadata.format,
-                    waveform_data: JSON.stringify(waveform)
+                    format: metadata.format
                 });
 
                 songs.push({

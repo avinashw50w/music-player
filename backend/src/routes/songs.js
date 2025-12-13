@@ -1,3 +1,4 @@
+
 import express from 'express';
 import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -51,14 +52,32 @@ const transformSong = (row) => ({
     isFavorite: Boolean(row.is_favorite),
     lyrics: row.lyrics,
     bitrate: row.bitrate,
-    format: row.format,
-    waveformData: row.waveform_data ? JSON.parse(row.waveform_data) : null
+    format: row.format
 });
 
 // GET all songs
 router.get('/', async (req, res, next) => {
     try {
-        const songs = await db('songs').select('*').orderBy('created_at', 'desc');
+        const { limit, offset, search } = req.query;
+        let query = db('songs').select('*').orderBy('created_at', 'desc');
+        
+        if (search) {
+            const term = `%${search}%`;
+            query = query.where(function() {
+                this.where('title', 'like', term)
+                    .orWhere('artist_name', 'like', term)
+                    .orWhere('album_name', 'like', term);
+            });
+        }
+
+        if (limit) {
+            query = query.limit(parseInt(limit));
+        }
+        if (offset) {
+            query = query.offset(parseInt(offset));
+        }
+
+        const songs = await query;
         res.json(songs.map(transformSong));
     } catch (err) {
         next(err);
