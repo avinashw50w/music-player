@@ -43,7 +43,7 @@ const App: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState({ songs: false, albums: false, artists: false });
   // Search state for lists
   const [listQueries, setListQueries] = useState({ songs: '', albums: '', artists: '' });
-  const PAGE_LIMIT = 50;
+  const PAGE_LIMIT = 20;
   
   // Abort Controllers
   const searchAbortControllers = useRef<{ [key: string]: AbortController }>({});

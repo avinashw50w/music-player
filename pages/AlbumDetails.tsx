@@ -34,18 +34,28 @@ export const AlbumDetails: React.FC<DetailProps> = ({
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
+  // Pagination State
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_LIMIT = 20;
+
   useEffect(() => {
     if (id) {
         setLoading(true);
         // Clean up internal state to prevent flashing old data
         setAlbum(null);
         setTracks([]);
+        setOffset(0);
+        setHasMore(true);
         
-        api.getAlbum(id)
+        api.getAlbum(id, PAGE_LIMIT, 0)
             .then(data => {
                 const { songs, ...albumData } = data;
                 setAlbum(albumData);
                 setTracks(songs);
+                if (songs.length < PAGE_LIMIT) setHasMore(false);
+                setOffset(PAGE_LIMIT);
             })
             .catch(err => {
                 console.error("Failed to fetch album details", err);
@@ -54,6 +64,21 @@ export const AlbumDetails: React.FC<DetailProps> = ({
             .finally(() => setLoading(false));
     }
   }, [id]);
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore || !album) return;
+    setLoadingMore(true);
+    try {
+        const newSongs = await api.getAlbumSongs(album.id, PAGE_LIMIT, offset);
+        if (newSongs.length < PAGE_LIMIT) setHasMore(false);
+        setTracks(prev => [...prev, ...newSongs]);
+        setOffset(prev => prev + PAGE_LIMIT);
+    } catch (err) {
+        console.error("Failed to load more songs", err);
+    } finally {
+        setLoadingMore(false);
+    }
+  };
 
   if (loading) {
       return (
@@ -164,6 +189,20 @@ export const AlbumDetails: React.FC<DetailProps> = ({
           }}
         />
       </div>
+
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="px-10 max-w-7xl mx-auto mb-10 mt-4 flex justify-center">
+            <button 
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50"
+            >
+                {loadingMore ? 'Loading...' : 'Load More Songs'}
+            </button>
+        </div>
+      )}
+
       {isEditing && (
         <EditModal
           title="Edit Album"

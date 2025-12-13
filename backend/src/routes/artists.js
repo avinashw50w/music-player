@@ -70,13 +70,18 @@ router.get('/', async (req, res, next) => {
 // GET artist by ID with albums and songs
 router.get('/:id', async (req, res, next) => {
     try {
+        const { songLimit = 20, songOffset = 0 } = req.query;
         const artist = await db('artists').where({ id: req.params.id }).first();
         if (!artist) {
             return res.status(404).json({ error: 'Artist not found' });
         }
 
         const albums = await db('albums').where({ artist_id: req.params.id }).select('*');
-        const songs = await db('songs').where({ artist_id: req.params.id }).select('*');
+        const songs = await db('songs')
+            .where({ artist_id: req.params.id })
+            .limit(parseInt(songLimit))
+            .offset(parseInt(songOffset))
+            .select('*');
 
         res.json({
             ...transformArtist(artist),
@@ -92,14 +97,44 @@ router.get('/:id', async (req, res, next) => {
                 id: s.id,
                 title: s.title,
                 artist: s.artist_name,
+                artistId: s.artist_id,
                 album: s.album_name,
+                albumId: s.album_id,
                 duration: s.duration,
                 coverUrl: s.cover_url,
-                genre: s.genre,
+                genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite),
                 fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
             }))
         });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET artist songs (paginated)
+router.get('/:id/songs', async (req, res, next) => {
+    try {
+        const { limit = 20, offset = 0 } = req.query;
+        const songs = await db('songs')
+            .where({ artist_id: req.params.id })
+            .limit(parseInt(limit))
+            .offset(parseInt(offset))
+            .select('*');
+
+        res.json(songs.map(s => ({
+            id: s.id,
+            title: s.title,
+            artist: s.artist_name,
+            artistId: s.artist_id,
+            album: s.album_name,
+            albumId: s.album_id,
+            duration: s.duration,
+            coverUrl: s.cover_url,
+            genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
+            isFavorite: Boolean(s.is_favorite),
+            fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
+        })));
     } catch (err) {
         next(err);
     }

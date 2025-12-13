@@ -103,9 +103,14 @@ export async function getAlbums(limit?: number, offset?: number, search?: string
   return handleResponse<Album[]>(response);
 }
 
-export async function getAlbum(id: string): Promise<Album & { songs: Song[] }> {
-    const response = await fetch(`${API_BASE_URL}/albums/${id}`);
+export async function getAlbum(id: string, songLimit: number = 20, songOffset: number = 0): Promise<Album & { songs: Song[] }> {
+    const response = await fetch(`${API_BASE_URL}/albums/${id}?songLimit=${songLimit}&songOffset=${songOffset}`);
     return handleResponse<Album & { songs: Song[] }>(response);
+}
+
+export async function getAlbumSongs(id: string, limit: number = 20, offset: number = 0): Promise<Song[]> {
+    const response = await fetch(`${API_BASE_URL}/albums/${id}/songs?limit=${limit}&offset=${offset}`);
+    return handleResponse<Song[]>(response);
 }
 
 export async function toggleAlbumFavorite(id: string): Promise<Album> {
@@ -144,9 +149,14 @@ export async function getArtists(limit?: number, offset?: number, search?: strin
   return handleResponse<Artist[]>(response);
 }
 
-export async function getArtist(id: string): Promise<Artist & { songs: Song[], albums: Album[] }> {
-    const response = await fetch(`${API_BASE_URL}/artists/${id}`);
+export async function getArtist(id: string, songLimit: number = 20, songOffset: number = 0): Promise<Artist & { songs: Song[], albums: Album[] }> {
+    const response = await fetch(`${API_BASE_URL}/artists/${id}?songLimit=${songLimit}&songOffset=${songOffset}`);
     return handleResponse<Artist & { songs: Song[], albums: Album[] }>(response);
+}
+
+export async function getArtistSongs(id: string, limit: number = 20, offset: number = 0): Promise<Song[]> {
+    const response = await fetch(`${API_BASE_URL}/artists/${id}/songs?limit=${limit}&offset=${offset}`);
+    return handleResponse<Song[]>(response);
 }
 
 export async function toggleArtistFavorite(id: string): Promise<Artist> {

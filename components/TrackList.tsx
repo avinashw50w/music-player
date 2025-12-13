@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useRef } from 'react';
 import { Clock } from 'lucide-react';
 import { Song, NavigationState } from '../types';
 import { SongListItem } from './SongListItem';
@@ -30,7 +31,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   onReorder,
   showHeader = true
 }) => {
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const draggedIndexRef = useRef<number | null>(null);
 
   return (
     <div className="px-6 md:px-10 pb-32 max-w-7xl mx-auto">
@@ -56,13 +57,21 @@ export const TrackList: React.FC<TrackListProps> = ({
             onAddToPlaylist={onAddToPlaylist}
             isEditable={isEditable}
             onRemove={() => onRemoveSong?.(song.id)}
-            onDragStart={() => isEditable && setDraggedIndex(i)}
-            onDragOver={(e) => { e.preventDefault(); }}
+            onDragStart={() => {
+                if (isEditable) draggedIndexRef.current = i;
+            }}
+            onDragOver={(e) => { 
+                if (isEditable) {
+                    e.preventDefault(); 
+                    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+                }
+            }}
             onDrop={(e) => {
               e.preventDefault();
+              const draggedIndex = draggedIndexRef.current;
               if (isEditable && draggedIndex !== null && draggedIndex !== i) {
                 onReorder?.(draggedIndex, i);
-                setDraggedIndex(null);
+                draggedIndexRef.current = null;
               }
             }}
           />

@@ -28,20 +28,30 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
+  // Pagination State
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_LIMIT = 20;
+
   useEffect(() => {
     if (id) {
         setLoading(true);
-        // Reset state to avoid flashing previous data
+        // Reset state
         setArtist(null);
         setSongs([]);
         setAlbums([]);
+        setOffset(0);
+        setHasMore(true);
 
-        api.getArtist(id)
+        api.getArtist(id, PAGE_LIMIT, 0)
             .then(data => {
                 const { songs, albums, ...artistData } = data;
                 setArtist(artistData);
                 setSongs(songs);
                 setAlbums(albums);
+                if (songs.length < PAGE_LIMIT) setHasMore(false);
+                setOffset(PAGE_LIMIT);
             })
             .catch(err => {
                 console.error("Failed to fetch artist details", err);
@@ -50,6 +60,21 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
             .finally(() => setLoading(false));
     }
   }, [id]);
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore || !artist) return;
+    setLoadingMore(true);
+    try {
+        const newSongs = await api.getArtistSongs(artist.id, PAGE_LIMIT, offset);
+        if (newSongs.length < PAGE_LIMIT) setHasMore(false);
+        setSongs(prev => [...prev, ...newSongs]);
+        setOffset(prev => prev + PAGE_LIMIT);
+    } catch (err) {
+        console.error("Failed to load more songs", err);
+    } finally {
+        setLoadingMore(false);
+    }
+  };
 
   if (loading) {
       return (
@@ -157,6 +182,19 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
         }}
         showHeader={false}
       />
+      
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="px-10 max-w-7xl mx-auto mb-10 flex justify-center">
+            <button 
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50"
+            >
+                {loadingMore ? 'Loading...' : 'Load More Songs'}
+            </button>
+        </div>
+      )}
 
       {albums.length > 0 && (
         <div className="px-10 max-w-7xl mx-auto mt-16 mb-12">
