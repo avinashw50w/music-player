@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Song, Album, Artist, Playlist, NavigationState } from '../types';
-import { Heart, ListMusic, MoreHorizontal, Play, ListPlus } from 'lucide-react';
-import PlayingIndicator from '../components/PlayingIndicator';
+import { Heart, ListMusic, MoreHorizontal } from 'lucide-react';
+import { SongListItem } from '../components/SongListItem';
 
 interface FavoritesProps {
   songs: Song[];
@@ -32,53 +32,19 @@ const Favorites: React.FC<FavoritesProps> = ({ songs, albums, artists, playlists
       if (favoriteSongs.length === 0) return <div className="text-slate-500 mt-10 text-left">No favorite songs yet.</div>;
       return (
         <div className="space-y-1">
-          {favoriteSongs.map((song) => {
-            const isCurrent = currentSongId === song.id;
-            return (
-              <div 
-                key={song.id} 
-                onClick={() => onPlaySong(song)}
-                className="group flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-5">
-                  <div className="relative w-14 h-14 flex-shrink-0">
-                    <img src={song.coverUrl} alt={song.title} className="w-full h-full rounded-2xl object-cover shadow-lg" />
-                    {isCurrent && isPlaying && (
-                       <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                         <PlayingIndicator />
-                       </div>
-                    )}
-                    <div className={`absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px] ${isCurrent && isPlaying ? 'hidden' : ''}`}>
-                       <Play className="w-6 h-6 text-white fill-current ml-1" />
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className={`font-bold text-lg mb-1 ${isCurrent ? 'text-indigo-400' : 'text-white'}`}>{song.title}</h4>
-                    <p className="text-slate-500 text-sm font-medium">{song.artist}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-4 pr-4">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onAddToPlaylist(song); }}
-                    className="p-2 text-slate-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
-                    title="Add to Playlist"
-                  >
-                    <ListPlus className="w-6 h-6" />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onToggleFavorite(song.id); }}
-                    className="p-2 text-rose-500 hover:scale-110 transition-transform"
-                  >
-                    <Heart className="w-6 h-6 fill-current" />
-                  </button>
-                  <button className="p-2 text-slate-600 hover:text-white transition-colors">
-                    <MoreHorizontal className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          {favoriteSongs.map((song, i) => (
+             <SongListItem
+                key={song.id}
+                song={song}
+                index={i}
+                currentSongId={currentSongId}
+                isPlaying={isPlaying}
+                onPlay={() => onPlaySong(song)}
+                onNavigate={onNavigate}
+                onToggleFavorite={onToggleFavorite}
+                onAddToPlaylist={onAddToPlaylist}
+             />
+          ))}
         </div>
       );
     }

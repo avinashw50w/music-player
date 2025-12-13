@@ -69,7 +69,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
         <div className="overflow-hidden min-w-0">
           <h4 
             onClick={() => onNavigate('song_details', currentSong.id)}
-            className="text-white text-lg font-bold truncate cursor-pointer hover:underline hover:text-indigo-400 transition-colors"
+            className="text-white text-lg font-semibold truncate cursor-pointer hover:underline hover:text-indigo-400 transition-colors"
           >
             {currentSong.title}
           </h4>
