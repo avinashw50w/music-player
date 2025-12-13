@@ -49,7 +49,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
       {/* Song Info */}
       <div className="flex items-center gap-5 w-[30%] min-w-0">
         <div 
-          className="relative group cursor-pointer"
+          className="relative group cursor-pointer flex-shrink-0"
           onClick={() => onNavigate('song_details', currentSong.id)}
         >
            <img

@@ -261,7 +261,7 @@ export const SongDetails: React.FC<DetailProps> = ({ id, onBack, songs, currentS
                 { name: 'title', label: 'Title', value: song.title },
                 { name: 'artist', label: 'Artist', value: song.artist },
                 { name: 'album', label: 'Album', value: song.album },
-                { name: 'genre', label: 'Genre', value: song.genre.join(', ') }
+                { name: 'genre', label: 'Genre (comma separated)', value: song.genre.join(', ') }
             ]}
         />
       )}

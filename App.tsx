@@ -14,6 +14,7 @@ import { CreatePlaylistModal } from './components/CreatePlaylistModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import * as api from './services/api';
 import { Song, Album, Artist, Playlist, NavigationState, ViewType } from './types';
+import { AlertCircle, RefreshCw, X } from 'lucide-react';
 
 const App: React.FC = () => {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -34,6 +35,9 @@ const App: React.FC = () => {
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
   const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
   const [songToAdd, setSongToAdd] = useState<Song | null>(null);
+  
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -78,7 +82,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (audioRef.current) {
         if (isPlaying) {
-            audioRef.current.play().catch(e => console.error("Playback failed", e));
+            // Reset error on play attempt
+            setPlaybackError(null);
+            audioRef.current.play().catch(e => {
+                console.error("Playback failed", e);
+                // Note: Standard play interruptions shouldn't trigger full UI errors usually,
+                // but real load errors are handled by onError on the audio tag.
+            });
         } else {
             audioRef.current.pause();
         }
@@ -129,6 +139,7 @@ const App: React.FC = () => {
     } else {
         setCurrentSong(song);
         setIsPlaying(true);
+        setPlaybackError(null); // Clear previous errors
         if (context) {
             setPlaybackQueue(context);
         } else {
@@ -177,6 +188,27 @@ const App: React.FC = () => {
 
   const handleSongEnded = () => {
       handleNext();
+  };
+
+  const handleAudioError = () => {
+      if (currentSong) {
+          setIsPlaying(false);
+          setPlaybackError(`File not found: "${currentSong.title}". It may have been moved.`);
+      }
+  };
+
+  const handleRefreshLibrary = async () => {
+      setIsRefreshing(true);
+      try {
+          const res = await api.refreshLibrary();
+          setPlaybackError(null);
+          await fetchData();
+          // Optional: You could show a success toast here
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsRefreshing(false);
+      }
   };
 
   const handleToggleFavorite = async (id: string) => {
@@ -435,6 +467,36 @@ const App: React.FC = () => {
           <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-900/20 blur-[150px]"></div>
       </div>
 
+      {/* Error Toast */}
+      {playbackError && (
+          <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-2 fade-in">
+              <div className="bg-rose-500/10 backdrop-blur-md border border-rose-500/20 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4">
+                  <div className="p-2 bg-rose-500 rounded-full">
+                      <AlertCircle className="w-5 h-5 fill-current" />
+                  </div>
+                  <div className="flex flex-col">
+                      <span className="font-bold text-sm">Playback Failed</span>
+                      <span className="text-xs text-rose-200">{playbackError}</span>
+                  </div>
+                  <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
+                  <button 
+                      onClick={handleRefreshLibrary}
+                      disabled={isRefreshing}
+                      className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-wait"
+                  >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      {isRefreshing ? 'Refreshing...' : 'Refresh Library'}
+                  </button>
+                  <button 
+                      onClick={() => setPlaybackError(null)}
+                      className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1"
+                  >
+                      <X className="w-4 h-4" />
+                  </button>
+              </div>
+          </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden relative z-10">
         <Sidebar 
             currentView={navState.view} 
@@ -471,6 +533,7 @@ const App: React.FC = () => {
         src={currentSong?.fileUrl} 
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleSongEnded}
+        onError={handleAudioError}
       />
 
       {showCreatePlaylistModal && (
