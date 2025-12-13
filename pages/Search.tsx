@@ -61,12 +61,12 @@ const Search: React.FC<SearchProps> = ({ songs, albums, artists, onPlaySong, onN
   );
   
   const categories = [
-    { title: 'Pop', color: 'from-pink-500 to-rose-500', img: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?w=300' },
+    { title: 'Pop', color: 'from-pink-500 to-rose-500', img: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
     { title: 'R&B', color: 'from-purple-500 to-indigo-500', img: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300' },
     { title: 'Jazz', color: 'from-blue-500 to-cyan-500', img: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=300' },
     { title: 'Rock', color: 'from-red-500 to-orange-500', img: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=300' },
-    { title: 'Indie', color: 'from-emerald-500 to-teal-500', img: 'https://images.unsplash.com/photo-1510915361405-ef2dbf44d7f6?w=300' },
-    { title: 'Hip Hop', color: 'from-amber-500 to-yellow-500', img: 'https://images.unsplash.com/photo-1520166012956-add9ba0835ca?w=300' },
+    { title: 'Indie', color: 'from-emerald-500 to-teal-500', img: 'https://images.unsplash.com/photo-1759415548138-4754287fb43f?w=300' },
+    { title: 'Hip Hop', color: 'from-amber-500 to-yellow-500', img: 'https://images.unsplash.com/photo-1602306022553-2bd3c9928f0d?w=300' },
   ];
 
   return (

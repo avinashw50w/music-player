@@ -44,7 +44,8 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-    const visualizers = ['bars', 'wave', 'circle', 'dots', 'shockwave', 'album cover', 'none'];
+    // const visualizers = ['bars', 'wave', 'circle', 'dots', 'shockwave', 'album cover', 'none'];
+    const visualizers = wavis.getVisualizers();
 
     useEffect(() => {
         const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none';
