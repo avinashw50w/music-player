@@ -12,9 +12,11 @@ import { SongDetails } from './pages/SongDetails';
 import FullList from './pages/FullList';
 import { CreatePlaylistModal } from './components/CreatePlaylistModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
+import { Visualizer } from './components/Visualizer';
 import * as api from './services/api';
 import { Song, Album, Artist, Playlist, NavigationState, ViewType } from './types';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
+import Wavis from './lib/waviz';
 
 const App: React.FC = () => {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -38,11 +40,20 @@ const App: React.FC = () => {
   
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showVisualizer, setShowVisualizer] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const wavisRef = useRef<Wavis | null>(null);
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  // Initialize Wavis once audioRef is available
+  useEffect(() => {
+      if (audioRef.current && !wavisRef.current) {
+          wavisRef.current = new Wavis(audioRef.current);
+      }
   }, []);
 
   // Keyboard Controls
@@ -72,12 +83,14 @@ const App: React.FC = () => {
         } else if (e.code === 'ArrowDown') {
             e.preventDefault();
             setVolume(prev => Math.max(0, prev - 0.1));
+        } else if (e.code === 'Escape') {
+            if (showVisualizer) setShowVisualizer(false);
         }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSong, playbackQueue]); 
+  }, [currentSong, playbackQueue, showVisualizer]); 
 
   useEffect(() => {
     if (audioRef.current) {
@@ -121,6 +134,8 @@ const App: React.FC = () => {
   const handleNavigate = (view: ViewType, entityId?: string) => {
     setNavHistory(prev => [...prev, navState]);
     setNavState({ view, entityId });
+    // Close visualizer on navigation
+    setShowVisualizer(false);
   };
 
   const handleBack = () => {
@@ -525,16 +540,33 @@ const App: React.FC = () => {
             onSeek={handleSeek}
             volume={volume}
             onVolumeChange={setVolume}
+            onExpand={() => setShowVisualizer(true)}
         />
       </div>
       
       <audio 
         ref={audioRef} 
         src={currentSong?.fileUrl} 
+        crossOrigin="anonymous"
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleSongEnded}
         onError={handleAudioError}
       />
+
+      {showVisualizer && currentSong && wavisRef.current && (
+          <Visualizer 
+              currentSong={currentSong}
+              isPlaying={isPlaying}
+              onClose={() => setShowVisualizer(false)}
+              wavis={wavisRef.current}
+              onPlayPause={() => setIsPlaying(!isPlaying)}
+              onNext={handleNext}
+              onPrev={handlePrev}
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={handleSeek}
+          />
+      )}
 
       {showCreatePlaylistModal && (
         <CreatePlaylistModal 

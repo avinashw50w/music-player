@@ -15,6 +15,7 @@ interface PlayerBarProps {
   onSeek: (time: number) => void;
   volume: number;
   onVolumeChange: (vol: number) => void;
+  onExpand?: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -36,7 +37,8 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   duration,
   onSeek,
   volume,
-  onVolumeChange
+  onVolumeChange,
+  onExpand
 }) => {
   
   if (!currentSong) return null;
@@ -48,18 +50,21 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
       
       {/* Song Info */}
       <div className="flex items-center gap-5 w-[30%] min-w-0">
-        <div 
-          className="relative group cursor-pointer flex-shrink-0"
-          onClick={() => onNavigate('song_details', currentSong.id)}
-        >
+        <div className="relative group flex-shrink-0">
            <img
              src={currentSong.coverUrl}
              alt={currentSong.title}
-             className="w-16 h-16 rounded-xl object-cover shadow-lg group-hover:opacity-80 transition-opacity"
+             onClick={() => onNavigate('song_details', currentSong.id)}
+             className="w-16 h-16 rounded-xl object-cover shadow-lg group-hover:opacity-80 transition-opacity cursor-pointer"
            />
-           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-             <Maximize2 className="w-6 h-6 text-white" />
-           </div>
+           {onExpand && (
+               <button 
+                 onClick={(e) => { e.stopPropagation(); onExpand(); }}
+                 className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-xl"
+               >
+                 <Maximize2 className="w-6 h-6 text-white" />
+               </button>
+           )}
         </div>
         <div className="overflow-hidden min-w-0">
           <h4 
