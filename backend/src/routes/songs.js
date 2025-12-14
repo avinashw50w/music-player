@@ -6,6 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import { broadcast } from '../services/sse.js';
 import { identifySongMetadata, downloadCoverImage } from '../services/metadataService.js';
+import { identificationQueue } from '../services/taskQueue.js';
 import { config } from '../config/env.js';
 
 const router = express.Router();
@@ -185,74 +186,92 @@ router.get('/:id/stream', async (req, res, next) => {
 });
 
 // POST identify song using audio fingerprinting
+// Uses task queue to prevent rate limiting and CPU overload
 router.post('/:id/identify', async (req, res, next) => {
     try {
-        const song = await db('songs').where({ id: req.params.id }).first();
-        if (!song || !song.file_path) {
-            return res.status(404).json({ error: 'Song or file not found' });
-        }
-
-        // 1. Identify
-        const metadata = await identifySongMetadata(song.file_path);
-
-        // 2. Download Cover if available
-        let coverUrl = song.cover_url;
-        if (metadata.coverUrl) {
-            const downloaded = await downloadCoverImage(metadata.coverUrl, `auto-${song.id}`);
-            if (downloaded) coverUrl = downloaded;
-        }
-
-        // 3. Process Artists (create and link)
-        const primaryArtistId = await processSongArtists(song.id, metadata.artists || [metadata.artist]);
-
-        // 4. Update Album (find or create)
-        let albumId = song.album_id;
-        if (metadata.album) {
-            const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
-            if (existingAlbum) {
-                albumId = existingAlbum.id;
-            } else {
-                albumId = uuidv4();
-                await db('albums').insert({
-                    id: albumId,
-                    title: metadata.album,
-                    artist_id: primaryArtistId,
-                    artist_name: metadata.artist,
-                    cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
-                    year: metadata.year,
-                    genre: JSON.stringify(metadata.genre || []),
-                    track_count: 1
-                });
+        // Wrap the logic in the queue
+        const result = await identificationQueue.add(async () => {
+            const song = await db('songs').where({ id: req.params.id }).first();
+            if (!song || !song.file_path) {
+                throw new Error('Song or file not found');
             }
-        }
 
-        // 5. Update Song
-        await db('songs').where({ id: req.params.id }).update({
-            title: metadata.title || song.title,
-            artist_name: metadata.artist || song.artist_name,
-            artist_id: primaryArtistId || song.artist_id,
-            album_name: metadata.album || song.album_name,
-            album_id: albumId,
-            cover_url: coverUrl
+            // 1. Identify and enrich with MusicBrainz
+            const metadata = await identifySongMetadata(song.file_path);
+
+            // 2. Download Cover if available
+            let coverUrl = song.cover_url;
+            if (metadata.coverUrl) {
+                const downloaded = await downloadCoverImage(metadata.coverUrl, `auto-${song.id}`);
+                if (downloaded) coverUrl = downloaded;
+            }
+
+            // 3. Process Artists (create and link)
+            const primaryArtistId = await processSongArtists(song.id, metadata.artists || [metadata.artist]);
+
+            // 4. Update Album (find or create)
+            let albumId = song.album_id;
+            if (metadata.album) {
+                const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
+                if (existingAlbum) {
+                    albumId = existingAlbum.id;
+                    // Update album details if improved data found
+                    if (metadata.year || metadata.genre.length > 0) {
+                        await db('albums').where({ id: albumId }).update({
+                            year: metadata.year || existingAlbum.year,
+                            // Merge genres roughly by preferring new ones if exist
+                            genre: metadata.genre.length > 0 ? JSON.stringify(metadata.genre) : existingAlbum.genre
+                        });
+                    }
+                } else {
+                    albumId = uuidv4();
+                    await db('albums').insert({
+                        id: albumId,
+                        title: metadata.album,
+                        artist_id: primaryArtistId,
+                        artist_name: metadata.artist,
+                        cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
+                        year: metadata.year,
+                        genre: JSON.stringify(metadata.genre || []),
+                        track_count: 1
+                    });
+                }
+            }
+
+            // 5. Update Song
+            await db('songs').where({ id: req.params.id }).update({
+                title: metadata.title || song.title,
+                artist_name: metadata.artist || song.artist_name,
+                artist_id: primaryArtistId || song.artist_id,
+                album_name: metadata.album || song.album_name,
+                album_id: albumId,
+                cover_url: coverUrl,
+                genre: JSON.stringify(metadata.genre || [])
+            });
+
+            // 6. Return full updated song with artists
+            const updatedSong = await db('songs').where({ id: req.params.id }).first();
+            
+            const artists = await db('song_artists')
+                .join('artists', 'song_artists.artist_id', 'artists.id')
+                .where('song_artists.song_id', song.id)
+                .select('artists.id', 'artists.name');
+
+            const transformed = {
+                ...transformSong(updatedSong),
+                artists
+            };
+            
+            broadcast('song:update', transformed);
+            return transformed;
         });
 
-        // 6. Return full updated song with artists
-        const updatedSong = await db('songs').where({ id: req.params.id }).first();
-        
-        const artists = await db('song_artists')
-            .join('artists', 'song_artists.artist_id', 'artists.id')
-            .where('song_artists.song_id', song.id)
-            .select('artists.id', 'artists.name');
-
-        const transformed = {
-            ...transformSong(updatedSong),
-            artists
-        };
-        
-        broadcast('song:update', transformed);
-        res.json(transformed);
+        res.json(result);
 
     } catch (err) {
+        if (err.message === 'Song or file not found') {
+            return res.status(404).json({ error: err.message });
+        }
         res.status(500).json({ 
             error: err.message || 'Identification failed', 
             details: 'Ensure fpcalc is installed on the server.' 
