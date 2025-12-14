@@ -4,7 +4,7 @@
 import { Song, Album, Artist, Playlist } from './types';
 
 // API Base URL - used by services/api.ts
-export const API_BASE_URL = 'http://localhost:3001/api';
+export const API_BASE_URL = 'http://localhost:3010/api';
 
 // Default/fallback data for when backend is not available
 export const ARTISTS: Artist[] = [];

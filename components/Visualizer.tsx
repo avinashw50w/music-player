@@ -90,9 +90,9 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
     // Combine custom visualizers with static modes
     const allOptions = [
-        ...visualizerOptions,
         { name: 'album cover', displayName: 'Album Cover', type: 'static' },
-        { name: 'none', displayName: 'None', type: 'static' }
+        { name: 'none', displayName: 'None', type: 'static' },
+        ...visualizerOptions,
     ];
 
     return (

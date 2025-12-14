@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Navigate, useLocation, ScrollRestoration } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
 import Home from './pages/Home';
@@ -74,7 +74,7 @@ const App: React.FC = () => {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showVisualizer, setShowVisualizer] = useState(false);
-  const [activeVisualizer, setActiveVisualizer] = useState('ncs_waveform');
+  const [activeVisualizer, setActiveVisualizer] = useState('bars');
 
   // Scanning State (Lifted from Browse)
   const [scanStatus, setScanStatus] = useState<api.ScanStatus | null>(null);
@@ -83,6 +83,46 @@ const App: React.FC = () => {
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const wavisRef = useRef<any>(null);
+
+  // --- CUSTOM SCROLL RESTORATION ---
+  const scrollPositions = useRef<Record<string, number>>({});
+
+  useLayoutEffect(() => {
+    // 1. Force manual restoration to prevent browser interference
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    const key = location.key;
+    const savedPosition = scrollPositions.current[key];
+
+    // 2. Restore Scroll Position
+    // We explicitly disable smooth scrolling on the document level during restoration
+    // to ensure an 'instant' jump and avoid the visual "scrolling down" animation.
+    const originalScrollBehavior = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = 'auto';
+
+    if (savedPosition !== undefined) {
+      window.scrollTo(0, savedPosition);
+    } else {
+      window.scrollTo(0, 0);
+    }
+
+    // Restore original scroll behavior (microtask or immediate is fine as scrollTo is sync)
+    document.documentElement.style.scrollBehavior = originalScrollBehavior;
+
+    // 3. Setup Scroll Listener
+    // Use a robust listener that updates the ref.
+    // Important: We use useLayoutEffect cleanup to remove the listener BEFORE
+    // the DOM updates for the next route, preventing the "reset to 0" issue.
+    const saveScrollPosition = () => {
+      scrollPositions.current[key] = window.scrollY;
+    };
+
+    window.addEventListener('scroll', saveScrollPosition);
+    return () => window.removeEventListener('scroll', saveScrollPosition);
+  }, [location.key]);
+  // ---------------------------------
 
   // 1. Fetch Playlists ONCE on mount & Load History
   useEffect(() => {
@@ -666,7 +706,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen text-white font-sans relative">
-      <ScrollRestoration />
       
       {/* Background Ambience */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
