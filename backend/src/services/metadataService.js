@@ -22,8 +22,13 @@ export async function identifySongMetadata(filePath) {
         duration: duration.toString(),
         fingerprint: fingerprint
     });
-    // GET works
-    const acoustidResponse = await fetch(`https://api.acoustid.org/v2/lookup?${params.toString()}`);
+
+    const url = `https://api.acoustid.org/v2/lookup?${params.toString()}`;
+
+    // Using POST with params in URL
+    const acoustidResponse = await fetch(url, {
+        method: 'POST'
+    });
 
     if (!acoustidResponse.ok) {
         const errorBody = await acoustidResponse.text();
@@ -66,9 +71,14 @@ export async function identifySongMetadata(filePath) {
     }
 
     // 4. Extract Data
+    // Map artists to array of objects { name, id (optional MBID) }
+    const artists = recording.artists ? recording.artists.map(a => ({ name: a.name, id: a.id })) : [];
+    const artistDisplay = artists.map(a => a.name).join(', ') || 'Unknown Artist';
+
     const metadata = {
         title: recording.title,
-        artist: recording.artists ? recording.artists.map(a => a.name).join(', ') : 'Unknown Artist',
+        artist: artistDisplay,
+        artists: artists,
         // Prefer Release Group title (Album) over Release title
         album: releaseGroup ? releaseGroup.title : (release ? release.title : 'Unknown Album'),
         year: (release && release.date && release.date.year) ? parseInt(release.date.year) : null,

@@ -54,6 +54,30 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   
   if (!currentSong) return null;
 
+  const renderArtists = () => {
+      if (currentSong.artists && currentSong.artists.length > 0) {
+          return currentSong.artists.map((artist, i) => (
+              <React.Fragment key={artist.id}>
+                  {i > 0 && <span className="text-slate-500 cursor-default">, </span>}
+                  <span 
+                      className="text-slate-400 hover:text-white cursor-pointer transition-colors text-sm"
+                      onClick={() => navigate(`/artist/${artist.id}`)}
+                  >
+                      {artist.name}
+                  </span>
+              </React.Fragment>
+          ));
+      }
+      return (
+          <p 
+            onClick={() => navigate(`/artist/${currentSong.artistId || 'ar1'}`)} 
+            className="text-slate-400 text-sm truncate hover:text-white cursor-pointer transition-colors w-fit"
+          >
+            {currentSong.artist}
+          </p>
+      );
+  };
+
   return (
     <div className="h-28 bg-black/40 backdrop-blur-2xl px-8 flex items-center justify-between z-[100] w-full shadow-2xl border-t border-white/5 flex-shrink-0 relative">
       
@@ -82,12 +106,9 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
           >
             {currentSong.title}
           </h4>
-          <p 
-            onClick={() => navigate(`/artist/${currentSong.artistId || 'ar1'}`)} 
-            className="text-slate-400 text-sm truncate hover:text-white cursor-pointer transition-colors w-fit"
-          >
-            {currentSong.artist}
-          </p>
+          <div className="truncate">
+             {renderArtists()}
+          </div>
         </div>
         <button 
           onClick={() => onToggleFavorite(currentSong.id)}

@@ -132,20 +132,38 @@ router.post('/scan', async (req, res) => {
                         console.warn('Cover extraction failed', e);
                     }
 
-                    // Artist Logic
-                    let artistId = null;
-                    if (metadata.artist) {
-                        const existingArtist = await db('artists').where('name', 'like', metadata.artist).first();
-                        if (existingArtist) {
-                            artistId = existingArtist.id;
-                        } else {
-                            artistId = uuidv4();
-                            await db('artists').insert({
-                                id: artistId,
-                                name: metadata.artist,
-                                avatar_url: `https://picsum.photos/seed/${encodeURIComponent(metadata.artist)}/200/200`
-                            });
+                    // Artist Logic (Multi-artist support)
+                    let primaryArtistId = null;
+                    if (metadata.artists && metadata.artists.length > 0) {
+                        for (let j = 0; j < metadata.artists.length; j++) {
+                            const name = metadata.artists[j].trim();
+                            if (!name) continue;
+                            
+                            let artistId;
+                            const existingArtist = await db('artists').where('name', 'like', name).first();
+                            if (existingArtist) {
+                                artistId = existingArtist.id;
+                            } else {
+                                artistId = uuidv4();
+                                await db('artists').insert({
+                                    id: artistId,
+                                    name: name,
+                                    avatar_url: `https://picsum.photos/seed/${encodeURIComponent(name)}/200/200`
+                                });
+                            }
+                            
+                            if (j === 0) primaryArtistId = artistId;
+                            
+                            try {
+                                await db('song_artists').insert({
+                                    song_id: songId,
+                                    artist_id: artistId
+                                });
+                            } catch(e) {}
                         }
+                    } else {
+                        // Fallback Unknown Artist
+                        // ... code omitted for brevity as usually extractMetadata returns 'Unknown Artist' in array
                     }
 
                     // Album Logic
@@ -160,7 +178,7 @@ router.post('/scan', async (req, res) => {
                             await db('albums').insert({
                                 id: albumId,
                                 title: metadata.album,
-                                artist_id: artistId,
+                                artist_id: primaryArtistId,
                                 artist_name: metadata.artist || 'Unknown Artist',
                                 cover_url: coverUrl, // Use same cover for album
                                 year: metadata.year,
@@ -173,7 +191,7 @@ router.post('/scan', async (req, res) => {
                     await db('songs').insert({
                         id: songId,
                         title: metadata.title,
-                        artist_id: artistId,
+                        artist_id: primaryArtistId,
                         artist_name: metadata.artist,
                         album_id: albumId,
                         album_name: metadata.album,

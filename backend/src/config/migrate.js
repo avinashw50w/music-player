@@ -89,6 +89,17 @@ export async function migrate() {
         });
     }
 
+    // Song Artists junction table (New)
+    if (!(await db.schema.hasTable('song_artists'))) {
+        await db.schema.createTable('song_artists', (table) => {
+            table.increments('id').primary();
+            table.string('song_id').references('id').inTable('songs').onDelete('CASCADE');
+            table.string('artist_id').references('id').inTable('artists').onDelete('CASCADE');
+            table.unique(['song_id', 'artist_id']);
+        });
+        console.log('Created song_artists table');
+    }
+
     // Genres table
     if (!(await db.schema.hasTable('genres'))) {
         await db.schema.createTable('genres', (table) => {

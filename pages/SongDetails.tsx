@@ -140,6 +140,23 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
       }
   };
 
+  const renderArtists = () => {
+      if (song.artists && song.artists.length > 0) {
+          return song.artists.map((artist, i) => (
+              <React.Fragment key={artist.id}>
+                  {i > 0 && <span className="text-indigo-300/50">, </span>}
+                  <span 
+                      className="cursor-pointer hover:text-white transition-colors hover:underline"
+                      onClick={() => navigate(`/artist/${artist.id}`)}
+                  >
+                      {artist.name}
+                  </span>
+              </React.Fragment>
+          ));
+      }
+      return song.artist;
+  };
+
 
   return (
     <div className="min-h-full flex flex-col p-8 pb-10 relative overflow-hidden animate-fade-in-up">
@@ -205,7 +222,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
               )}
               
               <h1 className="text-4xl md:text-5xl font-black text-white mb-2 tracking-tight leading-tight">{song.title}</h1>
-              <p className="text-2xl text-indigo-300 font-medium mb-4">{song.artist}</p>
+              <p className="text-2xl text-indigo-300 font-medium mb-4">{renderArtists()}</p>
 
               <div className="flex items-center justify-center lg:justify-start gap-4 flex-wrap">
                 <button

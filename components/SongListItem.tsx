@@ -41,6 +41,36 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
   const displayIndex = String(index + 1).padStart(2, '0');
   const navigate = useNavigate();
 
+  const renderArtists = () => {
+      if (song.artists && song.artists.length > 0) {
+          return song.artists.map((artist, i) => (
+              <React.Fragment key={artist.id}>
+                  {i > 0 && <span className="text-slate-500 cursor-default">, </span>}
+                  <span 
+                      className="hover:text-white hover:underline cursor-pointer transition-colors truncate"
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/artist/${artist.id}`);
+                      }}
+                  >
+                      {artist.name}
+                  </span>
+              </React.Fragment>
+          ));
+      }
+      return (
+          <span 
+              className="hover:text-white hover:underline cursor-pointer transition-colors truncate max-w-full"
+              onClick={(e) => {
+                  e.stopPropagation();
+                  if (song.artistId) navigate(`/artist/${song.artistId}`);
+              }}
+          >
+              {song.artist}
+          </span>
+      );
+  };
+
   return (
     <div
       draggable={isEditable}
@@ -114,16 +144,8 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
             >
                 {song.title}
             </span>
-            <div className="flex items-center text-sm text-slate-500 w-full mt-0.5">
-                <span 
-                    className="hover:text-white hover:underline cursor-pointer transition-colors truncate max-w-full"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (song.artistId) navigate(`/artist/${song.artistId}`);
-                    }}
-                >
-                    {song.artist}
-                </span>
+            <div className="flex items-center text-sm text-slate-500 w-full mt-0.5 truncate">
+                {renderArtists()}
             </div>
          </div>
       </div>

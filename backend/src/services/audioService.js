@@ -34,11 +34,17 @@ export async function extractMetadata(filePath) {
             }
             if (genres.length === 0) genres = ['Unknown'];
 
+            // Handle Multiple Artists (simple split)
+            const rawArtist = tags.artist || tags.ARTIST || 'Unknown Artist';
+            const artistNames = rawArtist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
+            if (artistNames.length === 0) artistNames.push('Unknown Artist');
+
             resolve({
                 title: tags.title || path.basename(filePath, path.extname(filePath)),
-                artist: tags.artist || tags.ARTIST || 'Unknown Artist',
+                artist: artistNames.join(', '), // Display string
+                artists: artistNames, // Array of names for logic
                 album: tags.album || tags.ALBUM || 'Unknown Album',
-                genre: genres, // Now returns an array
+                genre: genres, 
                 year: tags.date ? parseInt(tags.date.substring(0, 4)) : null,
                 duration,
                 durationSeconds,

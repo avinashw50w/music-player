@@ -53,6 +53,51 @@ const transformSong = (row) => ({
     format: row.format
 });
 
+// Helper to process multiple artists for a song
+// This ensures all artists in the list exist in DB and links them to the song
+const processSongArtists = async (songId, artistsData) => {
+    // 1. Clear existing links
+    await db('song_artists').where({ song_id: songId }).del();
+
+    const artistIds = [];
+
+    // 2. Iterate artists
+    for (const artistData of artistsData) {
+        const name = typeof artistData === 'string' ? artistData.trim() : artistData.name.trim();
+        if (!name) continue;
+
+        let artistId = null;
+        // Try to find existing artist
+        const existingArtist = await db('artists').where('name', 'like', name).first();
+        
+        if (existingArtist) {
+            artistId = existingArtist.id;
+        } else {
+            // Create new artist
+            artistId = uuidv4();
+            await db('artists').insert({
+                id: artistId,
+                name: name,
+                avatar_url: `https://picsum.photos/seed/${encodeURIComponent(name)}/200/200`
+            });
+        }
+
+        artistIds.push(artistId);
+
+        // 3. Link to song
+        try {
+            await db('song_artists').insert({
+                song_id: songId,
+                artist_id: artistId
+            });
+        } catch (e) {
+            // Ignore duplicates if any logic error occurs
+        }
+    }
+
+    return artistIds.length > 0 ? artistIds[0] : null; // Return primary artist ID
+};
+
 // GET all songs
 router.get('/', async (req, res, next) => {
     try {
@@ -80,7 +125,24 @@ router.get('/', async (req, res, next) => {
         }
 
         const songs = await query;
-        res.json(songs.map(transformSong));
+
+        // Fetch associated artists for these songs
+        const songIds = songs.map(s => s.id);
+        const songArtists = await db('song_artists')
+            .join('artists', 'song_artists.artist_id', 'artists.id')
+            .whereIn('song_artists.song_id', songIds)
+            .select('song_artists.song_id', 'artists.id', 'artists.name');
+
+        const artistsBySong = {};
+        songArtists.forEach(sa => {
+            if (!artistsBySong[sa.song_id]) artistsBySong[sa.song_id] = [];
+            artistsBySong[sa.song_id].push({ id: sa.id, name: sa.name });
+        });
+
+        res.json(songs.map(s => ({
+            ...transformSong(s),
+            artists: artistsBySong[s.id] || [{ id: s.artist_id, name: s.artist_name }]
+        })));
     } catch (err) {
         next(err);
     }
@@ -93,7 +155,17 @@ router.get('/:id', async (req, res, next) => {
         if (!song) {
             return res.status(404).json({ error: 'Song not found' });
         }
-        res.json(transformSong(song));
+
+        // Fetch artists
+        const artists = await db('song_artists')
+            .join('artists', 'song_artists.artist_id', 'artists.id')
+            .where('song_artists.song_id', song.id)
+            .select('artists.id', 'artists.name');
+
+        res.json({
+            ...transformSong(song),
+            artists: artists.length > 0 ? artists : [{ id: song.artist_id, name: song.artist_name }]
+        });
     } catch (err) {
         next(err);
     }
@@ -130,21 +202,8 @@ router.post('/:id/identify', async (req, res, next) => {
             if (downloaded) coverUrl = downloaded;
         }
 
-        // 3. Update Artist (find or create)
-        let artistId = song.artist_id;
-        if (metadata.artist) {
-             const existingArtist = await db('artists').where('name', 'like', metadata.artist).first();
-             if (existingArtist) {
-                 artistId = existingArtist.id;
-             } else {
-                 artistId = uuidv4();
-                 await db('artists').insert({
-                     id: artistId,
-                     name: metadata.artist,
-                     avatar_url: `https://picsum.photos/seed/${encodeURIComponent(metadata.artist)}/200/200`
-                 });
-             }
-        }
+        // 3. Process Artists (create and link)
+        const primaryArtistId = await processSongArtists(song.id, metadata.artists || [metadata.artist]);
 
         // 4. Update Album (find or create)
         let albumId = song.album_id;
@@ -157,7 +216,7 @@ router.post('/:id/identify', async (req, res, next) => {
                 await db('albums').insert({
                     id: albumId,
                     title: metadata.album,
-                    artist_id: artistId,
+                    artist_id: primaryArtistId,
                     artist_name: metadata.artist,
                     cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
                     year: metadata.year,
@@ -171,21 +230,29 @@ router.post('/:id/identify', async (req, res, next) => {
         await db('songs').where({ id: req.params.id }).update({
             title: metadata.title || song.title,
             artist_name: metadata.artist || song.artist_name,
-            artist_id: artistId,
+            artist_id: primaryArtistId || song.artist_id,
             album_name: metadata.album || song.album_name,
             album_id: albumId,
             cover_url: coverUrl
-            // We generally don't overwrite genre from AcoustID as it's often empty, keeping existing is safer
         });
 
+        // 6. Return full updated song with artists
         const updatedSong = await db('songs').where({ id: req.params.id }).first();
-        const transformed = transformSong(updatedSong);
+        
+        const artists = await db('song_artists')
+            .join('artists', 'song_artists.artist_id', 'artists.id')
+            .where('song_artists.song_id', song.id)
+            .select('artists.id', 'artists.name');
+
+        const transformed = {
+            ...transformSong(updatedSong),
+            artists
+        };
         
         broadcast('song:update', transformed);
         res.json(transformed);
 
     } catch (err) {
-        // Return 500 but with specific error message
         res.status(500).json({ 
             error: err.message || 'Identification failed', 
             details: 'Ensure fpcalc is installed on the server.' 
@@ -199,13 +266,13 @@ router.post('/', async (req, res, next) => {
         const { title, artist, album, duration, coverUrl, genre, filePath } = req.body;
         const id = uuidv4();
 
-        // Ensure genre is stringified for DB
         const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
 
+        // Create song entry
         await db('songs').insert({
             id,
             title,
-            artist_name: artist,
+            artist_name: artist, // Store display string
             album_name: album,
             duration,
             cover_url: coverUrl,
@@ -214,9 +281,25 @@ router.post('/', async (req, res, next) => {
             is_favorite: false
         });
 
+        // Process artists (split string)
+        const artistNames = artist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
+        const primaryArtistId = await processSongArtists(id, artistNames);
+        
+        if (primaryArtistId) {
+            await db('songs').where({ id }).update({ artist_id: primaryArtistId });
+        }
+
         const song = await db('songs').where({ id }).first();
-        const transformed = transformSong(song);
-        broadcast('song:update', transformed); // Treat create as update for list syncing
+        const artists = await db('song_artists')
+            .join('artists', 'song_artists.artist_id', 'artists.id')
+            .where('song_artists.song_id', id)
+            .select('artists.id', 'artists.name');
+
+        const transformed = {
+            ...transformSong(song),
+            artists
+        };
+        broadcast('song:update', transformed); 
         res.status(201).json(transformed);
     } catch (err) {
         next(err);
@@ -228,7 +311,6 @@ router.put('/:id', async (req, res, next) => {
     try {
         const { title, artist, album, genre, coverUrl } = req.body;
         
-        // Ensure genre is stringified for DB
         const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
 
         await db('songs').where({ id: req.params.id }).update({
@@ -239,11 +321,24 @@ router.put('/:id', async (req, res, next) => {
             cover_url: coverUrl
         });
 
+        // Process artists if name changed
+        const artistNames = artist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
+        await processSongArtists(req.params.id, artistNames);
+
         const song = await db('songs').where({ id: req.params.id }).first();
         if (!song) {
             return res.status(404).json({ error: 'Song not found' });
         }
-        const transformed = transformSong(song);
+
+        const artists = await db('song_artists')
+            .join('artists', 'song_artists.artist_id', 'artists.id')
+            .where('song_artists.song_id', req.params.id)
+            .select('artists.id', 'artists.name');
+
+        const transformed = {
+            ...transformSong(song),
+            artists
+        };
         broadcast('song:update', transformed);
         res.json(transformed);
     } catch (err) {
