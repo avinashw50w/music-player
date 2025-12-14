@@ -93,7 +93,7 @@ const Browse: React.FC<BrowseProps> = ({
 
   return (
     <div className="p-10 pb-10">
-      <div className="flex justify-between items-center mb-10">
+      <div className="flex justify-between items-center mb-10 animate-fade-in-up">
           <h1 className="text-4xl font-bold text-white">Browse</h1>
           <button 
             onClick={handleRefreshLibrary}
@@ -112,7 +112,7 @@ const Browse: React.FC<BrowseProps> = ({
       )}
 
       {/* Library Scanner Section */}
-      <div className="mb-14 bg-gradient-to-br from-[#1e1e24] to-[#151518] rounded-[2rem] p-8 border border-white/5 shadow-2xl relative overflow-hidden">
+      <div className="mb-14 bg-gradient-to-br from-[#1e1e24] to-[#151518] rounded-[2rem] p-8 border border-white/5 shadow-2xl relative overflow-hidden animate-fade-in-up delay-100">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none -translate-y-1/2 translate-x-1/2"></div>
         
         <div className="relative z-10">
@@ -175,7 +175,7 @@ const Browse: React.FC<BrowseProps> = ({
 
       {/* Top Songs Section */}
       {songs.length > 0 && (
-        <div className="mb-14">
+        <div className="mb-14 animate-fade-in-up delay-100">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Top Songs</h2>
             <button 
@@ -233,7 +233,7 @@ const Browse: React.FC<BrowseProps> = ({
 
       {/* New Albums Section */}
       {albums.length > 0 && (
-        <div className="mb-14">
+        <div className="mb-14 animate-fade-in-up delay-200">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Albums</h2>
             <button 
@@ -289,7 +289,7 @@ const Browse: React.FC<BrowseProps> = ({
 
       {/* Playlists Section */}
       {playlists.length > 0 && (
-        <div className="mb-14">
+        <div className="mb-14 animate-fade-in-up delay-200">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Playlists</h2>
             <button 
@@ -330,7 +330,7 @@ const Browse: React.FC<BrowseProps> = ({
 
       {/* Artists Section */}
       {artists.length > 0 && (
-        <div className="mb-14">
+        <div className="mb-14 animate-fade-in-up delay-300">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Artists</h2>
             <button 
@@ -356,27 +356,27 @@ const Browse: React.FC<BrowseProps> = ({
       )}
 
       {/* Genres */}
-      <div className="mb-14">
+      <div className="mb-14 animate-fade-in-up delay-300">
         <h2 className="text-2xl font-bold text-white mb-6">Genres</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
           {genres.map(genre => (
-            <div key={genre.title} className={`${genre.color} h-28 rounded-2xl p-5 relative overflow-hidden cursor-pointer hover:scale-[1.03] transition-transform shadow-lg`}>
-              <span className="font-bold text-white text-xl relative z-10">{genre.title}</span>
-              <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-white/20 rounded-full blur-xl"></div>
+            <div key={genre.title} className={`${genre.color} h-28 rounded-2xl p-5 relative overflow-hidden cursor-pointer hover:scale-[1.03] transition-transform shadow-lg group`}>
+              <span className="font-bold text-white text-xl relative z-10 group-hover:scale-105 block transition-transform">{genre.title}</span>
+              <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-white/20 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500"></div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Moods */}
-      <div>
+      <div className="animate-fade-in-up delay-300">
         <h2 className="text-2xl font-bold text-white mb-6">Moods</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {moods.map(mood => (
             <div key={mood.title} className="relative h-48 rounded-3xl overflow-hidden cursor-pointer group shadow-lg">
               <img src={mood.img} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={mood.title} />
               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors"></div>
-              <span className="absolute bottom-5 left-6 text-white font-bold text-2xl">{mood.title}</span>
+              <span className="absolute bottom-5 left-6 text-white font-bold text-2xl group-hover:translate-x-2 transition-transform">{mood.title}</span>
             </div>
           ))}
         </div>

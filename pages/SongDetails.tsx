@@ -4,6 +4,7 @@ import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
 import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play } from 'lucide-react';
+import { SongDetailSkeleton } from '../components/Skeletons';
 import * as api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -57,11 +58,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
   }, [songs, id]);
 
   if (loading) {
-      return (
-          <div className="min-h-full flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-      );
+      return <SongDetailSkeleton />;
   }
 
   if (!song) {
@@ -114,7 +111,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
 
 
   return (
-    <div className="min-h-full flex flex-col p-8 pb-10 relative overflow-hidden">
+    <div className="min-h-full flex flex-col p-8 pb-10 relative overflow-hidden animate-fade-in-up">
       {/* Ambient Backdrops */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-rose-600/10 rounded-full blur-[120px] pointer-events-none"></div>

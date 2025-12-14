@@ -6,6 +6,7 @@ import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrackList } from '../components/TrackList';
 import { EditModal } from '../components/EditModal';
+import { DetailSkeleton } from '../components/Skeletons';
 import { useParams, useNavigate } from 'react-router-dom';
 
 interface DetailProps {
@@ -77,11 +78,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
   };
 
   if (loading) {
-      return (
-          <div className="min-h-full flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-      );
+      return <DetailSkeleton />;
   }
 
   if (!artist) {
@@ -136,7 +133,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
   }
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full animate-fade-in-up">
       <DetailHeader
         title={artist.name}
         subtitle={null}
@@ -189,9 +186,14 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
             <button 
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50"
+                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-                {loadingMore ? 'Loading...' : 'Load More Songs'}
+                {loadingMore ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Loading...
+                  </>
+                ) : 'Load More Songs'}
             </button>
         </div>
       )}

@@ -95,7 +95,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
           <button className="text-slate-500 hover:text-white transition-colors">
             <Shuffle className="w-5 h-5" />
           </button>
-          <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors">
+          <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform">
             <SkipBack className="w-7 h-7 fill-current" />
           </button>
           <button
@@ -108,7 +108,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
               <Play className="w-6 h-6 text-black fill-current ml-1" />
             )}
           </button>
-          <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors">
+          <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform">
             <SkipForward className="w-7 h-7 fill-current" />
           </button>
           <button className="text-slate-500 hover:text-white transition-colors">
@@ -128,22 +128,34 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
       </div>
 
       {/* Volume */}
-      <div className="flex items-center justify-end gap-4 w-[30%]">
+      <div className="flex items-center justify-end gap-4 w-[30%] group/vol">
         <button 
           onClick={() => onVolumeChange(volume === 0 ? 1 : 0)}
           className="text-slate-500 hover:text-white transition-colors"
         >
           {volume === 0 ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
         </button>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={volume}
-          onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-          className="w-28 h-1.5 accent-indigo-500 bg-white/10 rounded-full appearance-none cursor-pointer"
-        />
+        
+        {/* Custom Volume Slider reusing ProgressBar logic but simplified */}
+        <div className="w-28 h-1.5 bg-white/10 rounded-full cursor-pointer relative group-hover/vol:h-2 transition-all">
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={volume}
+            onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+          />
+          <div 
+            className="absolute h-full bg-slate-400 rounded-full group-hover/vol:bg-white transition-colors" 
+            style={{ width: `${volume * 100}%` }}
+          />
+          <div 
+             className="absolute h-3 w-3 bg-white rounded-full top-1/2 -translate-y-1/2 shadow-md opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+             style={{ left: `${volume * 100}%`, transform: 'translate(-50%, -50%)' }}
+          />
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
 import { TrackList } from '../components/TrackList';
 import { Music } from 'lucide-react';
+import { DetailSkeleton } from '../components/Skeletons';
 import { useParams, useNavigate } from 'react-router-dom';
 
 interface PlaylistDetailsProps {
@@ -54,11 +55,7 @@ export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({
   }, [id]);
 
   if (loading) {
-      return (
-          <div className="min-h-full flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-      );
+      return <DetailSkeleton />;
   }
 
   if (!playlist) return (
@@ -116,7 +113,7 @@ export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({
   };
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full animate-fade-in-up">
       <DetailHeader
         title={playlist.name}
         subtitle="Public Playlist"

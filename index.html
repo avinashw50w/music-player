@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -12,6 +13,10 @@
             fontFamily: {
               sans: ['Poppins', 'Inter', 'sans-serif'],
             },
+            animation: {
+              'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
           }
         }
       }
@@ -70,7 +75,34 @@
       .bar-1 { animation-delay: 0s; }
       .bar-2 { animation-delay: 0.2s; }
       .bar-3 { animation-delay: 0.4s; }
+
+      /* Page Transitions & Skeletons */
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      .animate-fade-in-up {
+        animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        opacity: 0; /* Start hidden */
+      }
+      
+      .delay-100 { animation-delay: 100ms; }
+      .delay-200 { animation-delay: 200ms; }
+      .delay-300 { animation-delay: 300ms; }
+
+      /* Skeleton Shimmer */
+      @keyframes shimmer {
+        0% { background-position: -1000px 0; }
+        100% { background-position: 1000px 0; }
+      }
+      .skeleton-bg {
+        animation: shimmer 2s infinite linear;
+        background: linear-gradient(to right, rgba(255,255,255,0.03) 8%, rgba(255,255,255,0.08) 18%, rgba(255,255,255,0.03) 33%);
+        background-size: 1000px 100%;
+      }
     </style>
+  <link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div class="app-background"></div>
