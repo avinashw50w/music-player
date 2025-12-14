@@ -106,7 +106,6 @@ router.post('/scan', async (req, res) => {
                     progress: Math.round(((i + 1) / currentScanStatus.totalFound) * 100)
                 });
 
-                // Broadcast progress every file
                 broadcast('scan:progress', currentScanStatus);
 
                 try {
@@ -132,8 +131,40 @@ router.post('/scan', async (req, res) => {
                         console.warn('Cover extraction failed', e);
                     }
 
+                    // Album Logic
+                    let albumId = null;
+                    if (metadata.album) {
+                        const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
+                        if (existingAlbum) {
+                            albumId = existingAlbum.id;
+                            await db('albums').where({ id: albumId }).increment('track_count', 1);
+                        } else {
+                            albumId = uuidv4();
+                            await db('albums').insert({
+                                id: albumId,
+                                title: metadata.album,
+                                cover_url: coverUrl, // Use extracted cover for album
+                                year: metadata.year,
+                                genre: JSON.stringify(metadata.genre),
+                                track_count: 1
+                            });
+                        }
+                    }
+
+                    // Insert Song
+                    await db('songs').insert({
+                        id: songId,
+                        title: metadata.title,
+                        album_id: albumId,
+                        duration_seconds: metadata.durationSeconds,
+                        file_path: filePath, // STORE ABSOLUTE PATH
+                        genre: JSON.stringify(metadata.genre),
+                        is_favorite: false,
+                        bitrate: metadata.bitrate,
+                        format: metadata.format
+                    });
+
                     // Artist Logic (Multi-artist support)
-                    let primaryArtistId = null;
                     if (metadata.artists && metadata.artists.length > 0) {
                         for (let j = 0; j < metadata.artists.length; j++) {
                             const name = metadata.artists[j].trim();
@@ -152,58 +183,17 @@ router.post('/scan', async (req, res) => {
                                 });
                             }
                             
-                            if (j === 0) primaryArtistId = artistId;
-                            
                             try {
                                 await db('song_artists').insert({
                                     song_id: songId,
-                                    artist_id: artistId
+                                    artist_id: artistId,
+                                    is_primary: j === 0 // First is primary
                                 });
                             } catch(e) {}
                         }
                     } else {
-                        // Fallback Unknown Artist
-                        // ... code omitted for brevity as usually extractMetadata returns 'Unknown Artist' in array
+                        // Handle unknown artist if array is empty? (Optional)
                     }
-
-                    // Album Logic
-                    let albumId = null;
-                    if (metadata.album) {
-                        const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
-                        if (existingAlbum) {
-                            albumId = existingAlbum.id;
-                            await db('albums').where({ id: albumId }).increment('track_count', 1);
-                        } else {
-                            albumId = uuidv4();
-                            await db('albums').insert({
-                                id: albumId,
-                                title: metadata.album,
-                                artist_id: primaryArtistId,
-                                artist_name: metadata.artist || 'Unknown Artist',
-                                cover_url: coverUrl, // Use same cover for album
-                                year: metadata.year,
-                                genre: JSON.stringify(metadata.genre),
-                                track_count: 1
-                            });
-                        }
-                    }
-
-                    await db('songs').insert({
-                        id: songId,
-                        title: metadata.title,
-                        artist_id: primaryArtistId,
-                        artist_name: metadata.artist,
-                        album_id: albumId,
-                        album_name: metadata.album,
-                        duration: metadata.duration,
-                        duration_seconds: metadata.durationSeconds,
-                        cover_url: coverUrl,
-                        file_path: filePath, // STORE ABSOLUTE PATH
-                        genre: JSON.stringify(metadata.genre),
-                        is_favorite: false,
-                        bitrate: metadata.bitrate,
-                        format: metadata.format
-                    });
 
                 } catch (err) {
                     console.error(`Failed to process ${filePath}`, err);

@@ -23,8 +23,7 @@ export async function migrate() {
         await db.schema.createTable('albums', (table) => {
             table.string('id').primary();
             table.string('title').notNullable();
-            table.string('artist_id').references('id').inTable('artists');
-            table.string('artist_name').notNullable();
+            // Removed artist_id and artist_name as they are derived
             table.string('cover_url');
             table.integer('year');
             table.string('genre');
@@ -39,13 +38,9 @@ export async function migrate() {
         await db.schema.createTable('songs', (table) => {
             table.string('id').primary();
             table.string('title').notNullable();
-            table.string('artist_id').references('id').inTable('artists');
-            table.string('artist_name').notNullable();
+            // Removed redundant columns: artist_id, artist_name, album_name, duration, cover_url
             table.string('album_id').references('id').inTable('albums');
-            table.string('album_name');
-            table.string('duration');
             table.integer('duration_seconds');
-            table.string('cover_url');
             table.string('file_path');
             table.string('genre');
             table.boolean('is_favorite').defaultTo(false);
@@ -54,7 +49,7 @@ export async function migrate() {
             table.string('format');
             table.timestamp('created_at').defaultTo(db.fn.now());
         });
-    }
+    } 
 
     // Playlists table
     if (!(await db.schema.hasTable('playlists'))) {
@@ -67,14 +62,13 @@ export async function migrate() {
         });
     }
 
-    // Ensure is_favorite column exists in playlists (for existing databases)
+    // Ensure is_favorite column exists in playlists
     if (await db.schema.hasTable('playlists')) {
         const hasPlaylistFavorite = await db.schema.hasColumn('playlists', 'is_favorite');
         if (!hasPlaylistFavorite) {
             await db.schema.alterTable('playlists', (table) => {
                 table.boolean('is_favorite').defaultTo(false);
             });
-            console.log('Added is_favorite column to playlists table');
         }
     }
 
@@ -89,15 +83,21 @@ export async function migrate() {
         });
     }
 
-    // Song Artists junction table (New)
+    // Song Artists junction table
     if (!(await db.schema.hasTable('song_artists'))) {
         await db.schema.createTable('song_artists', (table) => {
             table.increments('id').primary();
             table.string('song_id').references('id').inTable('songs').onDelete('CASCADE');
             table.string('artist_id').references('id').inTable('artists').onDelete('CASCADE');
+            table.boolean('is_primary').defaultTo(false); // Added is_primary
             table.unique(['song_id', 'artist_id']);
         });
         console.log('Created song_artists table');
+    } else {
+        if (!(await db.schema.hasColumn('song_artists', 'is_primary'))) {
+            await db.schema.alterTable('song_artists', table => table.boolean('is_primary').defaultTo(false));
+            console.log('Added is_primary to song_artists');
+        }
     }
 
     // Genres table

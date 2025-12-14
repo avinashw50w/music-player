@@ -45,6 +45,14 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Format duration helper (duplicated here for simplicity or could import)
+const formatDuration = (seconds) => {
+    if (!seconds) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 // Search endpoint (searches across songs, albums, artists)
 app.get('/api/search', async (req, res, next) => {
     try {
@@ -56,20 +64,37 @@ app.get('/api/search', async (req, res, next) => {
         const db = (await import('./config/database.js')).default;
         const searchTerm = `%${q}%`;
 
-        // Note: For multi-genre search in SQLite with JSON string, LIKE works but isn't perfect.
-        // We'll search the text representation of the JSON array.
+        // Search Songs (Join for album/artist info)
         const songs = await db('songs')
-            .where('title', 'like', searchTerm)
-            .orWhere('artist_name', 'like', searchTerm)
-            .orWhere('album_name', 'like', searchTerm)
-            .orWhere('genre', 'like', searchTerm) 
+            .leftJoin('albums', 'songs.album_id', 'albums.id')
+            .where('songs.title', 'like', searchTerm)
+            .orWhereIn('songs.id', function() {
+                this.select('song_id').from('song_artists')
+                    .join('artists', 'song_artists.artist_id', 'artists.id')
+                    .where('artists.name', 'like', searchTerm);
+            })
+            .orWhere('albums.title', 'like', searchTerm)
             .limit(20)
-            .select('*');
+            .select('songs.*', 'albums.title as album_title', 'albums.cover_url as album_cover_url');
+
+        // Fetch artists for found songs
+        let songArtists = [];
+        if (songs.length > 0) {
+            songArtists = await db('song_artists')
+                .join('artists', 'song_artists.artist_id', 'artists.id')
+                .whereIn('song_artists.song_id', songs.map(s => s.id))
+                .select('song_artists.song_id', 'artists.name');
+        }
+        
+        const artistsBySong = {};
+        songArtists.forEach(sa => {
+            if (!artistsBySong[sa.song_id]) artistsBySong[sa.song_id] = [];
+            artistsBySong[sa.song_id].push(sa.name);
+        });
 
         const albums = await db('albums')
             .where(function() {
-                this.where('title', 'like', searchTerm)
-                    .orWhere('artist_name', 'like', searchTerm);
+                this.where('title', 'like', searchTerm);
             })
             .whereExists(function() {
                 this.select('*').from('songs').whereRaw('songs.album_id = albums.id');
@@ -77,10 +102,21 @@ app.get('/api/search', async (req, res, next) => {
             .limit(10)
             .select('*');
 
+        // Fetch primary artist for albums via subquery or join
+        // For search, we can just grab one artist
+        const albumArtists = await Promise.all(albums.map(async (a) => {
+            const artist = await db('songs')
+                .join('song_artists', 'songs.id', 'song_artists.song_id')
+                .join('artists', 'song_artists.artist_id', 'artists.id')
+                .where('songs.album_id', a.id)
+                .first('artists.name');
+            return artist ? artist.name : 'Unknown Artist';
+        }));
+
         const artists = await db('artists')
             .where('name', 'like', searchTerm)
             .whereExists(function() {
-                this.select('*').from('songs').whereRaw('songs.artist_id = artists.id');
+                this.select('*').from('song_artists').whereRaw('song_artists.artist_id = artists.id');
             })
             .limit(10)
             .select('*');
@@ -89,18 +125,18 @@ app.get('/api/search', async (req, res, next) => {
             songs: songs.map(s => ({
                 id: s.id,
                 title: s.title,
-                artist: s.artist_name,
-                album: s.album_name,
-                duration: s.duration,
-                coverUrl: s.cover_url,
+                artist: artistsBySong[s.id] ? artistsBySong[s.id].join(', ') : 'Unknown',
+                album: s.album_title,
+                duration: formatDuration(s.duration_seconds),
+                coverUrl: s.album_cover_url,
                 fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null,
                 genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite)
             })),
-            albums: albums.map(a => ({
+            albums: albums.map((a, idx) => ({
                 id: a.id,
                 title: a.title,
-                artist: a.artist_name,
+                artist: albumArtists[idx],
                 coverUrl: a.cover_url,
                 year: a.year,
                 genre: (() => { try { return JSON.parse(a.genre); } catch { return [a.genre]; } })()

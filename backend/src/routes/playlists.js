@@ -19,6 +19,14 @@ const transformPlaylist = (row) => ({
     isFavorite: Boolean(row.is_favorite)
 });
 
+// Format duration helper
+const formatDuration = (seconds) => {
+    if (!seconds) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 // Helper to get full playlist with song IDs for broadcast
 const getFullPlaylist = async (id) => {
     const playlist = await db('playlists').where({ id }).first();
@@ -87,28 +95,55 @@ router.get('/:id', async (req, res, next) => {
         const songIds = playlistSongs.map(ps => ps.song_id);
 
         // Get full song data
-        const songs = await db('songs').whereIn('id', songIds).select('*');
+        if (songIds.length > 0) {
+            const songs = await db('songs')
+                .leftJoin('albums', 'songs.album_id', 'albums.id')
+                .whereIn('songs.id', songIds)
+                .select('songs.*', 'albums.title as album_title', 'albums.cover_url as album_cover_url');
 
-        // Sort songs by playlist order
-        const orderedSongs = songIds.map(id => songs.find(s => s.id === id)).filter(Boolean);
+            // Fetch artists
+            const songArtists = await db('song_artists')
+                .join('artists', 'song_artists.artist_id', 'artists.id')
+                .whereIn('song_artists.song_id', songIds)
+                .select('song_artists.song_id', 'artists.id', 'artists.name');
 
-        res.json({
-            ...transformPlaylist(playlist),
-            songIds,
-            songs: orderedSongs.map(s => ({
-                id: s.id,
-                title: s.title,
-                artist: s.artist_name,
-                artistId: s.artist_id,
-                album: s.album_name,
-                albumId: s.album_id,
-                duration: s.duration,
-                coverUrl: s.cover_url,
-                genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
-                isFavorite: Boolean(s.is_favorite),
-                fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
-            }))
-        });
+            const artistsBySong = {};
+            songArtists.forEach(sa => {
+                if (!artistsBySong[sa.song_id]) artistsBySong[sa.song_id] = [];
+                artistsBySong[sa.song_id].push({ id: sa.id, name: sa.name });
+            });
+
+            // Map back to ordered list
+            const orderedSongs = songIds.map(id => songs.find(s => s.id === id)).filter(Boolean);
+
+            res.json({
+                ...transformPlaylist(playlist),
+                songIds,
+                songs: orderedSongs.map(s => {
+                    const artists = artistsBySong[s.id] || [];
+                    return {
+                        id: s.id,
+                        title: s.title,
+                        artist: artists.map(a => a.name).join(', '),
+                        artistId: artists[0]?.id,
+                        artists: artists,
+                        album: s.album_title,
+                        albumId: s.album_id,
+                        duration: formatDuration(s.duration_seconds),
+                        coverUrl: s.album_cover_url,
+                        genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
+                        isFavorite: Boolean(s.is_favorite),
+                        fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
+                    };
+                })
+            });
+        } else {
+            res.json({
+                ...transformPlaylist(playlist),
+                songIds: [],
+                songs: []
+            });
+        }
     } catch (err) {
         next(err);
     }
@@ -122,7 +157,6 @@ router.post('/', async (req, res, next) => {
         
         let finalCoverUrl = coverUrl;
 
-        // If no cover URL provided, fetch a random one and save it locally
         if (!finalCoverUrl) {
             const tempUrl = `https://picsum.photos/seed/${encodeURIComponent(name)}-${Date.now()}/200/200`;
             try {
@@ -130,22 +164,19 @@ router.post('/', async (req, res, next) => {
                 if (response.ok) {
                     const filename = `playlist-${id}.jpg`;
                     const uploadDir = path.join(config.UPLOAD_DIR, 'covers');
-                    
                     if (!fs.existsSync(uploadDir)) {
                         fs.mkdirSync(uploadDir, { recursive: true });
                     }
-                    
                     const filepath = path.join(uploadDir, filename);
                     const fileStream = fs.createWriteStream(filepath);
                     // @ts-ignore
                     await pipeline(response.body, fileStream);
                     finalCoverUrl = `/uploads/covers/${filename}`;
                 } else {
-                    finalCoverUrl = tempUrl; // Fallback to remote if fetch fails
+                    finalCoverUrl = tempUrl;
                 }
             } catch (err) {
-                console.warn('Failed to cache playlist image:', err);
-                finalCoverUrl = tempUrl; // Fallback
+                finalCoverUrl = tempUrl;
             }
         }
 
@@ -209,20 +240,15 @@ router.patch('/:id/favorite', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
     try {
         const playlist = await db('playlists').where({ id: req.params.id }).first();
-        
-        // Delete associated playlist_songs first (handled by CASCADE in DB usually, but manual delete of image)
         const deleted = await db('playlists').where({ id: req.params.id }).del();
         
         if (!deleted) {
             return res.status(404).json({ error: 'Playlist not found' });
         }
 
-        // Clean up cached image if it exists and is local
         if (playlist && playlist.cover_url && playlist.cover_url.startsWith('/uploads/covers/playlist-')) {
              const filepath = path.join(config.UPLOAD_DIR, 'covers', path.basename(playlist.cover_url));
-             fs.unlink(filepath, (err) => {
-                 if (err && err.code !== 'ENOENT') console.error('Failed to delete playlist image:', err);
-             });
+             fs.unlink(filepath, (err) => {});
         }
         
         broadcast('playlist:delete', { id: req.params.id });
@@ -237,7 +263,6 @@ router.post('/:id/songs', async (req, res, next) => {
     try {
         const { songId } = req.body;
 
-        // Check if already in playlist
         const exists = await db('playlist_songs')
             .where({ playlist_id: req.params.id, song_id: songId })
             .first();
@@ -246,7 +271,6 @@ router.post('/:id/songs', async (req, res, next) => {
             return res.status(400).json({ error: 'Song already in playlist' });
         }
 
-        // Get max position
         const maxPos = await db('playlist_songs')
             .where({ playlist_id: req.params.id })
             .max('position as max')
@@ -286,7 +310,6 @@ router.put('/:id/reorder', async (req, res, next) => {
     try {
         const { songIds } = req.body;
 
-        // Update positions
         await Promise.all(
             songIds.map((songId, index) =>
                 db('playlist_songs')

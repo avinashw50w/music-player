@@ -36,15 +36,23 @@ const transformArtist = (row) => ({
     isFavorite: Boolean(row.is_favorite)
 });
 
+// Format duration helper
+const formatDuration = (seconds) => {
+    if (!seconds) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 // GET all artists
 router.get('/', async (req, res, next) => {
     try {
         const { limit, offset, search, favorites } = req.query;
         let query = db('artists').select('*').orderBy('name', 'asc');
 
-        // Only show artists which has atleast one song
+        // Only show artists which have at least one song
         query.whereExists(function() {
-            this.select('*').from('songs').whereRaw('songs.artist_id = artists.id');
+            this.select('*').from('song_artists').whereRaw('song_artists.artist_id = artists.id');
         });
 
         if (search) {
@@ -78,12 +86,24 @@ router.get('/:id', async (req, res, next) => {
             return res.status(404).json({ error: 'Artist not found' });
         }
 
-        const albums = await db('albums').where({ artist_id: req.params.id }).select('*');
+        // Get albums associated with this artist (via songs)
+        const albums = await db('albums')
+            .whereIn('id', function() {
+                this.select('album_id').from('songs')
+                    .join('song_artists', 'songs.id', 'song_artists.song_id')
+                    .where('song_artists.artist_id', artist.id)
+                    .distinct();
+            })
+            .select('*');
+
+        // Get songs
         const songs = await db('songs')
-            .where({ artist_id: req.params.id })
+            .join('song_artists', 'songs.id', 'song_artists.song_id')
+            .leftJoin('albums', 'songs.album_id', 'albums.id')
+            .where('song_artists.artist_id', req.params.id)
             .limit(parseInt(songLimit))
             .offset(parseInt(songOffset))
-            .select('*');
+            .select('songs.*', 'albums.title as album_title', 'albums.cover_url as album_cover_url');
 
         res.json({
             ...transformArtist(artist),
@@ -92,18 +112,18 @@ router.get('/:id', async (req, res, next) => {
                 title: a.title,
                 coverUrl: a.cover_url,
                 year: a.year,
-                genre: a.genre,
+                genre: (() => { try { return JSON.parse(a.genre); } catch { return a.genre ? [a.genre] : ['Unknown']; } })(),
                 trackCount: a.track_count
             })),
             songs: songs.map(s => ({
                 id: s.id,
                 title: s.title,
-                artist: s.artist_name,
-                artistId: s.artist_id,
-                album: s.album_name,
+                artist: artist.name, // Context is this artist
+                artistId: artist.id,
+                album: s.album_title,
                 albumId: s.album_id,
-                duration: s.duration,
-                coverUrl: s.cover_url,
+                duration: formatDuration(s.duration_seconds),
+                coverUrl: s.album_cover_url,
                 genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite),
                 fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
@@ -118,21 +138,25 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/songs', async (req, res, next) => {
     try {
         const { limit = 20, offset = 0 } = req.query;
+        const artist = await db('artists').where({ id: req.params.id }).first();
+        
         const songs = await db('songs')
-            .where({ artist_id: req.params.id })
+            .join('song_artists', 'songs.id', 'song_artists.song_id')
+            .leftJoin('albums', 'songs.album_id', 'albums.id')
+            .where('song_artists.artist_id', req.params.id)
             .limit(parseInt(limit))
             .offset(parseInt(offset))
-            .select('*');
+            .select('songs.*', 'albums.title as album_title', 'albums.cover_url as album_cover_url');
 
         res.json(songs.map(s => ({
             id: s.id,
             title: s.title,
-            artist: s.artist_name,
-            artistId: s.artist_id,
-            album: s.album_name,
+            artist: artist?.name,
+            artistId: artist?.id,
+            album: s.album_title,
             albumId: s.album_id,
-            duration: s.duration,
-            coverUrl: s.cover_url,
+            duration: formatDuration(s.duration_seconds),
+            coverUrl: s.album_cover_url,
             genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
             isFavorite: Boolean(s.is_favorite),
             fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
@@ -238,21 +262,8 @@ router.delete('/:id', async (req, res, next) => {
     try {
         const id = req.params.id;
         
-        // Unlink songs associated with this artist
-        await db('songs')
-            .where({ artist_id: id })
-            .update({ 
-                artist_id: null, 
-                artist_name: 'Unknown Artist' 
-            });
-            
-        // Unlink albums associated with this artist
-        await db('albums')
-            .where({ artist_id: id })
-            .update({
-                artist_id: null,
-                artist_name: 'Unknown Artist'
-            });
+        // Remove links in song_artists (handled by CASCADE usually but good to be explicit/safe)
+        await db('song_artists').where({ artist_id: id }).del();
 
         const deleted = await db('artists').where({ id }).del();
         

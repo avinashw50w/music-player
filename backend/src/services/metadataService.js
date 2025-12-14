@@ -31,7 +31,7 @@ export async function identifySongMetadata(filePath) {
     }
 
     const acoustidData = await acoustidResponse.json();
-
+    console.log(acoustidData)
     if (!acoustidData.results || acoustidData.results.length === 0) {
         throw new Error('No matches found for this song.');
     }

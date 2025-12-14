@@ -74,7 +74,8 @@ async function linkArtistsToSong(songId, artistNames) {
         try {
             await db('song_artists').insert({
                 song_id: songId,
-                artist_id: artistId
+                artist_id: artistId,
+                is_primary: i === 0 // First one is primary
             });
         } catch(e) {
             // ignore unique constraint
@@ -103,11 +104,11 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
 
                 const songId = uuidv4();
 
-                // Process artists
-                const primaryArtistId = await linkArtistsToSong(songId, metadata.artists);
-
                 // Check/create album
                 let albumId = null;
+                // Default cover
+                let coverUrl = `https://picsum.photos/seed/${songId}/100/100`;
+
                 if (metadata.album && metadata.album !== 'Unknown Album') {
                     const existingAlbum = await db('albums')
                         .where('title', 'like', metadata.album)
@@ -115,16 +116,16 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
 
                     if (existingAlbum) {
                         albumId = existingAlbum.id;
+                        coverUrl = existingAlbum.cover_url;
                         // Update track count
                         await db('albums').where({ id: albumId }).increment('track_count', 1);
                     } else {
                         albumId = uuidv4();
+                        coverUrl = `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`;
                         await db('albums').insert({
                             id: albumId,
                             title: metadata.album,
-                            artist_id: primaryArtistId,
-                            artist_name: metadata.artist, // Display string
-                            cover_url: `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
+                            cover_url: coverUrl,
                             year: metadata.year,
                             genre: JSON.stringify(metadata.genre), 
                             track_count: 1
@@ -136,15 +137,8 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
                 await db('songs').insert({
                     id: songId,
                     title: metadata.title,
-                    artist_id: primaryArtistId,
-                    artist_name: metadata.artist,
                     album_id: albumId,
-                    album_name: metadata.album,
-                    duration: metadata.duration,
                     duration_seconds: metadata.durationSeconds,
-                    cover_url: albumId
-                        ? (await db('albums').where({ id: albumId }).first())?.cover_url
-                        : `https://picsum.photos/seed/${songId}/100/100`,
                     file_path: filePath,
                     genre: JSON.stringify(metadata.genre), 
                     is_favorite: false,
@@ -152,13 +146,16 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
                     format: metadata.format
                 });
 
+                // Process artists (Linking happens after song creation due to FK)
+                await linkArtistsToSong(songId, metadata.artists);
+
                 songs.push({
                     id: songId,
                     title: metadata.title,
                     artist: metadata.artist,
                     album: metadata.album,
                     duration: metadata.duration,
-                    coverUrl: `https://picsum.photos/seed/${songId}/100/100`,
+                    coverUrl: coverUrl,
                     fileUrl: `/uploads/audio/${file.filename}`,
                     genre: metadata.genre,
                     isFavorite: false,
@@ -182,6 +179,8 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
 
 // POST upload folder (same as audio but with folder structure indication)
 router.post('/folder', audioUpload.array('files', 200), async (req, res, next) => {
+    // Reusing same logic logic as audio upload, simplified for this response
+    // In a real app, you might want to DRY this up by calling a shared processing function.
     try {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: 'No audio files provided' });
@@ -196,14 +195,11 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
 
             try {
                 const metadata = await extractMetadata(filePath);
-
                 const songId = uuidv4();
 
-                // Process artists
-                const primaryArtistId = await linkArtistsToSong(songId, metadata.artists);
-
-                // Check/create album
                 let albumId = null;
+                let coverUrl = `https://picsum.photos/seed/${songId}/100/100`;
+
                 if (metadata.album && metadata.album !== 'Unknown Album') {
                     const existingAlbum = await db('albums')
                         .where('title', 'like', metadata.album)
@@ -211,15 +207,15 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
 
                     if (existingAlbum) {
                         albumId = existingAlbum.id;
+                        coverUrl = existingAlbum.cover_url;
                         await db('albums').where({ id: albumId }).increment('track_count', 1);
                     } else {
                         albumId = uuidv4();
+                        coverUrl = `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`;
                         await db('albums').insert({
                             id: albumId,
                             title: metadata.album,
-                            artist_id: primaryArtistId,
-                            artist_name: metadata.artist,
-                            cover_url: `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
+                            cover_url: coverUrl,
                             year: metadata.year,
                             genre: JSON.stringify(metadata.genre), 
                             track_count: 1
@@ -230,13 +226,8 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
                 await db('songs').insert({
                     id: songId,
                     title: metadata.title,
-                    artist_id: primaryArtistId,
-                    artist_name: metadata.artist,
                     album_id: albumId,
-                    album_name: metadata.album,
-                    duration: metadata.duration,
                     duration_seconds: metadata.durationSeconds,
-                    cover_url: `https://picsum.photos/seed/${songId}/100/100`,
                     file_path: filePath,
                     genre: JSON.stringify(metadata.genre), 
                     is_favorite: false,
@@ -244,13 +235,15 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
                     format: metadata.format
                 });
 
+                await linkArtistsToSong(songId, metadata.artists);
+
                 songs.push({
                     id: songId,
                     title: metadata.title,
                     artist: metadata.artist,
                     album: metadata.album,
                     duration: metadata.duration,
-                    coverUrl: `https://picsum.photos/seed/${songId}/100/100`,
+                    coverUrl: coverUrl,
                     fileUrl: `/uploads/audio/${file.filename}`,
                     genre: metadata.genre,
                     isFavorite: false

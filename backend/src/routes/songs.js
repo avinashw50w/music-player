@@ -11,12 +11,12 @@ import { config } from '../config/env.js';
 
 const router = express.Router();
 
-// Configure multer for cover uploads
+// Configure multer for cover uploads (now updates albums)
 const storage = multer.diskStorage({
     destination: path.join(config.UPLOAD_DIR, 'covers'),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
-        cb(null, `song-${Date.now()}${ext}`);
+        cb(null, `cover-${Date.now()}${ext}`);
     }
 });
 
@@ -29,52 +29,115 @@ const upload = multer({
     }
 });
 
-// Helper to transform DB row to API response format
-const transformSong = (row) => ({
-    id: row.id,
-    title: row.title,
-    artist: row.artist_name,
-    artistId: row.artist_id,
-    album: row.album_name,
-    albumId: row.album_id,
-    duration: row.duration,
-    durationSeconds: row.duration_seconds,
-    coverUrl: row.cover_url,
-    fileUrl: row.file_path ? `/api/songs/${row.id}/stream` : null,
-    genre: (() => { 
-        try { 
-            return JSON.parse(row.genre); 
-        } catch { 
-            return row.genre ? [row.genre] : ['Unknown']; 
-        } 
-    })(),
-    isFavorite: Boolean(row.is_favorite),
-    lyrics: row.lyrics,
-    bitrate: row.bitrate,
-    format: row.format
-});
+// Helper for formatting duration
+const formatDuration = (seconds) => {
+    if (!seconds) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
+// Helper to get full song details with joins
+async function fetchSongsWithDetails(baseQuery) {
+    // Select song fields + album fields
+    const songs = await baseQuery
+        .leftJoin('albums', 'songs.album_id', 'albums.id')
+        .select(
+            'songs.*',
+            'albums.title as album_title',
+            'albums.cover_url as album_cover_url'
+        );
+
+    if (songs.length === 0) return [];
+
+    const songIds = songs.map(s => s.id);
+
+    // Fetch artists for these songs
+    const songArtists = await db('song_artists')
+        .join('artists', 'song_artists.artist_id', 'artists.id')
+        .whereIn('song_artists.song_id', songIds)
+        .select('song_artists.song_id', 'song_artists.is_primary', 'artists.id', 'artists.name')
+        .orderBy('song_artists.is_primary', 'desc'); // Primary first
+
+    const artistsBySong = {};
+    songArtists.forEach(sa => {
+        if (!artistsBySong[sa.song_id]) artistsBySong[sa.song_id] = [];
+        artistsBySong[sa.song_id].push({ id: sa.id, name: sa.name, isPrimary: Boolean(sa.is_primary) });
+    });
+
+    return songs.map(s => {
+        const artists = artistsBySong[s.id] || [{ id: 'unknown', name: 'Unknown Artist', isPrimary: true }];
+        return {
+            id: s.id,
+            title: s.title,
+            // Derived fields for frontend compatibility
+            artist: artists.map(a => a.name).join(', '),
+            artistId: artists[0].id,
+            artists: artists,
+            album: s.album_title || 'Unknown Album',
+            albumId: s.album_id,
+            duration: formatDuration(s.duration_seconds),
+            durationSeconds: s.duration_seconds,
+            // Cover comes from album now
+            coverUrl: s.album_cover_url || `https://picsum.photos/seed/${s.id}/200/200`,
+            fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null,
+            genre: (() => { 
+                try { return JSON.parse(s.genre); } 
+                catch { return s.genre ? [s.genre] : ['Unknown']; } 
+            })(),
+            isFavorite: Boolean(s.is_favorite),
+            lyrics: s.lyrics,
+            bitrate: s.bitrate,
+            format: s.format
+        };
+    });
+}
 
 // Helper to process multiple artists for a song
-// This ensures all artists in the list exist in DB and links them to the song
 const processSongArtists = async (songId, artistsData) => {
     // 1. Clear existing links
     await db('song_artists').where({ song_id: songId }).del();
 
     const artistIds = [];
+    
+    const validArtists = (artistsData || []).filter(a => {
+        const name = typeof a === 'string' ? a.trim() : a.name.trim();
+        return name.length > 0;
+    });
+
+    if (validArtists.length === 0) {
+        // Link to Unknown Artist
+        let unknown = await db('artists').where({ name: 'Unknown Artist' }).first();
+        if (!unknown) {
+             const newId = '00000000-0000-0000-0000-000000000000';
+             await db('artists').insert({
+                id: newId,
+                name: 'Unknown Artist',
+                avatar_url: 'https://ui-avatars.com/api/?name=Unknown+Artist&background=random',
+                followers: '0',
+                is_favorite: false
+            });
+            unknown = { id: newId };
+        }
+        await db('song_artists').insert({
+            song_id: songId,
+            artist_id: unknown.id,
+            is_primary: true
+        });
+        return unknown.id;
+    }
 
     // 2. Iterate artists
-    for (const artistData of artistsData) {
+    for (let i = 0; i < validArtists.length; i++) {
+        const artistData = validArtists[i];
         const name = typeof artistData === 'string' ? artistData.trim() : artistData.name.trim();
-        if (!name) continue;
-
+        
         let artistId = null;
-        // Try to find existing artist
         const existingArtist = await db('artists').where('name', 'like', name).first();
         
         if (existingArtist) {
             artistId = existingArtist.id;
         } else {
-            // Create new artist
             artistId = uuidv4();
             await db('artists').insert({
                 id: artistId,
@@ -85,37 +148,46 @@ const processSongArtists = async (songId, artistsData) => {
 
         artistIds.push(artistId);
 
-        // 3. Link to song
         try {
             await db('song_artists').insert({
                 song_id: songId,
-                artist_id: artistId
+                artist_id: artistId,
+                is_primary: i === 0 // First one is primary
             });
         } catch (e) {
-            // Ignore duplicates if any logic error occurs
+            // Ignore duplicates
         }
     }
 
-    return artistIds.length > 0 ? artistIds[0] : null; // Return primary artist ID
+    return artistIds.length > 0 ? artistIds[0] : null;
 };
 
 // GET all songs
 router.get('/', async (req, res, next) => {
     try {
         const { limit, offset, search, favorites } = req.query;
-        let query = db('songs').select('*').orderBy('created_at', 'desc');
+        let query = db('songs').orderBy('songs.created_at', 'desc');
         
         if (search) {
             const term = `%${search}%`;
             query = query.where(function() {
-                this.where('title', 'like', term)
-                    .orWhere('artist_name', 'like', term)
-                    .orWhere('album_name', 'like', term);
+                this.where('songs.title', 'like', term)
+                    .orWhereIn('songs.id', function() {
+                        // Subquery for artists
+                        this.select('song_id').from('song_artists')
+                            .join('artists', 'song_artists.artist_id', 'artists.id')
+                            .where('artists.name', 'like', term);
+                    })
+                    .orWhereIn('songs.album_id', function() {
+                        // Subquery for albums
+                        this.select('id').from('albums')
+                            .where('title', 'like', term);
+                    });
             });
         }
 
         if (favorites === 'true') {
-            query = query.where('is_favorite', true);
+            query = query.where('songs.is_favorite', true);
         }
 
         if (limit) {
@@ -125,25 +197,8 @@ router.get('/', async (req, res, next) => {
             query = query.offset(parseInt(offset));
         }
 
-        const songs = await query;
-
-        // Fetch associated artists for these songs
-        const songIds = songs.map(s => s.id);
-        const songArtists = await db('song_artists')
-            .join('artists', 'song_artists.artist_id', 'artists.id')
-            .whereIn('song_artists.song_id', songIds)
-            .select('song_artists.song_id', 'artists.id', 'artists.name');
-
-        const artistsBySong = {};
-        songArtists.forEach(sa => {
-            if (!artistsBySong[sa.song_id]) artistsBySong[sa.song_id] = [];
-            artistsBySong[sa.song_id].push({ id: sa.id, name: sa.name });
-        });
-
-        res.json(songs.map(s => ({
-            ...transformSong(s),
-            artists: artistsBySong[s.id] || [{ id: s.artist_id, name: s.artist_name }]
-        })));
+        const results = await fetchSongsWithDetails(query);
+        res.json(results);
     } catch (err) {
         next(err);
     }
@@ -152,21 +207,14 @@ router.get('/', async (req, res, next) => {
 // GET song by ID
 router.get('/:id', async (req, res, next) => {
     try {
-        const song = await db('songs').where({ id: req.params.id }).first();
-        if (!song) {
+        const query = db('songs').where({ 'songs.id': req.params.id });
+        const results = await fetchSongsWithDetails(query);
+        
+        if (results.length === 0) {
             return res.status(404).json({ error: 'Song not found' });
         }
 
-        // Fetch artists
-        const artists = await db('song_artists')
-            .join('artists', 'song_artists.artist_id', 'artists.id')
-            .where('song_artists.song_id', song.id)
-            .select('artists.id', 'artists.name');
-
-        res.json({
-            ...transformSong(song),
-            artists: artists.length > 0 ? artists : [{ id: song.artist_id, name: song.artist_name }]
-        });
+        res.json(results[0]);
     } catch (err) {
         next(err);
     }
@@ -186,50 +234,47 @@ router.get('/:id/stream', async (req, res, next) => {
 });
 
 // POST identify song using audio fingerprinting
-// Uses task queue to prevent rate limiting and CPU overload
 router.post('/:id/identify', async (req, res, next) => {
     try {
-        // Wrap the logic in the queue
         const result = await identificationQueue.add(async () => {
             const song = await db('songs').where({ id: req.params.id }).first();
             if (!song || !song.file_path) {
                 throw new Error('Song or file not found');
             }
 
-            // 1. Identify and enrich with MusicBrainz
             const metadata = await identifySongMetadata(song.file_path);
 
-            // 2. Download Cover if available
-            let coverUrl = song.cover_url;
+            // Determine Cover
+            let coverUrl = null;
             if (metadata.coverUrl) {
                 const downloaded = await downloadCoverImage(metadata.coverUrl, `auto-${song.id}`);
                 if (downloaded) coverUrl = downloaded;
             }
 
-            // 3. Process Artists (create and link)
-            const primaryArtistId = await processSongArtists(song.id, metadata.artists || [metadata.artist]);
+            // Process Artists
+            await processSongArtists(song.id, metadata.artists || [metadata.artist]);
 
-            // 4. Update Album (find or create)
+            // Update/Create Album and Update Cover in Album
             let albumId = song.album_id;
             if (metadata.album) {
                 const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
+                
                 if (existingAlbum) {
                     albumId = existingAlbum.id;
-                    // Update album details if improved data found
-                    if (metadata.year || metadata.genre.length > 0) {
-                        await db('albums').where({ id: albumId }).update({
-                            year: metadata.year || existingAlbum.year,
-                            // Merge genres roughly by preferring new ones if exist
-                            genre: metadata.genre.length > 0 ? JSON.stringify(metadata.genre) : existingAlbum.genre
-                        });
+                    // Update album metadata if we found better data
+                    const updates = {};
+                    if (metadata.year) updates.year = metadata.year;
+                    if (metadata.genre.length > 0) updates.genre = JSON.stringify(metadata.genre);
+                    if (coverUrl) updates.cover_url = coverUrl; // Update album cover
+                    
+                    if (Object.keys(updates).length > 0) {
+                        await db('albums').where({ id: albumId }).update(updates);
                     }
                 } else {
                     albumId = uuidv4();
                     await db('albums').insert({
                         id: albumId,
                         title: metadata.album,
-                        artist_id: primaryArtistId,
-                        artist_name: metadata.artist,
                         cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
                         year: metadata.year,
                         genre: JSON.stringify(metadata.genre || []),
@@ -238,31 +283,27 @@ router.post('/:id/identify', async (req, res, next) => {
                 }
             }
 
-            // 5. Update Song
+            // Update Song
             await db('songs').where({ id: req.params.id }).update({
                 title: metadata.title || song.title,
-                artist_name: metadata.artist || song.artist_name,
-                artist_id: primaryArtistId || song.artist_id,
-                album_name: metadata.album || song.album_name,
                 album_id: albumId,
-                cover_url: coverUrl,
                 genre: JSON.stringify(metadata.genre || [])
             });
 
-            // 6. Return full updated song with artists
-            const updatedSong = await db('songs').where({ id: req.params.id }).first();
-            
-            const artists = await db('song_artists')
-                .join('artists', 'song_artists.artist_id', 'artists.id')
-                .where('song_artists.song_id', song.id)
-                .select('artists.id', 'artists.name');
-
-            const transformed = {
-                ...transformSong(updatedSong),
-                artists
-            };
+            // Return full updated song
+            const query = db('songs').where({ 'songs.id': song.id });
+            const results = await fetchSongsWithDetails(query);
+            const transformed = results[0];
             
             broadcast('song:update', transformed);
+            
+            // Also broadcast album update if we changed it
+            if (albumId) {
+                const album = await db('albums').where({ id: albumId }).first();
+                // We'd need to re-fetch full album details to broadcast properly, but for now generic update
+                broadcast('album:update', { id: albumId, ...album }); 
+            }
+
             return transformed;
         });
 
@@ -285,39 +326,59 @@ router.post('/', async (req, res, next) => {
         const { title, artist, album, duration, coverUrl, genre, filePath } = req.body;
         const id = uuidv4();
 
-        const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
+        // 1. Process Artists
+        // We do this first to get IDs, but processSongArtists expects songId to exist in table for FK...
+        // Wait, FK constraint means song must exist first.
+        
+        // 2. Handle Album
+        let albumId = null;
+        if (album) {
+            const existingAlbum = await db('albums').where('title', 'like', album).first();
+            if (existingAlbum) {
+                albumId = existingAlbum.id;
+                await db('albums').where({ id: albumId }).increment('track_count', 1);
+            } else {
+                albumId = uuidv4();
+                await db('albums').insert({
+                    id: albumId,
+                    title: album,
+                    cover_url: coverUrl, // Album gets the cover
+                    year: new Date().getFullYear(),
+                    genre: JSON.stringify(Array.isArray(genre) ? genre : [genre]),
+                    track_count: 1
+                });
+            }
+        }
 
-        // Create song entry
+        // 3. Create Song
+        // Parse duration string to seconds if needed (assuming input might be "MM:SS" or raw seconds)
+        let durationSeconds = 0;
+        if (typeof duration === 'string' && duration.includes(':')) {
+            const parts = duration.split(':');
+            durationSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        } else {
+            durationSeconds = parseInt(duration) || 0;
+        }
+
         await db('songs').insert({
             id,
             title,
-            artist_name: artist, // Store display string
-            album_name: album,
-            duration,
-            cover_url: coverUrl,
-            genre: genreString,
+            album_id: albumId,
+            duration_seconds: durationSeconds,
             file_path: filePath,
+            genre: JSON.stringify(Array.isArray(genre) ? genre : [genre]),
             is_favorite: false
         });
 
-        // Process artists (split string)
+        // 4. Link Artists
         const artistNames = artist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
-        const primaryArtistId = await processSongArtists(id, artistNames);
-        
-        if (primaryArtistId) {
-            await db('songs').where({ id }).update({ artist_id: primaryArtistId });
-        }
+        await processSongArtists(id, artistNames);
 
-        const song = await db('songs').where({ id }).first();
-        const artists = await db('song_artists')
-            .join('artists', 'song_artists.artist_id', 'artists.id')
-            .where('song_artists.song_id', id)
-            .select('artists.id', 'artists.name');
+        // 5. Return
+        const query = db('songs').where({ 'songs.id': id });
+        const results = await fetchSongsWithDetails(query);
+        const transformed = results[0];
 
-        const transformed = {
-            ...transformSong(song),
-            artists
-        };
         broadcast('song:update', transformed); 
         res.status(201).json(transformed);
     } catch (err) {
@@ -328,36 +389,43 @@ router.post('/', async (req, res, next) => {
 // PUT update song
 router.put('/:id', async (req, res, next) => {
     try {
-        const { title, artist, album, genre, coverUrl } = req.body;
+        const { title, artist, album, genre } = req.body;
         
-        const genreString = Array.isArray(genre) ? JSON.stringify(genre) : JSON.stringify([genre]);
+        // Update Album association
+        let albumId = undefined; // Undefined means don't update if not provided
+        if (album) {
+             const currentSong = await db('songs').where({ id: req.params.id }).first();
+             // Find or create album
+             const existingAlbum = await db('albums').where('title', 'like', album).first();
+             if (existingAlbum) {
+                 albumId = existingAlbum.id;
+             } else {
+                 albumId = uuidv4();
+                 await db('albums').insert({
+                     id: albumId,
+                     title: album,
+                     cover_url: `https://picsum.photos/seed/${encodeURIComponent(album)}/300/300`,
+                     track_count: 1
+                 });
+             }
+        }
 
         await db('songs').where({ id: req.params.id }).update({
             title,
-            artist_name: artist,
-            album_name: album,
-            genre: genreString,
-            cover_url: coverUrl
+            ...(albumId && { album_id: albumId }),
+            genre: JSON.stringify(Array.isArray(genre) ? genre : [genre])
         });
 
-        // Process artists if name changed
-        const artistNames = artist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
-        await processSongArtists(req.params.id, artistNames);
-
-        const song = await db('songs').where({ id: req.params.id }).first();
-        if (!song) {
-            return res.status(404).json({ error: 'Song not found' });
+        // Process artists
+        if (artist) {
+            const artistNames = artist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
+            await processSongArtists(req.params.id, artistNames);
         }
 
-        const artists = await db('song_artists')
-            .join('artists', 'song_artists.artist_id', 'artists.id')
-            .where('song_artists.song_id', req.params.id)
-            .select('artists.id', 'artists.name');
+        const query = db('songs').where({ 'songs.id': req.params.id });
+        const results = await fetchSongsWithDetails(query);
+        const transformed = results[0];
 
-        const transformed = {
-            ...transformSong(song),
-            artists
-        };
         broadcast('song:update', transformed);
         res.json(transformed);
     } catch (err) {
@@ -377,8 +445,10 @@ router.patch('/:id/favorite', async (req, res, next) => {
             is_favorite: !song.is_favorite
         });
 
-        const updated = await db('songs').where({ id: req.params.id }).first();
-        const transformed = transformSong(updated);
+        const query = db('songs').where({ 'songs.id': req.params.id });
+        const results = await fetchSongsWithDetails(query);
+        const transformed = results[0];
+
         broadcast('song:update', transformed);
         res.json(transformed);
     } catch (err) {
@@ -390,14 +460,12 @@ router.patch('/:id/favorite', async (req, res, next) => {
 router.patch('/:id/lyrics', async (req, res, next) => {
     try {
         const { lyrics } = req.body;
-
         await db('songs').where({ id: req.params.id }).update({ lyrics });
 
-        const song = await db('songs').where({ id: req.params.id }).first();
-        if (!song) {
-            return res.status(404).json({ error: 'Song not found' });
-        }
-        const transformed = transformSong(song);
+        const query = db('songs').where({ 'songs.id': req.params.id });
+        const results = await fetchSongsWithDetails(query);
+        const transformed = results[0];
+
         broadcast('song:update', transformed);
         res.json(transformed);
     } catch (err) {
@@ -405,7 +473,7 @@ router.patch('/:id/lyrics', async (req, res, next) => {
     }
 });
 
-// PATCH update song cover
+// PATCH update song cover (Actually updates the Album Cover)
 router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
     try {
         if (!req.file) {
@@ -413,17 +481,25 @@ router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
         }
 
         const coverUrl = `/uploads/covers/${req.file.filename}`;
-
-        await db('songs').where({ id: req.params.id }).update({
-            cover_url: coverUrl
-        });
-
         const song = await db('songs').where({ id: req.params.id }).first();
-        if (!song) {
-            return res.status(404).json({ error: 'Song not found' });
+        
+        if (song && song.album_id) {
+            await db('albums').where({ id: song.album_id }).update({
+                cover_url: coverUrl
+            });
         }
-        const transformed = transformSong(song);
+
+        const query = db('songs').where({ 'songs.id': req.params.id });
+        const results = await fetchSongsWithDetails(query);
+        const transformed = results[0];
+
         broadcast('song:update', transformed);
+        // Also broadcast album update
+        if (song.album_id) {
+             const album = await db('albums').where({ id: song.album_id }).first();
+             broadcast('album:update', { ...album, isFavorite: Boolean(album.is_favorite) });
+        }
+
         res.json(transformed);
     } catch (err) {
         next(err);
