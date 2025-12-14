@@ -164,15 +164,16 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-rose-600/10 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto">
-        <div className="flex justify-start mb-8">
+      <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col gap-10">
+        <div className="flex justify-start">
           <BackButton />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Left Column: Image & Main Info */}
-          <div className="lg:col-span-5 flex flex-col items-center lg:items-start text-center lg:text-left">
-            <div className="relative mb-8 group w-full max-w-md aspect-square rounded-[2rem] overflow-hidden shadow-2xl">
+        {/* Top Section: Split Image and Details */}
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-12 items-end">
+          
+          {/* Left: Album Art */}
+          <div className="relative group w-80 h-80 rounded-[2.5rem] overflow-hidden shadow-2xl flex-shrink-0 mx-auto lg:mx-0">
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] h-[110%] bg-indigo-500/30 blur-3xl rounded-full opacity-50 -z-10"></div>
               <img
                 src={song.coverUrl}
@@ -195,37 +196,43 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                   }}
                 />
               </label>
-            </div>
+          </div>
 
-            <div className="mb-6 w-full relative group">
-              <div className="absolute right-0 top-0 z-30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-black/90 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-xl">
-                 <button 
-                    onClick={handleIdentify}
-                    disabled={isIdentifying}
-                    title="Identify Song with MusicBrainz"
-                    className={`p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-all ${isIdentifying ? 'animate-pulse text-indigo-400' : ''}`}
-                 >
-                     <Wand2 className="w-5 h-5"/>
-                 </button>
-                 <button onClick={() => setIsEditingInfo(true)} className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10" title="Edit Info">
-                     <Edit3 className="w-5 h-5"/>
-                 </button>
-                 <div className="w-[1px] h-5 bg-white/20 mx-1"></div>
-                 <button onClick={handleDelete} className="p-2 text-rose-400 hover:text-rose-300 rounded-xl hover:bg-rose-500/20" title="Delete Song">
-                     <Trash2 className="w-5 h-5"/>
-                 </button>
-              </div>
-              
-              {identifyError && (
-                  <div className="absolute top-[-40px] right-0 bg-rose-500/90 text-white text-xs px-3 py-2 rounded-xl animate-in fade-in slide-in-from-bottom-1 shadow-lg border border-rose-400/50">
-                      {identifyError}
-                  </div>
-              )}
-              
-              <h1 className="text-4xl md:text-5xl font-black text-white mb-2 tracking-tight leading-tight pr-12">{song.title}</h1>
-              <p className="text-2xl text-indigo-300 font-medium mb-4">{renderArtists()}</p>
+          {/* Right: Info & Controls */}
+          <div className="flex flex-col gap-6 w-full min-w-0">
+             
+             {/* Admin Controls (Floating Top Right relative to this block) */}
+             <div className="flex justify-end">
+                <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-xl">
+                    <button 
+                        onClick={handleIdentify}
+                        disabled={isIdentifying}
+                        title="Identify Song with MusicBrainz"
+                        className={`p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-all ${isIdentifying ? 'animate-pulse text-indigo-400' : ''}`}
+                    >
+                        <Wand2 className="w-5 h-5"/>
+                    </button>
+                    <button onClick={() => setIsEditingInfo(true)} className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10" title="Edit Info">
+                        <Edit3 className="w-5 h-5"/>
+                    </button>
+                    <div className="w-[1px] h-5 bg-white/20 mx-1"></div>
+                    <button onClick={handleDelete} className="p-2 text-rose-400 hover:text-rose-300 rounded-xl hover:bg-rose-500/20" title="Delete Song">
+                        <Trash2 className="w-5 h-5"/>
+                    </button>
+                </div>
+                {identifyError && (
+                    <div className="absolute top-0 right-0 bg-rose-500/90 text-white text-xs px-3 py-2 rounded-xl animate-in fade-in slide-in-from-bottom-1 shadow-lg border border-rose-400/50">
+                        {identifyError}
+                    </div>
+                )}
+             </div>
 
-              <div className="flex items-center justify-center lg:justify-start gap-4 flex-wrap">
+             <div>
+                <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tight leading-tight">{song.title}</h1>
+                <p className="text-2xl text-indigo-300 font-medium">{renderArtists()}</p>
+             </div>
+
+             <div className="flex items-center justify-start gap-4 flex-wrap">
                 <button
                   onClick={() => onPlaySong(song)}
                   className="px-8 py-3 bg-white text-black rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform"
@@ -246,48 +253,43 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                 >
                   <ListPlus className="w-6 h-6" />
                 </button>
-              </div>
-            </div>
+             </div>
 
-            {/* Metadata Grid */}
-            <div className="grid grid-cols-2 gap-4 w-full bg-white/5 p-6 rounded-3xl border border-white/5">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Album</span>
-                <span 
-                  className="text-white font-medium truncate cursor-pointer hover:text-indigo-400 transition-colors hover:underline"
-                  onClick={() => song.albumId && navigate(`/album/${song.albumId}`)}
-                >
-                  {song.album}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genre</span>
-                <span className="text-white font-medium truncate">
-                   {song.genre.join(', ')}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Length</span>
-                <span className="text-white font-medium">{song.duration}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Format</span>
-                <div className="flex items-center gap-2">
-                  <span className="bg-white/10 text-xs px-2 py-0.5 rounded text-indigo-200 uppercase">{song.format}</span>
-                  {/*<span className="text-slate-400 text-sm">24-bit</span>*/}
+             {/* Metadata Grid (Moved here) */}
+             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 w-full bg-white/5 p-6 rounded-3xl border border-white/5 mt-2">
+                <div className="flex flex-col gap-1 md:col-span-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Album</span>
+                    <span 
+                    className="text-white font-medium truncate cursor-pointer hover:text-indigo-400 transition-colors hover:underline"
+                    onClick={() => song.albumId && navigate(`/album/${song.albumId}`)}
+                    >
+                    {song.album}
+                    </span>
                 </div>
-              </div>
-              <div className="flex flex-col gap-1 col-span-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bitrate</span>
-                <span className="text-white font-medium">320 kbps</span>
-              </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genre</span>
+                    <span className="text-white font-medium truncate">
+                    {song.genre.join(', ')}
+                    </span>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Length</span>
+                    <span className="text-white font-medium">{song.duration}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Format</span>
+                    <div className="flex items-center gap-2">
+                    <span className="bg-white/10 text-xs px-2 py-0.5 rounded text-indigo-200 uppercase">{song.format}</span>
+                    </div>
+                </div>
             </div>
           </div>
+        </div>
 
-          {/* Right Column: Lyrics */}
-          <div className="lg:col-span-7 flex flex-col h-full min-h-[500px]">
-            <div className="bg-[#1c1c1e]/80 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 flex flex-col h-full shadow-2xl relative overflow-hidden">
-              <div className="flex items-center justify-between mb-6 relative z-10">
+        {/* Bottom Section: Lyrics (Full Width) */}
+        <div className="w-full">
+            <div className="bg-[#1c1c1e]/80 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-10 flex flex-col min-h-[400px] shadow-2xl relative overflow-hidden">
+              <div className="flex items-center justify-between mb-8 relative z-10">
                 <h3 className="text-2xl font-bold text-white flex items-center gap-2">
                   <Mic2 className="w-6 h-6 text-indigo-400" /> Lyrics
                 </h3>
@@ -308,7 +310,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                       value={lyrics}
                       onChange={(e) => setLyrics(e.target.value)}
                       placeholder="Paste lyrics here..."
-                      className="w-full h-full bg-black/20 text-white rounded-xl p-4 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 text-lg leading-relaxed font-medium placeholder:text-slate-600 mb-4"
+                      className="w-full min-h-[300px] bg-black/20 text-white rounded-xl p-6 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xl leading-relaxed font-medium placeholder:text-slate-600 mb-4"
                     />
                     <div className="flex justify-end gap-3">
                       <button
@@ -328,11 +330,11 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     {lyrics ? (
-                      <p className="whitespace-pre-line text-xl leading-relaxed text-slate-300 font-medium text-center">
+                      <p className="whitespace-pre-line text-2xl leading-relaxed text-slate-300 font-medium text-center max-w-4xl mx-auto">
                         {lyrics}
                       </p>
                     ) : (
-                      <div className="text-center">
+                      <div className="text-center py-10">
                         <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-500">
                           <Music className="w-8 h-8" />
                         </div>
@@ -350,7 +352,6 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                 )}
               </div>
             </div>
-          </div>
         </div>
       </div>
       
