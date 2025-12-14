@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Song } from '../types';
+import { Song, NavigationState } from '../types';
 import { Play, Pause, Heart, ListPlus, GripVertical, Trash2 } from 'lucide-react';
 import PlayingIndicator from './PlayingIndicator';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +19,7 @@ interface SongListItemProps {
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
   showAlbum?: boolean;
-  onNavigate?: any; // Kept for backward compat if passed explicitly, though we use hook mostly
+  onNavigate?: (view: NavigationState['view'], id?: string) => void;
 }
 
 const SongListItemComponent: React.FC<SongListItemProps> = ({
@@ -48,48 +48,50 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onClick={onPlay}
-      className={`group grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_4fr_2fr_auto] gap-4 px-4 py-3 rounded-xl transition-colors cursor-pointer items-center border border-transparent
+      className={`group grid gap-4 px-4 py-3 rounded-xl transition-colors cursor-pointer items-center border border-transparent
+        ${isEditable 
+            ? 'grid-cols-[auto_auto_1fr_auto] md:grid-cols-[auto_auto_4fr_2fr_auto]' 
+            : 'grid-cols-[auto_1fr_auto] md:grid-cols-[auto_4fr_2fr_auto]'}
         ${isCurrent ? 'bg-white/10 border-white/5 shadow-lg' : 'hover:bg-white/5 hover:border-white/5'}
       `}
     >
+      {/* 0. Drag Handle (Only if Editable) */}
+      {isEditable && (
+         <button 
+            className="cursor-grab active:cursor-grabbing p-1 text-slate-600 hover:text-slate-300 flex-shrink-0" 
+            onMouseDown={(e) => e.stopPropagation()} 
+         >
+            <GripVertical className="w-5 h-5" />
+         </button>
+      )}
+
       {/* 1. Index / Play / Pause / Visualizer */}
       <div className="w-8 md:w-10 flex justify-center items-center text-slate-500 font-medium text-base relative flex-shrink-0">
-         {isEditable ? (
-             <button 
-                className="cursor-grab active:cursor-grabbing p-2 text-slate-600 hover:text-slate-300 -ml-2" 
-                onMouseDown={(e) => e.stopPropagation()} 
-             >
-                <GripVertical className="w-5 h-5" />
-             </button>
-         ) : (
-             <>
-                {/* Number: Hidden if playing or hovering */}
-                <span className={`tabular-nums w-6 text-center ${isCurrent && isPlaying ? 'hidden' : 'group-hover:hidden'} ${isCurrent ? 'text-indigo-400' : ''}`}>
-                    {displayIndex}
-                </span>
-                
-                {/* Play Button: Shown on hover if NOT playing this song */}
-                <button 
-                    className={`hidden group-hover:flex ${isCurrent && isPlaying ? '!hidden' : ''} items-center justify-center w-6`}
-                >
-                    <Play className="w-4 h-4 text-white fill-current" />
-                </button>
+        {/* Number: Hidden if playing or hovering */}
+        <span className={`tabular-nums w-6 text-center ${isCurrent && isPlaying ? 'hidden' : 'group-hover:hidden'} ${isCurrent ? 'text-indigo-400' : ''}`}>
+            {displayIndex}
+        </span>
+        
+        {/* Play Button: Shown on hover if NOT playing this song */}
+        <button 
+            className={`hidden group-hover:flex ${isCurrent && isPlaying ? '!hidden' : ''} items-center justify-center w-6`}
+        >
+            <Play className="w-4 h-4 text-white fill-current" />
+        </button>
 
-                {/* Pause Button: Shown on hover if IS playing this song */}
-                <button 
-                    className={`hidden ${isCurrent && isPlaying ? 'group-hover:flex' : ''} items-center justify-center w-6`}
-                >
-                    <Pause className="w-4 h-4 text-white fill-current" />
-                </button>
+        {/* Pause Button: Shown on hover if IS playing this song */}
+        <button 
+            className={`hidden ${isCurrent && isPlaying ? 'group-hover:flex' : ''} items-center justify-center w-6`}
+        >
+            <Pause className="w-4 h-4 text-white fill-current" />
+        </button>
 
-                {/* Visualizer: Shown if playing this song AND NOT hovering */}
-                {isCurrent && isPlaying && (
-                    <div className="group-hover:hidden">
-                        <PlayingIndicator />
-                    </div>
-                )}
-             </>
-         )}
+        {/* Visualizer: Shown if playing this song AND NOT hovering */}
+        {isCurrent && isPlaying && (
+            <div className="group-hover:hidden">
+                <PlayingIndicator />
+            </div>
+        )}
       </div>
 
       {/* 2. Cover + Title + Artist */}
@@ -183,8 +185,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
 };
 
 export const SongListItem = React.memo(SongListItemComponent, (prev, next) => {
-    // Custom comparison to avoid re-renders when function props change (since they are anonymous in parent)
-    // We only care if data relevant to this specific row changes
+    // Custom comparison to avoid re-renders when function props change
     return (
         prev.song.id === next.song.id &&
         prev.song.title === next.song.title &&

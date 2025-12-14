@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Shuffle, Heart, Maximize2, VolumeX } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Repeat1, Shuffle, Heart, Maximize2, VolumeX } from 'lucide-react';
 import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
 import { useNavigate } from 'react-router-dom';
@@ -18,7 +18,11 @@ interface PlayerBarProps {
   volume: number;
   onVolumeChange: (vol: number) => void;
   onExpand?: () => void;
-  onNavigate?: any; // kept for legacy props safety
+  onNavigate?: any; 
+  isShuffle: boolean;
+  repeatMode: 'off' | 'all' | 'one';
+  onToggleShuffle: () => void;
+  onToggleRepeat: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -40,7 +44,11 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   onSeek,
   volume,
   onVolumeChange,
-  onExpand
+  onExpand,
+  isShuffle,
+  repeatMode,
+  onToggleShuffle,
+  onToggleRepeat
 }) => {
   const navigate = useNavigate();
   
@@ -92,12 +100,18 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
       {/* Controls */}
       <div className="flex flex-col items-center w-[40%] max-w-xl">
         <div className="flex items-center gap-8 mb-3">
-          <button className="text-slate-500 hover:text-white transition-colors">
+          <button 
+            onClick={onToggleShuffle}
+            className={`transition-colors ${isShuffle ? 'text-indigo-500' : 'text-slate-500 hover:text-white'}`}
+            title="Shuffle"
+          >
             <Shuffle className="w-5 h-5" />
           </button>
+          
           <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform">
             <SkipBack className="w-7 h-7 fill-current" />
           </button>
+          
           <button
             onClick={onPlayPause}
             className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl shadow-white/10 active:scale-95"
@@ -108,11 +122,17 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
               <Play className="w-6 h-6 text-black fill-current ml-1" />
             )}
           </button>
+          
           <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform">
             <SkipForward className="w-7 h-7 fill-current" />
           </button>
-          <button className="text-slate-500 hover:text-white transition-colors">
-            <Repeat className="w-5 h-5" />
+          
+          <button 
+            onClick={onToggleRepeat}
+            className={`transition-colors ${repeatMode !== 'off' ? 'text-indigo-500' : 'text-slate-500 hover:text-white'}`}
+            title="Repeat"
+          >
+            {repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
           </button>
         </div>
         

@@ -109,7 +109,7 @@ router.get('/:id', async (req, res, next) => {
                 coverUrl: s.cover_url,
                 genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite),
-                fileUrl: s.file_path ? `/uploads/audio/${s.file_path.split('/').pop()}` : null
+                fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
             }))
         });
     } catch (err) {

@@ -62,6 +62,10 @@ const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   
+  // Playback Controls
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
+  
   const [playbackQueue, setPlaybackQueue] = useState<Song[]>([]);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
   const [showAddToPlaylistModal, setShowAddToPlaylistModal] = useState(false);
@@ -357,7 +361,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSong, playbackQueue, showVisualizer]); 
+  }, [currentSong, playbackQueue, showVisualizer, isShuffle, repeatMode]); 
 
   const playAudio = async () => {
     if (!audioRef.current || !currentSong) return;
@@ -412,7 +416,7 @@ const App: React.FC = () => {
         
         if (context) {
             setPlaybackQueue(context);
-        } else {
+        } else if (playbackQueue.length === 0 || !playbackQueue.find(s => s.id === song.id)) {
             setPlaybackQueue([song]); 
         }
     }
@@ -424,22 +428,76 @@ const App: React.FC = () => {
       }
   };
 
+  const toggleShuffle = () => setIsShuffle(!isShuffle);
+  const toggleRepeat = () => {
+    const modes: ('off' | 'all' | 'one')[] = ['off', 'all', 'one'];
+    const nextIndex = (modes.indexOf(repeatMode) + 1) % modes.length;
+    setRepeatMode(modes[nextIndex]);
+  };
+
   const handleNext = () => {
       if (!currentSong || playbackQueue.length === 0) return;
-      const idx = playbackQueue.findIndex(s => s.id === currentSong.id);
-      if (idx !== -1 && idx < playbackQueue.length - 1) {
-          handlePlaySong(playbackQueue[idx + 1], playbackQueue);
+      
+      const currentIndex = playbackQueue.findIndex(s => s.id === currentSong.id);
+      let nextIndex = -1;
+
+      if (isShuffle) {
+         // Simple random shuffle: Pick any song except current (if possible)
+         if (playbackQueue.length > 1) {
+             do {
+                 nextIndex = Math.floor(Math.random() * playbackQueue.length);
+             } while (nextIndex === currentIndex);
+         } else {
+             nextIndex = 0;
+         }
+      } else {
+         nextIndex = currentIndex + 1;
       }
+
+      // Boundary / Repeat logic
+      if (nextIndex >= playbackQueue.length) {
+          if (repeatMode === 'all') {
+              nextIndex = 0;
+          } else {
+              // End of queue and no repeat
+              setIsPlaying(false);
+              return;
+          }
+      }
+
+      handlePlaySong(playbackQueue[nextIndex], playbackQueue);
   };
 
   const handlePrev = () => {
     if (!currentSong || playbackQueue.length === 0) return;
-    const idx = playbackQueue.findIndex(s => s.id === currentSong.id);
-    if (idx > 0) {
-        handlePlaySong(playbackQueue[idx - 1], playbackQueue);
-    } else {
-        if (audioRef.current) audioRef.current.currentTime = 0;
+    
+    // If playing for more than 3s, restart song
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+        audioRef.current.currentTime = 0;
+        return;
     }
+
+    // If repeat one is on, restart song
+    if (repeatMode === 'one') {
+        if (audioRef.current) audioRef.current.currentTime = 0;
+        return;
+    }
+
+    const currentIndex = playbackQueue.findIndex(s => s.id === currentSong.id);
+    let prevIndex = currentIndex - 1;
+
+    if (prevIndex < 0) {
+        if (repeatMode === 'all' || isShuffle) { 
+            // Wrap around for shuffle or repeat all
+            prevIndex = playbackQueue.length - 1;
+        } else {
+            // Stop at start
+            if (audioRef.current) audioRef.current.currentTime = 0;
+            return;
+        }
+    }
+
+    handlePlaySong(playbackQueue[prevIndex], playbackQueue);
   };
 
   const handleTimeUpdate = () => {
@@ -457,7 +515,14 @@ const App: React.FC = () => {
   };
 
   const handleSongEnded = () => {
-      handleNext();
+      if (repeatMode === 'one') {
+          if (audioRef.current) {
+              audioRef.current.currentTime = 0;
+              playAudio();
+          }
+      } else {
+          handleNext();
+      }
   };
 
   const handleAudioError = () => {
@@ -475,7 +540,6 @@ const App: React.FC = () => {
           // Refetch what we need based on current path
           const path = location.pathname;
           if (path === '/') api.getSongs(PAGE_LIMIT, 0).then(setSongs);
-          // ... simpler to just let user navigation trigger reload or reload page
       } catch (e) {
           console.error(e);
       } finally {
@@ -486,14 +550,14 @@ const App: React.FC = () => {
   const handleToggleFavorite = async (id: string) => {
     let isSong = false;
 
-    // 1. Check if it is the currently playing song (might be searched and not in global list)
+    // 1. Check if it is the currently playing song
     if (currentSong?.id === id) {
         isSong = true;
         const newStatus = !currentSong.isFavorite;
         setCurrentSong(prev => prev ? { ...prev, isFavorite: newStatus } : null);
     }
 
-    // 2. Check if it is in the global songs list
+    // 2. Check global list
     const songIndex = songs.findIndex(s => s.id === id);
     if (songIndex !== -1) {
         isSong = true;
@@ -542,7 +606,7 @@ const App: React.FC = () => {
   const handleCreatePlaylist = async (name: string) => {
       try {
           const newPlaylist = await api.createPlaylist(name);
-          setPlaylists(prev => [newPlaylist, ...prev]); // update local state
+          setPlaylists(prev => [newPlaylist, ...prev]);
           setShowCreatePlaylistModal(false);
           if (songToAdd) {
              handleConfirmAddToPlaylist(newPlaylist.id);
@@ -566,8 +630,6 @@ const App: React.FC = () => {
       if (!songToAdd) return;
       try {
           await api.addSongToPlaylist(playlistId, songToAdd.id);
-          // Update local playlist state to reflect added song (optimistic or re-fetch)
-          // Simplified: just update the count/ids in local state
           setPlaylists(prev => prev.map(p => {
               if (p.id === playlistId && !p.songIds.includes(songToAdd.id)) {
                   return { ...p, songIds: [...p.songIds, songToAdd.id], songCount: (p.songCount || 0) + 1 };
@@ -733,7 +795,6 @@ const App: React.FC = () => {
                         }}
                         onRemoveSong={async (pid: string, sid: string) => {
                             await api.removeSongFromPlaylist(pid, sid);
-                            // Update local playlist state
                             setPlaylists(prev => prev.map(p => {
                                 if (p.id === pid) {
                                     return { ...p, songIds: p.songIds.filter(id => id !== sid), songCount: (p.songCount || 1) - 1 };
@@ -812,6 +873,10 @@ const App: React.FC = () => {
             volume={volume}
             onVolumeChange={setVolume}
             onExpand={() => setShowVisualizer(true)}
+            isShuffle={isShuffle}
+            repeatMode={repeatMode}
+            onToggleShuffle={toggleShuffle}
+            onToggleRepeat={toggleRepeat}
         />
       </div>
       

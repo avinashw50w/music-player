@@ -36,7 +36,12 @@ export const TrackList: React.FC<TrackListProps> = ({
   return (
     <div className="px-6 md:px-10 pb-32 max-w-7xl mx-auto">
       {showHeader && (
-        <div className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_4fr_2fr_auto] gap-4 px-8 py-4 border-b border-white/5 text-slate-400 text-xs font-bold uppercase tracking-widest sticky top-0 bg-black/40 backdrop-blur-md z-10 mb-2 rounded-xl">
+        <div className={`grid gap-4 px-8 py-4 border-b border-white/5 text-slate-400 text-xs font-bold uppercase tracking-widest sticky top-0 bg-black/40 backdrop-blur-md z-10 mb-2 rounded-xl
+            ${isEditable 
+                ? 'grid-cols-[auto_auto_1fr_auto] md:grid-cols-[auto_auto_4fr_2fr_auto]' 
+                : 'grid-cols-[auto_1fr_auto] md:grid-cols-[auto_4fr_2fr_auto]'}
+        `}>
+          {isEditable && <span className="w-7"></span>}
           <span className="w-10 text-center">#</span>
           <span>Title</span>
           <span className="hidden md:block">Album</span>
