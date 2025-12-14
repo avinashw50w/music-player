@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, ScrollRestoration } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
 import Home from './pages/Home';
@@ -665,7 +665,9 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen flex-col text-white font-sans overflow-hidden">
+    <div className="flex min-h-screen text-white font-sans relative">
+      <ScrollRestoration />
+      
       {/* Background Ambience */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-900/20 blur-[150px]"></div>
@@ -702,13 +704,16 @@ const App: React.FC = () => {
           </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden relative z-10">
+      {/* Sidebar - Sticky */}
+      <div className="w-72 h-screen sticky top-0 z-30 flex-shrink-0 hidden lg:block">
         <Sidebar 
             onCreatePlaylist={() => setShowCreatePlaylistModal(true)}
             playlists={playlists}
         />
+      </div>
         
-        <main className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar scroll-smooth">
+      {/* Main Content - Scrolls with Window */}
+      <main className="flex-1 min-w-0 pb-32">
             <Routes>
                 <Route path="/" element={
                     <Home 
@@ -857,9 +862,9 @@ const App: React.FC = () => {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </main>
-      </div>
 
-      <div className="z-[100] w-full flex-shrink-0">
+      {/* Player Bar - Fixed */}
+      <div className="z-[100] w-full fixed bottom-0 left-0">
         <PlayerBar 
             currentSong={currentSong}
             isPlaying={isPlaying}

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Route, createRoutesFromElements } from 'react-router-dom';
 import App from './App';
 
 const rootElement = document.getElementById('root');
@@ -9,11 +9,15 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route path="*" element={<App />} />
+  )
+);
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <RouterProvider router={router} />
   </React.StrictMode>
 );
