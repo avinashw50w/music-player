@@ -90,6 +90,12 @@ export async function updateSongCover(id: string, file: File): Promise<Song> {
     return handleResponse<Song>(response);
 }
 
+export async function identifySong(id: string): Promise<Song> {
+    const response = await fetch(`${API_BASE_URL}/songs/${id}/identify`, {
+        method: 'POST'
+    });
+    return handleResponse<Song>(response);
+}
 
 // Albums
 export async function getAlbums(limit?: number, offset?: number, search?: string, signal?: AbortSignal, favorites?: boolean): Promise<Album[]> {

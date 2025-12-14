@@ -5,11 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
-import { fileURLToPath } from 'url';
 import { broadcast } from '../services/sse.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { config } from '../config/env.js';
 
 const router = express.Router();
 
@@ -132,7 +129,7 @@ router.post('/', async (req, res, next) => {
                 const response = await fetch(tempUrl);
                 if (response.ok) {
                     const filename = `playlist-${id}.jpg`;
-                    const uploadDir = path.join(__dirname, '../../uploads/covers');
+                    const uploadDir = path.join(config.UPLOAD_DIR, 'covers');
                     
                     if (!fs.existsSync(uploadDir)) {
                         fs.mkdirSync(uploadDir, { recursive: true });
@@ -222,7 +219,7 @@ router.delete('/:id', async (req, res, next) => {
 
         // Clean up cached image if it exists and is local
         if (playlist && playlist.cover_url && playlist.cover_url.startsWith('/uploads/covers/playlist-')) {
-             const filepath = path.join(__dirname, '../../', playlist.cover_url);
+             const filepath = path.join(config.UPLOAD_DIR, 'covers', path.basename(playlist.cover_url));
              fs.unlink(filepath, (err) => {
                  if (err && err.code !== 'ENOENT') console.error('Failed to delete playlist image:', err);
              });

@@ -2,19 +2,16 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../config/database.js';
+import { config } from '../config/env.js';
 import { extractMetadata } from '../services/audioService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
 // Configure multer for audio uploads
 const audioStorage = multer.diskStorage({
-    destination: path.join(__dirname, '../../uploads/audio'),
+    destination: path.join(config.UPLOAD_DIR, 'audio'),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
         cb(null, `${Date.now()}-${uuidv4().slice(0, 8)}${ext}`);
@@ -22,7 +19,7 @@ const audioStorage = multer.diskStorage({
 });
 
 const coverStorage = multer.diskStorage({
-    destination: path.join(__dirname, '../../uploads/covers'),
+    destination: path.join(config.UPLOAD_DIR, 'covers'),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
         cb(null, `cover-${Date.now()}${ext}`);

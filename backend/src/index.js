@@ -1,9 +1,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
+import { config } from './config/env.js'; // Import config first
 import { migrate } from './config/migrate.js';
 
 // Routes
@@ -17,14 +15,8 @@ import libraryRouter from './routes/library.js';
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
 
-// Config
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = config.PORT;
 
 // CORS configuration
 app.use(cors({
@@ -38,7 +30,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Static file serving for uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(config.UPLOAD_DIR));
 
 // API Routes
 app.use('/api/songs', songsRouter);
@@ -142,7 +134,7 @@ const startServer = async () => {
 
         const server = app.listen(PORT, () => {
             console.log(`🎵 Myousic Backend running on http://localhost:${PORT}`);
-            console.log(`📁 Uploads served from: ${path.join(__dirname, '../uploads')}`);
+            console.log(`📁 Uploads served from: ${config.UPLOAD_DIR}`);
         });
 
         // Graceful Shutdown

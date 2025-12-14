@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
-import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play } from 'lucide-react';
+import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Wand2 } from 'lucide-react';
 import { SongDetailSkeleton } from '../components/Skeletons';
 import * as api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -29,6 +29,10 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
   const [lyrics, setLyrics] = useState<string>("");
   const [isEditingLyrics, setIsEditingLyrics] = useState(false);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+  
+  // Identify State
+  const [isIdentifying, setIsIdentifying] = useState(false);
+  const [identifyError, setIdentifyError] = useState<string | null>(null);
 
   useEffect(() => {
     // If song is not found in initial props (e.g. refresh or direct link), fetch it
@@ -108,6 +112,22 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
       console.error("Failed to update song cover", err);
     }
   };
+  
+  const handleIdentify = async () => {
+      if (isIdentifying) return;
+      setIsIdentifying(true);
+      setIdentifyError(null);
+      try {
+          const updated = await api.identifySong(song.id);
+          setSong(updated);
+          onUpdateSong?.(updated);
+      } catch (e: any) {
+          setIdentifyError(e.message || "Identification failed");
+          setTimeout(() => setIdentifyError(null), 4000);
+      } finally {
+          setIsIdentifying(false);
+      }
+  };
 
 
   return (
@@ -150,11 +170,26 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
             </div>
 
             <div className="mb-6 w-full relative group">
-              <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                 <button 
+                    onClick={handleIdentify}
+                    disabled={isIdentifying}
+                    title="Identify Song with MusicBrainz"
+                    className={`p-2 text-slate-500 hover:text-white rounded-full hover:bg-white/10 transition-all ${isIdentifying ? 'animate-pulse text-indigo-400' : ''}`}
+                 >
+                     <Wand2 className="w-5 h-5"/>
+                 </button>
                  <button onClick={() => setIsEditingInfo(true)} className="p-2 text-slate-500 hover:text-white rounded-full hover:bg-white/10">
                      <Edit3 className="w-5 h-5"/>
                  </button>
               </div>
+              
+              {identifyError && (
+                  <div className="absolute top-[-30px] right-0 bg-rose-500/90 text-white text-xs px-2 py-1 rounded-md animate-in fade-in slide-in-from-bottom-1">
+                      {identifyError}
+                  </div>
+              )}
+              
               <h1 className="text-4xl md:text-5xl font-black text-white mb-2 tracking-tight leading-tight">{song.title}</h1>
               <p className="text-2xl text-indigo-300 font-medium mb-4">{song.artist}</p>
 

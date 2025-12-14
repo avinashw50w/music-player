@@ -4,17 +4,14 @@ import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { broadcast } from '../services/sse.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { config } from '../config/env.js';
 
 const router = express.Router();
 
 // Configure multer for avatar uploads
 const storage = multer.diskStorage({
-    destination: path.join(__dirname, '../../uploads/covers'),
+    destination: path.join(config.UPLOAD_DIR, 'covers'),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
         cb(null, `artist-${Date.now()}${ext}`);
