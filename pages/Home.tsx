@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Song } from '../types';
 import { Heart, Play, Disc, Music, Mic2 } from 'lucide-react';
 import PlayingIndicator from '../components/PlayingIndicator';
@@ -15,6 +15,28 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isPlaying, onToggleFavorite }) => {
   const navigate = useNavigate();
+
+  // Keep a snapshot of the IDs to preserve order during the session
+  const [frozenIds, setFrozenIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Only initialize if we have no IDs and we received data
+    // This handles the initial load from localStorage
+    if (frozenIds.length === 0 && recentSongs.length > 0) {
+      setFrozenIds(recentSongs.map(s => s.id));
+    }
+  }, [recentSongs, frozenIds.length]);
+
+  const displaySongs = useMemo(() => {
+    // If we haven't frozen any IDs yet, just show the incoming props
+    if (frozenIds.length === 0) return recentSongs;
+    
+    // Map frozen IDs to current song objects to get updates (like favorites)
+    // while maintaining the frozen order
+    return frozenIds
+      .map(id => recentSongs.find(s => s.id === id))
+      .filter((s): s is Song => !!s);
+  }, [frozenIds, recentSongs]);
 
   return (
     <div className="p-10 pb-10">
@@ -98,12 +120,12 @@ const Home: React.FC<HomeProps> = ({ recentSongs, onPlaySong, currentSongId, isP
         <div className="flex-1">
           <h2 className="text-3xl font-bold text-white mb-8">Recently Played</h2>
           <div className="flex flex-col gap-3">
-            {recentSongs.map((song, index) => {
+            {displaySongs.map((song, index) => {
               const isCurrent = currentSongId === song.id;
               return (
                 <div 
                   key={song.id} 
-                  onClick={() => onPlaySong(song, recentSongs)}
+                  onClick={() => onPlaySong(song, displaySongs)}
                   className={`group grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_2fr_1fr_auto_auto] items-center gap-6 p-4 rounded-2xl transition-all cursor-pointer hover:bg-white/5 ${isCurrent ? 'bg-white/10' : ''}`}
                 >
                   <div className="w-10 flex justify-center text-slate-500 font-medium text-base">
