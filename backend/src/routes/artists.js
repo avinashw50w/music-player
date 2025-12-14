@@ -42,6 +42,11 @@ router.get('/', async (req, res, next) => {
         const { limit, offset, search, favorites } = req.query;
         let query = db('artists').select('*').orderBy('name', 'asc');
 
+        // Only show artists which has atleast one song
+        query.whereExists(function() {
+            this.select('*').from('songs').whereRaw('songs.artist_id = artists.id');
+        });
+
         if (search) {
             query = query.where('name', 'like', `%${search}%`);
         }
@@ -223,6 +228,39 @@ router.patch('/:id/favorite', async (req, res, next) => {
         const transformed = transformArtist(updated);
         broadcast('artist:update', transformed);
         res.json(transformed);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// DELETE artist
+router.delete('/:id', async (req, res, next) => {
+    try {
+        const id = req.params.id;
+        
+        // Unlink songs associated with this artist
+        await db('songs')
+            .where({ artist_id: id })
+            .update({ 
+                artist_id: null, 
+                artist_name: 'Unknown Artist' 
+            });
+            
+        // Unlink albums associated with this artist
+        await db('albums')
+            .where({ artist_id: id })
+            .update({
+                artist_id: null,
+                artist_name: 'Unknown Artist'
+            });
+
+        const deleted = await db('artists').where({ id }).del();
+        
+        if (!deleted) {
+            return res.status(404).json({ error: 'Artist not found' });
+        }
+        broadcast('artist:delete', { id });
+        res.json({ success: true });
     } catch (err) {
         next(err);
     }

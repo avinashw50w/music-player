@@ -97,6 +97,10 @@ export async function identifySong(id: string): Promise<Song> {
     return handleResponse<Song>(response);
 }
 
+export async function deleteSong(id: string): Promise<void> {
+    await fetch(`${API_BASE_URL}/songs/${id}`, { method: 'DELETE' });
+}
+
 // Albums
 export async function getAlbums(limit?: number, offset?: number, search?: string, signal?: AbortSignal, favorites?: boolean): Promise<Album[]> {
   const params = new URLSearchParams();
@@ -143,6 +147,10 @@ export async function updateAlbumCover(id: string, file: File): Promise<Album> {
     return handleResponse<Album>(response);
 }
 
+export async function deleteAlbum(id: string): Promise<void> {
+    await fetch(`${API_BASE_URL}/albums/${id}`, { method: 'DELETE' });
+}
+
 // Artists
 export async function getArtists(limit?: number, offset?: number, search?: string, signal?: AbortSignal, favorites?: boolean): Promise<Artist[]> {
   const params = new URLSearchParams();
@@ -187,6 +195,10 @@ export async function updateArtistAvatar(id: string, file: File): Promise<Artist
         body: formData
     });
     return handleResponse<Artist>(response);
+}
+
+export async function deleteArtist(id: string): Promise<void> {
+    await fetch(`${API_BASE_URL}/artists/${id}`, { method: 'DELETE' });
 }
 
 // Playlists

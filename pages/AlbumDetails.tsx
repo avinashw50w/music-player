@@ -121,6 +121,17 @@ export const AlbumDetails: React.FC<DetailProps> = ({
     }
   };
 
+  const handleDelete = async () => {
+    if (window.confirm(`Are you sure you want to delete the album "${album.title}"?`)) {
+        try {
+            await api.deleteAlbum(album.id);
+            navigate(-1);
+        } catch (e) {
+            console.error("Failed to delete album", e);
+        }
+    }
+  };
+
   const handlePlayToggle = () => {
     if (isContextPlaying && currentSongId) {
         const song = tracks.find(s => s.id === currentSongId);
@@ -167,6 +178,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({
         onPlay={handlePlayToggle} 
         onFollow={() => { }} 
         onEdit={() => setIsEditing(true)}
+        onDelete={handleDelete}
         isFavorite={album.isFavorite}
         onToggleFavorite={() => handleToggleFavoriteInternal(album.id)}
       />

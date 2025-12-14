@@ -67,13 +67,21 @@ app.get('/api/search', async (req, res, next) => {
             .select('*');
 
         const albums = await db('albums')
-            .where('title', 'like', searchTerm)
-            .orWhere('artist_name', 'like', searchTerm)
+            .where(function() {
+                this.where('title', 'like', searchTerm)
+                    .orWhere('artist_name', 'like', searchTerm);
+            })
+            .whereExists(function() {
+                this.select('*').from('songs').whereRaw('songs.album_id = albums.id');
+            })
             .limit(10)
             .select('*');
 
         const artists = await db('artists')
             .where('name', 'like', searchTerm)
+            .whereExists(function() {
+                this.select('*').from('songs').whereRaw('songs.artist_id = artists.id');
+            })
             .limit(10)
             .select('*');
 

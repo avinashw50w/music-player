@@ -114,6 +114,17 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
     }
   };
 
+  const handleDelete = async () => {
+      if (window.confirm(`Are you sure you want to delete the artist "${artist.name}"?`)) {
+          try {
+              await api.deleteArtist(artist.id);
+              navigate(-1);
+          } catch (e) {
+              console.error("Failed to delete artist", e);
+          }
+      }
+  };
+
   const handlePlayToggle = () => {
     if (isContextPlaying && currentSongId) {
         const song = songs.find(s => s.id === currentSongId);
@@ -149,6 +160,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
         onPlay={handlePlayToggle} 
         onFollow={() => { }} 
         onEdit={() => setIsEditing(true)}
+        onDelete={handleDelete}
         isFavorite={artist.isFavorite}
         onToggleFavorite={() => handleToggleFavoriteInternal(artist.id)}
       />

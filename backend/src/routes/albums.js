@@ -52,6 +52,11 @@ router.get('/', async (req, res, next) => {
         const { limit, offset, search, favorites } = req.query;
         let query = db('albums').select('*').orderBy('created_at', 'desc');
 
+        // Only show albums which has atleast one song
+        query.whereExists(function() {
+            this.select('*').from('songs').whereRaw('songs.album_id = albums.id');
+        });
+
         if (search) {
             const term = `%${search}%`;
             query = query.where(function() {
@@ -246,11 +251,23 @@ router.patch('/:id/favorite', async (req, res, next) => {
 // DELETE album
 router.delete('/:id', async (req, res, next) => {
     try {
-        const deleted = await db('albums').where({ id: req.params.id }).del();
+        const id = req.params.id;
+
+        // Unlink songs associated with this album to prevent orphans or errors
+        // We set album fields to null
+        await db('songs')
+            .where({ album_id: id })
+            .update({ 
+                album_id: null, 
+                album_name: null 
+            });
+
+        const deleted = await db('albums').where({ id }).del();
+        
         if (!deleted) {
             return res.status(404).json({ error: 'Album not found' });
         }
-        broadcast('album:delete', { id: req.params.id });
+        broadcast('album:delete', { id });
         res.json({ success: true });
     } catch (err) {
         next(err);

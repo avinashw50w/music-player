@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
-import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Wand2 } from 'lucide-react';
+import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2 } from 'lucide-react';
 import { SongDetailSkeleton } from '../components/Skeletons';
 import * as api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -129,6 +129,17 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
       }
   };
 
+  const handleDelete = async () => {
+      if (window.confirm(`Are you sure you want to delete "${song.title}" from your library?`)) {
+          try {
+              await api.deleteSong(song.id);
+              navigate(-1);
+          } catch (e) {
+              console.error("Failed to delete song", e);
+          }
+      }
+  };
+
 
   return (
     <div className="min-h-full flex flex-col p-8 pb-10 relative overflow-hidden animate-fade-in-up">
@@ -179,8 +190,11 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                  >
                      <Wand2 className="w-5 h-5"/>
                  </button>
-                 <button onClick={() => setIsEditingInfo(true)} className="p-2 text-slate-500 hover:text-white rounded-full hover:bg-white/10">
+                 <button onClick={() => setIsEditingInfo(true)} className="p-2 text-slate-500 hover:text-white rounded-full hover:bg-white/10" title="Edit Info">
                      <Edit3 className="w-5 h-5"/>
+                 </button>
+                 <button onClick={handleDelete} className="p-2 text-slate-500 hover:text-rose-500 rounded-full hover:bg-white/10" title="Delete Song">
+                     <Trash2 className="w-5 h-5"/>
                  </button>
               </div>
               
