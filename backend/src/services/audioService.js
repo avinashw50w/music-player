@@ -20,8 +20,8 @@ export async function extractMetadata(filePath, originalFilename = null) {
             const format = metadata.format;
             const audioStream = metadata.streams.find(s => s.codec_type === 'audio');
 
-            // Try to get tags from format or stream
-            const tags = format.tags || {};
+            // Try to get tags from format or stream (format usually has global tags)
+            const tags = format.tags || audioStream?.tags || {};
 
             const durationSeconds = Math.floor(format.duration || 0);
             const minutes = Math.floor(durationSeconds / 60);
@@ -46,6 +46,9 @@ export async function extractMetadata(filePath, originalFilename = null) {
             const filenameForTitle = originalFilename || filePath;
             const fallbackTitle = path.basename(filenameForTitle, path.extname(filenameForTitle));
 
+            // Extract Lyrics (Common keys)
+            const lyrics = tags.lyrics || tags.LYRICS || tags.unsyncedlyrics || tags.USLT || null;
+
             resolve({
                 title: tags.title || fallbackTitle,
                 artist: artistNames.join(', '), // Display string
@@ -58,7 +61,8 @@ export async function extractMetadata(filePath, originalFilename = null) {
                 bitrate: Math.floor((format.bit_rate || 0) / 1000), // Convert to kbps
                 format: audioStream?.codec_name?.toUpperCase() || path.extname(filePath).slice(1).toUpperCase(),
                 sampleRate: audioStream?.sample_rate,
-                channels: audioStream?.channels
+                channels: audioStream?.channels,
+                lyrics: lyrics
             });
         });
     });
@@ -112,10 +116,6 @@ export async function updateAudioTags(filePath, metadata) {
             // Map 1 (Image from input 1)
             outputOptions.push('-map', '1');
             
-            // Note: We avoid setting '-metadata:s:v title="Album cover"' here because 
-            // spaces in the value can cause argument parsing errors in some environments/ffmpeg versions 
-            // when passed via node-fluent-ffmpeg.
-            // The disposition 'attached_pic' is sufficient for players to recognize it as cover art.
             outputOptions.push('-disposition:v', 'attached_pic');
         } else {
             // Keep original streams (preserves existing art if no new art provided)
@@ -124,15 +124,16 @@ export async function updateAudioTags(filePath, metadata) {
 
         // Add Text Metadata
         // Note: We avoid manual quoting as spawn handles separate arguments.
-        if (metadata.title) outputOptions.push('-metadata', `title=${metadata.title}`);
-        if (metadata.artist) outputOptions.push('-metadata', `artist=${metadata.artist}`);
-        if (metadata.album) outputOptions.push('-metadata', `album=${metadata.album}`);
-        if (metadata.year) outputOptions.push('-metadata', `date=${metadata.year}`);
-        if (metadata.genre) {
-            const genreStr = Array.isArray(metadata.genre) ? metadata.genre.join(', ') : metadata.genre;
+        if (metadata.title !== undefined) outputOptions.push('-metadata', `title=${metadata.title}`);
+        if (metadata.artist !== undefined) outputOptions.push('-metadata', `artist=${metadata.artist}`);
+        if (metadata.album !== undefined) outputOptions.push('-metadata', `album=${metadata.album}`);
+        if (metadata.year !== undefined) outputOptions.push('-metadata', `date=${metadata.year}`);
+        if (metadata.genre !== undefined) {
+            const genreStr = Array.isArray(metadata.genre) ? metadata.genre.join(', ') : (metadata.genre || '');
             outputOptions.push('-metadata', `genre=${genreStr}`);
         }
-        if (metadata.lyrics) {
+        // Explicitly check for undefined to allow empty string (clearing lyrics)
+        if (metadata.lyrics !== undefined) {
             outputOptions.push('-metadata', `lyrics=${metadata.lyrics}`);
         }
 

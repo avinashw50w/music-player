@@ -175,7 +175,8 @@ router.post('/scan', async (req, res) => {
                         genre: JSON.stringify(metadata.genre),
                         is_favorite: false,
                         bitrate: metadata.bitrate,
-                        format: metadata.format
+                        format: metadata.format,
+                        lyrics: metadata.lyrics // Store extracted lyrics
                     });
 
                     // Artist Logic (Multi-artist support)

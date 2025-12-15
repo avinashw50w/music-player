@@ -159,7 +159,8 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
                     genre: JSON.stringify(metadata.genre), 
                     is_favorite: false,
                     bitrate: metadata.bitrate,
-                    format: metadata.format
+                    format: metadata.format,
+                    lyrics: metadata.lyrics // Save lyrics
                 });
 
                 // Process artists (Linking happens after song creation due to FK)
@@ -262,7 +263,8 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
                     genre: JSON.stringify(metadata.genre), 
                     is_favorite: false,
                     bitrate: metadata.bitrate,
-                    format: metadata.format
+                    format: metadata.format,
+                    lyrics: metadata.lyrics // Save lyrics
                 });
 
                 await linkArtistsToSong(songId, metadata.artists);

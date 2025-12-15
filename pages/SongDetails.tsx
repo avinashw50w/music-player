@@ -49,8 +49,8 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
   const [suggestionData, setSuggestionData] = useState<any>(null);
 
   useEffect(() => {
-    // If song is not found in initial props (e.g. refresh or direct link), fetch it
-    if (!song && id) {
+    // Fetch full details if song is missing OR if lyrics are undefined (incomplete data from list view)
+    if (id && (!song || song.lyrics === undefined)) {
         setLoading(true);
         api.getSong(id)
             .then(data => {
@@ -63,14 +63,21 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
             .finally(() => setLoading(false));
     } else if (song?.lyrics) {
       setLyrics(song.lyrics);
+      setLoading(false);
     }
-  }, [id, song]);
+  }, [id]);
 
   // Update local state if props change (e.g. favorite toggle from parent)
+  // CRITICAL: Preserve lyrics if the incoming prop song (from list) doesn't have them
   useEffect(() => {
       const propSong = songs.find(s => s.id === id);
       if (propSong) {
-          setSong(propSong);
+          setSong(prev => {
+              if (prev?.lyrics && propSong.lyrics === undefined) {
+                  return { ...propSong, lyrics: prev.lyrics };
+              }
+              return propSong;
+          });
           if (propSong.lyrics) setLyrics(propSong.lyrics);
       }
   }, [songs, id]);
