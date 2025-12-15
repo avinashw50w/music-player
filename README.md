@@ -33,7 +33,7 @@ Before running the application, ensure you have the following installed:
 
 ### 1. Environment Setup
 
-Create a `.env` file in the **root** directory of the project. You can copy the structure below:
+Create a `.env` file in the **backend** directory of the project. You can copy the structure below:
 
 ```env
 # Server Configuration
