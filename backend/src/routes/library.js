@@ -97,9 +97,27 @@ router.post('/scan', async (req, res) => {
                 return;
             }
 
-            // 2. Process files
+            // 2. Fetch existing file paths to skip duplicates efficiently
+            updateScanStatus({ currentFile: 'Checking database...' });
+            const existingPaths = new Set();
+            const existingSongs = await db('songs').select('file_path');
+            existingSongs.forEach(s => existingPaths.add(s.file_path));
+
+            // 3. Process files
             for (let i = 0; i < audioFiles.length; i++) {
                 const filePath = audioFiles[i];
+                
+                // Skip if already exists
+                if (existingPaths.has(filePath)) {
+                    updateScanStatus({
+                        currentFile: `Skipping: ${path.basename(filePath)}`,
+                        processed: i + 1,
+                        progress: Math.round(((i + 1) / currentScanStatus.totalFound) * 100)
+                    });
+                    broadcast('scan:progress', currentScanStatus);
+                    continue; 
+                }
+
                 updateScanStatus({
                     currentFile: path.basename(filePath),
                     processed: i + 1,
@@ -109,10 +127,6 @@ router.post('/scan', async (req, res) => {
                 broadcast('scan:progress', currentScanStatus);
 
                 try {
-                    // Check if file already exists in DB (by exact path)
-                    const existing = await db('songs').where({ file_path: filePath }).first();
-                    if (existing) continue;
-
                     const metadata = await extractMetadata(filePath);
                     
                     const songId = uuidv4();
@@ -128,7 +142,7 @@ router.post('/scan', async (req, res) => {
                             coverUrl = `/uploads/covers/${coverFilename}`;
                         }
                     } catch (e) {
-                        console.warn('Cover extraction failed', e);
+                        // console.warn('Cover extraction failed', e);
                     }
 
                     // Album Logic
@@ -191,8 +205,6 @@ router.post('/scan', async (req, res) => {
                                 });
                             } catch(e) {}
                         }
-                    } else {
-                        // Handle unknown artist if array is empty? (Optional)
                     }
 
                 } catch (err) {

@@ -126,7 +126,8 @@ router.get('/:id', async (req, res, next) => {
                 coverUrl: s.album_cover_url,
                 genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite),
-                fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
+                fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null,
+                // Lyrics removed from list view
             }))
         });
     } catch (err) {
@@ -159,7 +160,8 @@ router.get('/:id/songs', async (req, res, next) => {
             coverUrl: s.album_cover_url,
             genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
             isFavorite: Boolean(s.is_favorite),
-            fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
+            fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null,
+            // Lyrics removed from list view
         })));
     } catch (err) {
         next(err);

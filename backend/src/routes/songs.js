@@ -42,7 +42,7 @@ const formatDuration = (seconds) => {
 };
 
 // Helper to get full song details with joins
-async function fetchSongsWithDetails(baseQuery) {
+async function fetchSongsWithDetails(baseQuery, includeLyrics = false) {
     // Select song fields + album fields
     const songs = await baseQuery
         .leftJoin('albums', 'songs.album_id', 'albums.id')
@@ -71,7 +71,7 @@ async function fetchSongsWithDetails(baseQuery) {
 
     return songs.map(s => {
         const artists = artistsBySong[s.id] || [{ id: 'unknown', name: 'Unknown Artist', isPrimary: true }];
-        return {
+        const songData = {
             id: s.id,
             title: s.title,
             // Derived fields for frontend compatibility
@@ -90,10 +90,15 @@ async function fetchSongsWithDetails(baseQuery) {
                 catch { return s.genre ? [s.genre] : ['Unknown']; } 
             })(),
             isFavorite: Boolean(s.is_favorite),
-            lyrics: s.lyrics,
             bitrate: s.bitrate,
             format: s.format
         };
+
+        if (includeLyrics) {
+            songData.lyrics = s.lyrics;
+        }
+
+        return songData;
     });
 }
 
@@ -226,7 +231,8 @@ router.get('/', async (req, res, next) => {
             query = query.offset(parseInt(offset));
         }
 
-        const results = await fetchSongsWithDetails(query);
+        // Do not include lyrics in list view
+        const results = await fetchSongsWithDetails(query, false);
         res.json(results);
     } catch (err) {
         next(err);
@@ -237,7 +243,8 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
     try {
         const query = db('songs').where({ 'songs.id': req.params.id });
-        const results = await fetchSongsWithDetails(query);
+        // Include lyrics for single song view
+        const results = await fetchSongsWithDetails(query, true);
         
         if (results.length === 0) {
             return res.status(404).json({ error: 'Song not found' });
@@ -321,7 +328,7 @@ router.post('/:id/identify', async (req, res, next) => {
 
             // Return full updated song
             const query = db('songs').where({ 'songs.id': song.id });
-            const results = await fetchSongsWithDetails(query);
+            const results = await fetchSongsWithDetails(query, true);
             const transformed = results[0];
             
             broadcast('song:update', transformed);
@@ -431,7 +438,7 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
             });
 
             const query = db('songs').where({ 'songs.id': song.id });
-            const results = await fetchSongsWithDetails(query);
+            const results = await fetchSongsWithDetails(query, true);
             const transformed = results[0];
             
             broadcast('song:update', transformed);
@@ -526,7 +533,7 @@ router.post('/:id/lyrics/fetch', async (req, res, next) => {
         await db('songs').where({ id: req.params.id }).update({ lyrics });
 
         const query = db('songs').where({ 'songs.id': req.params.id });
-        const results = await fetchSongsWithDetails(query);
+        const results = await fetchSongsWithDetails(query, true);
         const transformed = results[0];
 
         broadcast('song:update', transformed);
@@ -591,7 +598,7 @@ router.post('/', async (req, res, next) => {
 
         // 5. Return
         const query = db('songs').where({ 'songs.id': id });
-        const results = await fetchSongsWithDetails(query);
+        const results = await fetchSongsWithDetails(query, true);
         const transformed = results[0];
 
         broadcast('song:update', transformed); 
@@ -676,7 +683,7 @@ router.put('/:id', async (req, res, next) => {
         }
 
         const query = db('songs').where({ 'songs.id': req.params.id });
-        const results = await fetchSongsWithDetails(query);
+        const results = await fetchSongsWithDetails(query, true);
         const transformed = results[0];
 
         broadcast('song:update', transformed);
@@ -699,7 +706,7 @@ router.patch('/:id/favorite', async (req, res, next) => {
         });
 
         const query = db('songs').where({ 'songs.id': req.params.id });
-        const results = await fetchSongsWithDetails(query);
+        const results = await fetchSongsWithDetails(query, true);
         const transformed = results[0];
 
         broadcast('song:update', transformed);
@@ -716,7 +723,7 @@ router.patch('/:id/lyrics', async (req, res, next) => {
         await db('songs').where({ id: req.params.id }).update({ lyrics });
 
         const query = db('songs').where({ 'songs.id': req.params.id });
-        const results = await fetchSongsWithDetails(query);
+        const results = await fetchSongsWithDetails(query, true);
         const transformed = results[0];
 
         broadcast('song:update', transformed);
@@ -758,7 +765,7 @@ router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
         }
 
         const query = db('songs').where({ 'songs.id': req.params.id });
-        const results = await fetchSongsWithDetails(query);
+        const results = await fetchSongsWithDetails(query, true);
         const transformed = results[0];
 
         broadcast('song:update', transformed);

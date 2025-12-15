@@ -974,6 +974,7 @@ const App: React.FC = () => {
               onSeek={handleSeek}
               activeVisualizer={activeVisualizer}
               onVisualizerChange={setActiveVisualizer}
+              onUpdateSong={onUpdateSong}
           />
       )}
 

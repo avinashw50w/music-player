@@ -138,6 +138,7 @@ app.get('/api/search', async (req, res, next) => {
                 fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null,
                 genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite)
+                // Removed lyrics to optimize payload
             })),
             albums: albums.map((a, idx) => ({
                 id: a.id,

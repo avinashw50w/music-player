@@ -19,6 +19,7 @@ interface VisualizerProps {
     onSeek: (time: number) => void;
     activeVisualizer: string;
     onVisualizerChange: (visualizer: string) => void;
+    onUpdateSong: (song: Song) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -65,7 +66,8 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     duration,
     onSeek,
     activeVisualizer,
-    onVisualizerChange
+    onVisualizerChange,
+    onUpdateSong
 }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
@@ -78,6 +80,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     const [parsedLyrics, setParsedLyrics] = useState<LrcLine[]>([]);
     const [activeLineIndex, setActiveLineIndex] = useState(-1);
     const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
+    
+    // New state to track background fetch of song details
+    const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+    const [fetchedDetailsForId, setFetchedDetailsForId] = useState<string | null>(null);
 
     // Create a stable onSeek reference to pass to memoized components
     const onSeekRef = useRef(onSeek);
@@ -113,11 +119,27 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         if (currentSong.lyrics) {
             const parsed = parseLrc(currentSong.lyrics);
             setParsedLyrics(parsed);
+            setIsFetchingDetails(false);
         } else {
             setParsedLyrics([]);
+            
+            // If lyrics are missing, try fetching the full song object once
+            // This is the "on-demand" fetching logic
+            if (fetchedDetailsForId !== currentSong.id) {
+                setFetchedDetailsForId(currentSong.id);
+                setIsFetchingDetails(true);
+                api.getSong(currentSong.id).then(fullSong => {
+                    // Update global state with full details (including lyrics if they exist)
+                    if (fullSong.lyrics) {
+                        onUpdateSong(fullSong);
+                    }
+                })
+                .catch(e => console.error("Failed to background fetch song details", e))
+                .finally(() => setIsFetchingDetails(false));
+            }
         }
         setActiveLineIndex(-1);
-    }, [currentSong.lyrics, currentSong.id]);
+    }, [currentSong.lyrics, currentSong.id, fetchedDetailsForId, onUpdateSong]);
 
     // Determine Active Lyric Line (Optimized)
     useEffect(() => {
@@ -180,8 +202,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         if (isFetchingLyrics) return;
         setIsFetchingLyrics(true);
         try {
-            await api.fetchSyncedLyrics(currentSong.id);
-            // The global event listener in App.tsx will handle the update and trigger re-render
+            const updatedSong = await api.fetchSyncedLyrics(currentSong.id);
+            if (updatedSong) {
+                onUpdateSong(updatedSong);
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -259,6 +283,11 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                 />
                             ))}
                             <div className="h-[45vh]"></div> {/* Spacer */}
+                        </div>
+                    ) : isFetchingDetails ? (
+                        <div className="flex flex-col items-center justify-center">
+                            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                            <p className="text-slate-400 font-medium">Loading lyrics...</p>
                         </div>
                     ) : currentSong.lyrics ? (
                         // Unsynced Lyrics View
