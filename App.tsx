@@ -299,6 +299,16 @@ const App: React.FC = () => {
                 
                 // Update currentSong if it matches using functional update
                 setCurrentSong(prev => prev?.id === payload.id ? payload : prev);
+
+                // Update Recently Played if song exists there
+                setRecentlyPlayed(prev => {
+                    if (prev.some(s => s.id === payload.id)) {
+                        const newHistory = prev.map(s => s.id === payload.id ? payload : s);
+                        localStorage.setItem('recentlyPlayed', JSON.stringify(newHistory));
+                        return newHistory;
+                    }
+                    return prev;
+                });
             } else if (type === 'song:delete') {
                 setSongs(prev => prev.filter(s => s.id !== payload.id));
                 setCurrentSong(prev => {
@@ -692,6 +702,15 @@ const App: React.FC = () => {
   const onUpdateSong = (updated: Song) => {
       setSongs(prev => prev.map(s => s.id === updated.id ? updated : s));
       if (currentSong?.id === updated.id) setCurrentSong(updated);
+      
+      setRecentlyPlayed(prev => {
+          if (prev.some(s => s.id === updated.id)) {
+              const newHistory = prev.map(s => s.id === updated.id ? updated : s);
+              localStorage.setItem('recentlyPlayed', JSON.stringify(newHistory));
+              return newHistory;
+          }
+          return prev;
+      });
   };
   
   const onUpdateAlbum = (updated: Album) => {
