@@ -139,7 +139,8 @@ app.get('/api/search', async (req, res, next) => {
                 artist: albumArtists[idx],
                 coverUrl: a.cover_url,
                 year: a.year,
-                genre: (() => { try { return JSON.parse(a.genre); } catch { return [a.genre]; } })()
+                genre: (() => { try { return JSON.parse(a.genre); } catch { return [a.genre]; } })(),
+                trackCount: a.track_count
             })),
             artists: artists.map(ar => ({
                 id: ar.id,

@@ -579,32 +579,70 @@ router.post('/', async (req, res, next) => {
 // PUT update song
 router.put('/:id', async (req, res, next) => {
     try {
-        const { title, artist, album, genre } = req.body;
+        const { title, artist, album, genre, albumId: providedAlbumId } = req.body;
         
-        // Update Album association
-        let albumId = undefined; // Undefined means don't update if not provided
-        if (album) {
-             const currentSong = await db('songs').where({ id: req.params.id }).first();
-             // Find or create album
+        // 1. Fetch current song state to track changes
+        const currentSong = await db('songs').where({ id: req.params.id }).first();
+        if (!currentSong) return res.status(404).json({ error: 'Song not found' });
+
+        const oldAlbumId = currentSong.album_id;
+        let newAlbumId = undefined; // Undefined = no change to column
+
+        // 2. Determine New Album ID
+        
+        // Case A: Explicit ID provided (from dropdown selection)
+        if (providedAlbumId) {
+             const exists = await db('albums').where({ id: providedAlbumId }).first();
+             if (exists) {
+                 newAlbumId = providedAlbumId;
+             }
+        }
+
+        // Case B: No ID provided, but Album Name string is present
+        // This handles:
+        // 1. User typed a new album name (create new)
+        // 2. User cleared the ID but typed an existing name (lookup)
+        if (!newAlbumId && album) {
+             // Look up by title
              const existingAlbum = await db('albums').where('title', 'like', album).first();
              if (existingAlbum) {
-                 albumId = existingAlbum.id;
+                 newAlbumId = existingAlbum.id;
              } else {
-                 albumId = uuidv4();
+                 // Create New Album
+                 newAlbumId = uuidv4();
                  await db('albums').insert({
-                     id: albumId,
+                     id: newAlbumId,
                      title: album,
                      cover_url: `https://picsum.photos/seed/${encodeURIComponent(album)}/300/300`,
-                     track_count: 1
+                     year: new Date().getFullYear(),
+                     genre: JSON.stringify(Array.isArray(genre) ? genre : [genre]),
+                     track_count: 0 // Will increment later
                  });
              }
         }
 
-        await db('songs').where({ id: req.params.id }).update({
+        // 3. Prepare Song Update
+        const updateData = {
             title,
-            ...(albumId && { album_id: albumId }),
             genre: JSON.stringify(Array.isArray(genre) ? genre : [genre])
-        });
+        };
+        
+        if (newAlbumId !== undefined) {
+            updateData.album_id = newAlbumId;
+        }
+
+        // 4. Update Song
+        await db('songs').where({ id: req.params.id }).update(updateData);
+
+        // 5. Maintain Track Counts if album changed
+        if (newAlbumId && newAlbumId !== oldAlbumId) {
+            // Decrement old album count
+            if (oldAlbumId) {
+                await db('albums').where({ id: oldAlbumId }).decrement('track_count', 1);
+            }
+            // Increment new album count
+            await db('albums').where({ id: newAlbumId }).increment('track_count', 1);
+        }
 
         // Process artists
         if (artist) {

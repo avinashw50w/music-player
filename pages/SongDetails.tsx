@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
-import { EditModal } from '../components/EditModal';
+import { EditModal, SuggestionItem } from '../components/EditModal';
 import { SuggestionModal } from '../components/SuggestionModal';
 import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2, Sparkles, Bot, Search } from 'lucide-react';
 import { SongDetailSkeleton } from '../components/Skeletons';
@@ -31,8 +31,8 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
   const [isEditingLyrics, setIsEditingLyrics] = useState(false);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   
-  // Suggestions State
-  const [albumSuggestions, setAlbumSuggestions] = useState<string[]>([]);
+  // Suggestions State - Typed to handle both strings and rich objects
+  const [albumSuggestions, setAlbumSuggestions] = useState<(string | SuggestionItem)[]>([]);
   const [artistSuggestions, setArtistSuggestions] = useState<string[]>([]);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -77,7 +77,12 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
 
   useEffect(() => {
       if (isEditingInfo && albums) {
-          setAlbumSuggestions(albums.map(a => a.title).slice(0, 20));
+          setAlbumSuggestions(albums.map(a => ({ 
+              text: a.title, 
+              subtext: `${a.trackCount || 0} songs`,
+              image: a.coverUrl,
+              id: a.id
+          })).slice(0, 20));
       }
       if (isEditingInfo && artists) {
           setArtistSuggestions(artists.map(a => a.name).slice(0, 20));
@@ -100,11 +105,21 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
       
       searchTimeoutRef.current = setTimeout(async () => {
-          if (value.trim().length > 1) {
+          // Determine query based on field type (multi vs single)
+          const query = (name === 'artist' || name === 'genre') 
+            ? value.split(',').pop()?.trim() 
+            : value.trim();
+
+          if (query && query.length > 1) {
               try {
-                  const results = await api.search(value);
+                  const results = await api.search(query);
                   if (name === 'album') {
-                      setAlbumSuggestions(results.albums.map(a => a.title));
+                      setAlbumSuggestions(results.albums.map(a => ({
+                          text: a.title,
+                          subtext: `${a.trackCount || 0} songs`,
+                          image: a.coverUrl,
+                          id: a.id
+                      })));
                   } else if (name === 'artist') {
                       setArtistSuggestions(results.artists.map(a => a.name));
                   }
@@ -115,7 +130,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
       }, 300);
   };
 
-  const handleSaveInfo = async (data: any) => {
+  const handleSaveInfo = async (data: any, ids?: Record<string, string>) => {
     try {
         // Split comma-separated genres back into array
         const genres = data.genre.split(',').map((g: string) => g.trim()).filter(Boolean);
@@ -124,6 +139,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
             title: data.title,
             artist: data.artist,
             album: data.album,
+            albumId: ids?.album, // Pass the captured album ID if selected
             genre: genres
         });
         setSong(updated);
@@ -525,6 +541,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
                     name: 'artist', 
                     label: 'Artist (comma separated)', 
                     value: song.artist, 
+                    isMulti: true, // Enable multi-value support
                     suggestions: artistSuggestions
                 },
                 { 
@@ -533,7 +550,12 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
                     value: song.album, 
                     suggestions: albumSuggestions 
                 },
-                { name: 'genre', label: 'Genre (comma separated)', value: (song.genre || []).join(', ') }
+                { 
+                    name: 'genre', 
+                    label: 'Genre (comma separated)', 
+                    value: (song.genre || []).join(', '),
+                    isMulti: true // Enable multi-value support
+                }
             ]}
         />
       )}
