@@ -4,7 +4,7 @@ import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
 import { SuggestionModal } from '../components/SuggestionModal';
-import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2, Sparkles, Bot } from 'lucide-react';
+import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2, Sparkles, Bot, Search } from 'lucide-react';
 import { SongDetailSkeleton } from '../components/Skeletons';
 import * as api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -36,6 +36,9 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
   const [isIdentifyingSpotify, setIsIdentifyingSpotify] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
+  
+  // Lyrics Fetching State
+  const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
   
   // Suggestion Modal State
   const [suggestionData, setSuggestionData] = useState<any>(null);
@@ -163,6 +166,24 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
           setTimeout(() => setIdentifyError(null), 4000);
       } finally {
           setIsRefining(false);
+      }
+  };
+
+  const handleFetchSyncedLyrics = async () => {
+      if (isFetchingLyrics) return;
+      setIsFetchingLyrics(true);
+      setIdentifyError(null);
+      try {
+          const updated = await api.fetchSyncedLyrics(song.id);
+          setSong(updated);
+          setLyrics(updated.lyrics || "");
+          onUpdateSong?.(updated);
+      } catch (e: any) {
+          console.error("Failed to fetch synced lyrics", e);
+          setIdentifyError(e.message || "Could not find synced lyrics");
+          setTimeout(() => setIdentifyError(null), 4000);
+      } finally {
+          setIsFetchingLyrics(false);
       }
   };
 
@@ -362,14 +383,30 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                 <h3 className="text-2xl font-bold text-white flex items-center gap-2">
                   <Mic2 className="w-6 h-6 text-indigo-400" /> Lyrics
                 </h3>
-                {!isEditingLyrics && (
-                  <button
-                    onClick={() => setIsEditingLyrics(true)}
-                    className="text-sm font-bold text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full transition-colors"
-                  >
-                    {lyrics ? 'Edit Lyrics' : 'Add Lyrics'}
-                  </button>
-                )}
+                <div className="flex items-center gap-3">
+                    {!isEditingLyrics && (
+                        <button
+                            onClick={handleFetchSyncedLyrics}
+                            disabled={isFetchingLyrics}
+                            className="text-sm font-bold text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 px-4 py-2 rounded-full transition-colors flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isFetchingLyrics ? (
+                                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <Search className="w-3 h-3" />
+                            )}
+                            {lyrics ? 'Refetch Synced' : 'Find Synced'}
+                        </button>
+                    )}
+                    {!isEditingLyrics && (
+                        <button
+                            onClick={() => setIsEditingLyrics(true)}
+                            className="text-sm font-bold text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full transition-colors"
+                        >
+                            {lyrics ? 'Edit Lyrics' : 'Add Lyrics'}
+                        </button>
+                    )}
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10">
@@ -409,12 +446,31 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                         </div>
                         <h4 className="text-lg font-bold text-white mb-2">No Lyrics Available</h4>
                         <p className="text-slate-500 max-w-xs mx-auto mb-6">You can add lyrics for this song to sing along.</p>
-                        <button
-                          onClick={() => setIsEditingLyrics(true)}
-                          className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all"
-                        >
-                          Add Lyrics
-                        </button>
+                        <div className="flex items-center justify-center gap-4">
+                            <button
+                                onClick={handleFetchSyncedLyrics}
+                                disabled={isFetchingLyrics}
+                                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isFetchingLyrics ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Searching...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Search className="w-4 h-4" />
+                                        Find Synced Lyrics
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setIsEditingLyrics(true)}
+                                className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all"
+                            >
+                                Manual Entry
+                            </button>
+                        </div>
                       </div>
                     )}
                   </div>

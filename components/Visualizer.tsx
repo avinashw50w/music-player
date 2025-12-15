@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X, Play, Pause, SkipBack, SkipForward, ChevronDown, Mic2, Search } from 'lucide-react';
 import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -28,6 +28,31 @@ const formatTime = (seconds: number) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+// Optimized Lyric Line Component to prevent unnecessary re-renders
+const LyricLine = React.memo(({ 
+    line, 
+    isActive, 
+    onSeek 
+}: { 
+    line: LrcLine, 
+    isActive: boolean, 
+    onSeek: (time: number) => void 
+}) => {
+    return (
+        <p 
+            className={`transition-all duration-650 ease-out origin-center cursor-pointer py-2 select-none ${
+                isActive 
+                  ? 'text-white text-2xl md:text-3xl font-bold opacity-100 blur-0' 
+                  : 'text-neutral-400 text-xl md:text-2xl font-medium opacity-30 blur-[1px]'
+            }`}
+            style={{ willChange: 'transform, opacity, filter' }}
+            onClick={() => onSeek(line.time)}
+        >
+            {line.text}
+        </p>
+    );
+}, (prev, next) => prev.isActive === next.isActive && prev.line === next.line);
+
 export const Visualizer: React.FC<VisualizerProps> = ({
     currentSong,
     isPlaying,
@@ -53,6 +78,11 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     const [parsedLyrics, setParsedLyrics] = useState<LrcLine[]>([]);
     const [activeLineIndex, setActiveLineIndex] = useState(-1);
     const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
+
+    // Create a stable onSeek reference to pass to memoized components
+    const onSeekRef = useRef(onSeek);
+    useEffect(() => { onSeekRef.current = onSeek; }, [onSeek]);
+    const stableSeek = useCallback((t: number) => onSeekRef.current(t), []);
 
     useEffect(() => {
         const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && activeVisualizer !== 'lyrics';
@@ -86,20 +116,38 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         } else {
             setParsedLyrics([]);
         }
+        setActiveLineIndex(-1);
     }, [currentSong.lyrics, currentSong.id]);
 
-    // Determine Active Lyric Line
+    // Determine Active Lyric Line (Optimized)
     useEffect(() => {
         if (activeVisualizer !== 'lyrics' || parsedLyrics.length === 0) return;
 
-        // Find the line that corresponds to current time
+        // Optimization: Check if current active line is still valid (avoids array scan)
+        const currentLine = parsedLyrics[activeLineIndex];
+        const nextLine = parsedLyrics[activeLineIndex + 1];
+        
+        if (currentLine && currentTime >= currentLine.time && (!nextLine || currentTime < nextLine.time)) {
+            return; // Still on the same line
+        }
+
+        // Optimization: Check the immediate next line (sequential playback scenario)
+        if (nextLine && currentTime >= nextLine.time && (!parsedLyrics[activeLineIndex + 2] || currentTime < parsedLyrics[activeLineIndex + 2].time)) {
+            setActiveLineIndex(activeLineIndex + 1);
+            return;
+        }
+
+        // Fallback: Binary search or full scan for seek/jumps
+        // Since list is small (<200 typically), findIndex is acceptable but we can optimize slightly by finding from scratch
         const index = parsedLyrics.findIndex((line, i) => {
-            const nextLine = parsedLyrics[i + 1];
-            return currentTime >= line.time && (!nextLine || currentTime < nextLine.time);
+            const next = parsedLyrics[i + 1];
+            return currentTime >= line.time && (!next || currentTime < next.time);
         });
         
-        setActiveLineIndex(index);
-    }, [currentTime, parsedLyrics, activeVisualizer]);
+        if (index !== activeLineIndex) {
+            setActiveLineIndex(index);
+        }
+    }, [currentTime, parsedLyrics, activeVisualizer, activeLineIndex]);
 
     // Auto-scroll lyrics
     useEffect(() => {
@@ -143,10 +191,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     };
 
     const allOptions = [
-        ...visualizerOptions,
+        { name: 'none', displayName: 'None', type: 'static' },
         { name: 'lyrics', displayName: 'Lyrics', type: 'mode' },
         { name: 'album cover', displayName: 'Album Cover', type: 'static' },
-        { name: 'none', displayName: 'None', type: 'static' }
+        ...visualizerOptions,
     ];
 
     return (
@@ -166,6 +214,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                 src={currentSong.coverUrl} 
                                 className="absolute inset-0 w-full h-full object-cover blur-[80px] opacity-40 scale-110"
                                 alt=""
+                                style={{ transform: 'translate3d(0,0,0)' }} // Force GPU layer
                             />
                             <div className="absolute inset-0 bg-black/60"></div>
                         </>
@@ -195,28 +244,21 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                     {parsedLyrics.length > 0 ? (
                         <div 
                             ref={lyricsContainerRef}
-                            className="w-full max-w-5xl h-full overflow-y-auto px-8 md:px-24 text-center space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                            className="w-full max-w-6xl h-full overflow-y-auto px-8 md:px-24 text-center space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                             style={{ 
-                                maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+                                maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
+                                transform: 'translate3d(0,0,0)' // Force layer
                             }}
                         >
                             <div className="h-[45vh]"></div> {/* Spacer for center alignment */}
-                            {parsedLyrics.map((line, i) => {
-                                const isActive = i === activeLineIndex;
-                                return (
-                                    <p 
-                                        key={i}
-                                        className={`transition-all duration-700 ease-out origin-center cursor-pointer py-2 select-none ${
-                                            isActive 
-                                              ? 'text-white text-2xl md:text-3xl font-bold opacity-100 scale-105 blur-0' 
-                                              : 'text-neutral-400 text-xl md:text-2xl font-medium opacity-30 blur-[1px] scale-95 hover:opacity-60 hover:blur-0'
-                                        }`}
-                                        onClick={() => onSeek(line.time)}
-                                    >
-                                        {line.text}
-                                    </p>
-                                );
-                            })}
+                            {parsedLyrics.map((line, i) => (
+                                <LyricLine 
+                                    key={i} 
+                                    line={line} 
+                                    isActive={i === activeLineIndex} 
+                                    onSeek={stableSeek} 
+                                />
+                            ))}
                             <div className="h-[45vh]"></div> {/* Spacer */}
                         </div>
                     ) : (
@@ -311,14 +353,14 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                         </div>
 
                         <div className="flex items-center gap-4 w-full">
-                            <span className="text-xs font-bold text-slate-400 tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
+                            <span className="text-md font-bold text-slate-400 tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
                             <ProgressBar 
                                 currentTime={currentTime} 
                                 duration={duration} 
                                 onSeek={onSeek} 
                                 className="bg-white/20"
                             />
-                            <span className="text-xs font-bold text-slate-400 tabular-nums w-10">{formatTime(duration)}</span>
+                            <span className="text-md font-bold text-slate-400 tabular-nums w-10">{formatTime(duration)}</span>
                         </div>
 
                         <div className="flex items-center justify-center gap-10">
