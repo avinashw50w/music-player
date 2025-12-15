@@ -249,7 +249,7 @@ router.post('/:id/identify', async (req, res, next) => {
             // Determine Cover
             let coverUrl = null;
             if (metadata.coverUrl) {
-                const downloaded = await downloadCoverImage(metadata.coverUrl, `auto-${song.id}`);
+                const downloaded = await downloadCoverImage(metadata.coverUrl, `${song.album_id}`);
                 if (downloaded) coverUrl = downloaded;
             }
 
@@ -324,101 +324,106 @@ router.post('/:id/identify', async (req, res, next) => {
 // POST identify song using Hybrid approach (Audio Fingerprint -> Spotify) with Gemini Fallback
 router.post('/:id/identify-spotify', async (req, res, next) => {
     try {
-        const song = await db('songs')
-            .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
-            .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
-            .leftJoin('albums', 'songs.album_id', 'albums.id')
-            .where({ 'songs.id': req.params.id })
-            .orderBy('song_artists.is_primary', 'desc')
-            .select('songs.*', 'artists.name as artist_name', 'albums.title as album_title')
-            .first();
+        const result = await identificationQueue.add(async () => {
+            const song = await db('songs')
+                .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
+                .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
+                .leftJoin('albums', 'songs.album_id', 'albums.id')
+                .where({ 'songs.id': req.params.id })
+                .orderBy('song_artists.is_primary', 'desc')
+                .select('songs.*', 'artists.name as artist_name', 'albums.title as album_title')
+                .first();
 
-        if (!song) {
-            return res.status(404).json({ error: 'Song not found' });
-        }
-
-        // 1. Try to identify via AcoustID first to get Clean Title/Artist
-        let searchTitle = song.title;
-        let searchArtist = song.artist_name || 'Unknown Artist';
-        
-        try {
-            console.log(`[Hybrid] Fingerprinting ${song.file_path}...`);
-            const acoustidData = await identifySongMetadata(song.file_path);
-            if (acoustidData.title) {
-                console.log(`[Hybrid] AcoustID Found: ${acoustidData.title} by ${acoustidData.artist}`);
-                searchTitle = acoustidData.title;
-                searchArtist = acoustidData.artist;
+            if (!song) {
+                throw new Error('Song not found');
             }
-        } catch (e) {
-            console.warn(`[Hybrid] AcoustID failed, using existing metadata: ${e.message}`);
-        }
 
-        // REMOVED: Automatic Gemini Fallback logic
-
-        // 3. Search Spotify using the (hopefully clean) title and artist
-        console.log(`[Hybrid] Searching Spotify for: ${searchTitle} - ${searchArtist}`);
-        const metadata = await searchSpotifyMetadata(searchTitle, searchArtist);
-
-        // Download high-res cover
-        let coverUrl = null;
-        if (metadata.coverUrl) {
-            const downloaded = await downloadCoverImage(metadata.coverUrl, `spotify-${song.id}`);
-            if (downloaded) coverUrl = downloaded;
-        }
-
-        // Process Artists
-        await processSongArtists(song.id, metadata.artists);
-
-        // Handle Album Logic
-        let albumId = song.album_id;
-        if (metadata.album) {
-            const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
+            // 1. Try to identify via AcoustID first to get Clean Title/Artist
+            let searchTitle = song.title;
+            let searchArtist = song.artist_name || 'Unknown Artist';
             
-            if (existingAlbum) {
-                albumId = existingAlbum.id;
-                const updates = {};
-                if (metadata.year) updates.year = metadata.year;
-                if (metadata.genre && metadata.genre.length > 0) updates.genre = JSON.stringify(metadata.genre);
-                if (coverUrl) updates.cover_url = coverUrl;
-                
-                if (Object.keys(updates).length > 0) {
-                    await db('albums').where({ id: albumId }).update(updates);
+            try {
+                console.log(`[Hybrid] Fingerprinting ${song.file_path}...`);
+                const acoustidData = await identifySongMetadata(song.file_path);
+                if (acoustidData.title) {
+                    console.log(`[Hybrid] AcoustID Found: ${acoustidData.title} by ${acoustidData.artist}`);
+                    searchTitle = acoustidData.title;
+                    searchArtist = acoustidData.artist;
                 }
-            } else {
-                albumId = uuidv4();
-                await db('albums').insert({
-                    id: albumId,
-                    title: metadata.album,
-                    cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
-                    year: metadata.year,
-                    genre: JSON.stringify(metadata.genre || []),
-                    track_count: 1
-                });
+            } catch (e) {
+                console.warn(`[Hybrid] AcoustID failed, using existing metadata: ${e.message}`);
             }
-        }
 
-        // Update Song
-        await db('songs').where({ id: req.params.id }).update({
-            title: metadata.title,
-            album_id: albumId,
-            genre: JSON.stringify(metadata.genre || [])
+            // 3. Search Spotify using the (hopefully clean) title and artist
+            console.log(`[Hybrid] Searching Spotify for: ${searchTitle} - ${searchArtist}`);
+            const metadata = await searchSpotifyMetadata(searchTitle, searchArtist);
+
+            // Download high-res cover
+            let coverUrl = null;
+            if (metadata.coverUrl) {
+                const downloaded = await downloadCoverImage(metadata.coverUrl, `${song.album_id}`);
+                if (downloaded) coverUrl = downloaded;
+            }
+
+            // Process Artists
+            await processSongArtists(song.id, metadata.artists);
+
+            // Handle Album Logic
+            let albumId = song.album_id;
+            if (metadata.album) {
+                const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
+                
+                if (existingAlbum) {
+                    albumId = existingAlbum.id;
+                    const updates = {};
+                    if (metadata.year) updates.year = metadata.year;
+                    if (metadata.genre && metadata.genre.length > 0) updates.genre = JSON.stringify(metadata.genre);
+                    if (coverUrl) updates.cover_url = coverUrl;
+                    
+                    if (Object.keys(updates).length > 0) {
+                        await db('albums').where({ id: albumId }).update(updates);
+                    }
+                } else {
+                    albumId = uuidv4();
+                    await db('albums').insert({
+                        id: albumId,
+                        title: metadata.album,
+                        cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
+                        year: metadata.year,
+                        genre: JSON.stringify(metadata.genre || []),
+                        track_count: 1
+                    });
+                }
+            }
+
+            // Update Song
+            await db('songs').where({ id: req.params.id }).update({
+                title: metadata.title,
+                album_id: albumId,
+                genre: JSON.stringify(metadata.genre || [])
+            });
+
+            const query = db('songs').where({ 'songs.id': song.id });
+            const results = await fetchSongsWithDetails(query);
+            const transformed = results[0];
+            
+            broadcast('song:update', transformed);
+            
+            if (albumId) {
+                const album = await db('albums').where({ id: albumId }).first();
+                broadcast('album:update', { id: albumId, ...album }); 
+            }
+
+            return transformed;
         });
 
-        const query = db('songs').where({ 'songs.id': song.id });
-        const results = await fetchSongsWithDetails(query);
-        const transformed = results[0];
-        
-        broadcast('song:update', transformed);
-        
-        if (albumId) {
-            const album = await db('albums').where({ id: albumId }).first();
-            broadcast('album:update', { id: albumId, ...album }); 
-        }
-
-        res.json(transformed);
+        res.json(result);
 
     } catch (err) {
         console.error("Hybrid Identify Error", err);
+        if (err.message === 'Song not found') {
+             return res.status(404).json({ error: err.message });
+        }
         res.status(500).json({ error: err.message || 'Spotify identification failed' });
     }
 });
@@ -426,33 +431,40 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
 // POST Refine Metadata (Gemini)
 router.post('/:id/refine', async (req, res, next) => {
     try {
-        const song = await db('songs')
-            .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
-            .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
-            .leftJoin('albums', 'songs.album_id', 'albums.id')
-            .where({ 'songs.id': req.params.id })
-            .orderBy('song_artists.is_primary', 'desc')
-            .select('songs.*', 'artists.name as artist_name', 'albums.title as album_title')
-            .first();
+        const result = await identificationQueue.add(async () => {
+            const song = await db('songs')
+                .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
+                .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
+                .leftJoin('albums', 'songs.album_id', 'albums.id')
+                .where({ 'songs.id': req.params.id })
+                .orderBy('song_artists.is_primary', 'desc')
+                .select('songs.*', 'artists.name as artist_name', 'albums.title as album_title')
+                .first();
 
-        if (!song) {
-            return res.status(404).json({ error: 'Song not found' });
-        }
+            if (!song) {
+                throw new Error('Song not found');
+            }
 
-        const filename = path.basename(song.file_path);
-        const suggestion = await refineMetadataWithGemini(
-            filename, 
-            song.title, 
-            song.artist_name || 'Unknown Artist', 
-            song.album_title || 'Unknown Album'
-        );
+            const filename = path.basename(song.file_path);
+            const suggestion = await refineMetadataWithGemini(
+                filename, 
+                song.title, 
+                song.artist_name || 'Unknown Artist', 
+                song.album_title || 'Unknown Album'
+            );
 
-        if (!suggestion) {
-            return res.status(500).json({ error: 'Failed to generate suggestions' });
-        }
+            if (!suggestion) {
+                throw new Error('Failed to generate suggestions');
+            }
 
-        res.json(suggestion);
+            return suggestion;
+        });
+
+        res.json(result);
     } catch (err) {
+        if (err.message === 'Song not found') {
+             return res.status(404).json({ error: err.message });
+        }
         next(err);
     }
 });
