@@ -327,8 +327,10 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
         const song = await db('songs')
             .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
             .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
-            .where({ 'songs.id': req.params.id, 'song_artists.is_primary': true })
-            .select('songs.*', 'artists.name as artist_name')
+            .leftJoin('albums', 'songs.album_id', 'albums.id')
+            .where({ 'songs.id': req.params.id })
+            .orderBy('song_artists.is_primary', 'desc')
+            .select('songs.*', 'artists.name as artist_name', 'albums.title as album_title')
             .first();
 
         if (!song) {
@@ -359,11 +361,11 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
             const filename = path.basename(song.file_path);
             
             try {
-                const refined = await refineMetadataWithGemini(filename, searchTitle, searchArtist);
-                if (refined && refined.title && refined.artist) {
+                const refined = await refineMetadataWithGemini(filename, searchTitle, searchArtist, song.album_title);
+                if (refined && (refined.title || refined.artist)) {
+                    if (refined.title) searchTitle = refined.title;
+                    if (refined.artist) searchArtist = refined.artist;
                     console.log(`[Hybrid] Gemini Refined: "${refined.title}" by "${refined.artist}"`);
-                    searchTitle = refined.title;
-                    searchArtist = refined.artist;
                 } else {
                     console.log("[Hybrid] Gemini returned null, using raw DB values.");
                 }
