@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -27,6 +26,9 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
   
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  
+  // Refs for input elements to manage focus
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Prevent background scrolling when modal is open
   useEffect(() => {
@@ -67,10 +69,23 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
           setSelectedIds(prev => ({ ...prev, [fieldName]: id }));
       }
       
-      // Keep focus on the field for multi-selects to allow continued typing, 
-      // but usually we want to close the dropdown for the current selection.
-      // We rely on the user typing to trigger the dropdown again.
-      setFocusedField(null);
+      // For multi-select, keep focus and re-set to allow continued typing
+      if (field?.isMulti) {
+          // Keep field focused but maybe hide suggestions until user types again?
+          // Actually, if we just selected, the input value changed. The parent will trigger onFieldChange.
+          // If we want to hide suggestions immediately, we can check logic in render.
+          // But crucial part is keeping the input focused.
+          const inputEl = inputRefs.current[fieldName];
+          if (inputEl) {
+              requestAnimationFrame(() => {
+                  inputEl.focus();
+                  // Move cursor to end
+                  inputEl.setSelectionRange(newValue.length, newValue.length);
+              });
+          }
+      } else {
+          setFocusedField(null);
+      }
       
       // Trigger field change for search reset or update
       if (onFieldChange) onFieldChange(fieldName, newValue);
@@ -115,12 +130,16 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
                 <div key={field.name} className="relative">
                 <label className="block text-sm font-medium text-slate-400 mb-2">{field.label}</label>
                 <input
+                    ref={(el) => { inputRefs.current[field.name] = el; }}
                     type="text"
                     value={currentValue}
                     onChange={(e) => {
                         const val = e.target.value;
                         setFormData(prev => ({ ...prev, [field.name]: val }));
                         
+                        // Ensure dropdown opens when typing
+                        if (focusedField !== field.name) setFocusedField(field.name);
+
                         // Clear selected ID if user types (assumes they are entering something new)
                         if (!field.isMulti && selectedIds[field.name]) {
                             const newIds = { ...selectedIds };

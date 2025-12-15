@@ -35,8 +35,11 @@ export interface SearchResults {
     artists: Artist[];
 }
 
-export async function search(query: string, signal?: AbortSignal): Promise<SearchResults> {
-    const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`, { signal });
+export async function search(query: string, options?: { type?: 'song' | 'album' | 'artist', signal?: AbortSignal }): Promise<SearchResults> {
+    const params = new URLSearchParams({ q: query });
+    if (options?.type) params.append('type', options.type);
+    
+    const response = await fetch(`${API_BASE_URL}/search?${params.toString()}`, { signal: options?.signal });
     return handleResponse<SearchResults>(response);
 }
 

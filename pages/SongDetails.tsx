@@ -116,7 +116,9 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
 
           if (query && query.length > 1) {
               try {
-                  const results = await api.search(query);
+                  const type = name === 'artist' ? 'artist' : (name === 'album' ? 'album' : undefined);
+                  const results = await api.search(query, type ? { type } : undefined);
+                  
                   if (name === 'album') {
                       setAlbumSuggestions(results.albums.map(a => ({
                           text: a.title,

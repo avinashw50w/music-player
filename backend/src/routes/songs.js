@@ -169,9 +169,10 @@ const processSongArtists = async (songId, artistsData) => {
 // GET all songs
 router.get('/', async (req, res, next) => {
     try {
-        const { limit, offset, search, favorites } = req.query;
+        const { limit, offset, search, favorites, title, artist, album, genre } = req.query;
         let query = db('songs').orderBy('songs.created_at', 'desc');
         
+        // Generalized Search
         if (search) {
             const term = `%${search}%`;
             query = query.where(function() {
@@ -188,6 +189,30 @@ router.get('/', async (req, res, next) => {
                             .where('title', 'like', term);
                     });
             });
+        }
+
+        // Specific Filters
+        if (title) {
+            query = query.where('songs.title', 'like', `%${title}%`);
+        }
+
+        if (artist) {
+            query = query.whereIn('songs.id', function() {
+                this.select('song_id').from('song_artists')
+                    .join('artists', 'song_artists.artist_id', 'artists.id')
+                    .where('artists.name', 'like', `%${artist}%`);
+            });
+        }
+
+        if (album) {
+            query = query.whereIn('songs.album_id', function() {
+                this.select('id').from('albums')
+                    .where('title', 'like', `%${album}%`);
+            });
+        }
+
+        if (genre) {
+            query = query.where('songs.genre', 'like', `%${genre}%`);
         }
 
         if (favorites === 'true') {

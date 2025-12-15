@@ -56,54 +56,68 @@ const formatDuration = (seconds) => {
 // Search endpoint (searches across songs, albums, artists)
 app.get('/api/search', async (req, res, next) => {
     try {
-        const { q } = req.query;
+        const { q, type } = req.query; // type: 'song' | 'album' | 'artist' | undefined
         if (!q) {
             return res.json({ songs: [], albums: [], artists: [] });
         }
 
         const db = (await import('./config/database.js')).default;
         const searchTerm = `%${q}%`;
+        
+        let songs = [];
+        let albums = [];
+        let artists = [];
 
-        // Search Songs (Join for album/artist info)
-        const songs = await db('songs')
-            .leftJoin('albums', 'songs.album_id', 'albums.id')
-            .where('songs.title', 'like', searchTerm)
-            .orWhereIn('songs.id', function() {
-                this.select('song_id').from('song_artists')
-                    .join('artists', 'song_artists.artist_id', 'artists.id')
-                    .where('artists.name', 'like', searchTerm);
-            })
-            .orWhere('albums.title', 'like', searchTerm)
-            .limit(20)
-            .select('songs.*', 'albums.title as album_title', 'albums.cover_url as album_cover_url');
+        // Search Songs
+        if (!type || type === 'song') {
+            songs = await db('songs')
+                .leftJoin('albums', 'songs.album_id', 'albums.id')
+                .where('songs.title', 'like', searchTerm)
+                .orWhereIn('songs.id', function() {
+                    this.select('song_id').from('song_artists')
+                        .join('artists', 'song_artists.artist_id', 'artists.id')
+                        .where('artists.name', 'like', searchTerm);
+                })
+                .orWhere('albums.title', 'like', searchTerm)
+                .limit(20)
+                .select('songs.*', 'albums.title as album_title', 'albums.cover_url as album_cover_url');
+        }
+
+        // Search Albums
+        if (!type || type === 'album') {
+            albums = await db('albums')
+                .where(function() {
+                    this.where('title', 'like', searchTerm);
+                })
+                .limit(10)
+                .select('*');
+        }
+
+        // Search Artists
+        if (!type || type === 'artist') {
+            artists = await db('artists')
+                .where('name', 'like', searchTerm)
+                .limit(10)
+                .select('*');
+        }
+
+        // --- Post-Processing ---
 
         // Fetch artists for found songs
-        let songArtists = [];
+        const artistsBySong = {};
         if (songs.length > 0) {
-            songArtists = await db('song_artists')
+            const songArtists = await db('song_artists')
                 .join('artists', 'song_artists.artist_id', 'artists.id')
                 .whereIn('song_artists.song_id', songs.map(s => s.id))
                 .select('song_artists.song_id', 'artists.name');
+            
+            songArtists.forEach(sa => {
+                if (!artistsBySong[sa.song_id]) artistsBySong[sa.song_id] = [];
+                artistsBySong[sa.song_id].push(sa.name);
+            });
         }
-        
-        const artistsBySong = {};
-        songArtists.forEach(sa => {
-            if (!artistsBySong[sa.song_id]) artistsBySong[sa.song_id] = [];
-            artistsBySong[sa.song_id].push(sa.name);
-        });
 
-        const albums = await db('albums')
-            .where(function() {
-                this.where('title', 'like', searchTerm);
-            })
-            .whereExists(function() {
-                this.select('*').from('songs').whereRaw('songs.album_id = albums.id');
-            })
-            .limit(10)
-            .select('*');
-
-        // Fetch primary artist for albums via subquery or join
-        // For search, we can just grab one artist
+        // Fetch primary artist for albums
         const albumArtists = await Promise.all(albums.map(async (a) => {
             const artist = await db('songs')
                 .join('song_artists', 'songs.id', 'song_artists.song_id')
@@ -112,14 +126,6 @@ app.get('/api/search', async (req, res, next) => {
                 .first('artists.name');
             return artist ? artist.name : 'Unknown Artist';
         }));
-
-        const artists = await db('artists')
-            .where('name', 'like', searchTerm)
-            .whereExists(function() {
-                this.select('*').from('song_artists').whereRaw('song_artists.artist_id = artists.id');
-            })
-            .limit(10)
-            .select('*');
 
         res.json({
             songs: songs.map(s => ({
