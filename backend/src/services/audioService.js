@@ -2,6 +2,7 @@
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import { promisify } from 'util';
+import fs from 'fs';
 
 /**
  * Extract metadata from an audio file using FFmpeg
@@ -79,6 +80,83 @@ export async function extractCoverArt(audioPath, outputPath) {
                 resolve(outputPath);
             })
             .run();
+    });
+}
+
+/**
+ * Update audio file tags (Title, Artist, Album, Year, Genre, Cover Art, Lyrics)
+ * This creates a temporary copy and replaces the original.
+ * @param {string} filePath - Absolute path to the file
+ * @param {Object} metadata - { title, artist, album, year, genre, coverPath, lyrics }
+ */
+export async function updateAudioTags(filePath, metadata) {
+    const tempPath = `${filePath}.tmp${path.extname(filePath)}`;
+    
+    return new Promise((resolve, reject) => {
+        const command = ffmpeg(filePath);
+        
+        // Base Output Options
+        const outputOptions = [
+            '-id3v2_version', '3', // Ensure generic ID3 compatibility for MP3
+            '-write_id3v1', '1',
+            '-c', 'copy' // Copy codec (no re-encoding for audio/video streams unless specified)
+        ];
+
+        // Handle Cover Art Embedding
+        // Note: For best compatibility, we replace existing art if new art is provided
+        if (metadata.coverPath && fs.existsSync(metadata.coverPath)) {
+            command.input(metadata.coverPath);
+            
+            // Map 0:a (Audio from input 0)
+            outputOptions.push('-map', '0:a');
+            // Map 1 (Image from input 1)
+            outputOptions.push('-map', '1');
+            
+            // Note: We avoid setting '-metadata:s:v title="Album cover"' here because 
+            // spaces in the value can cause argument parsing errors in some environments/ffmpeg versions 
+            // when passed via node-fluent-ffmpeg.
+            // The disposition 'attached_pic' is sufficient for players to recognize it as cover art.
+            outputOptions.push('-disposition:v', 'attached_pic');
+        } else {
+            // Keep original streams (preserves existing art if no new art provided)
+            outputOptions.push('-map', '0');
+        }
+
+        // Add Text Metadata
+        // Note: We avoid manual quoting as spawn handles separate arguments.
+        if (metadata.title) outputOptions.push('-metadata', `title=${metadata.title}`);
+        if (metadata.artist) outputOptions.push('-metadata', `artist=${metadata.artist}`);
+        if (metadata.album) outputOptions.push('-metadata', `album=${metadata.album}`);
+        if (metadata.year) outputOptions.push('-metadata', `date=${metadata.year}`);
+        if (metadata.genre) {
+            const genreStr = Array.isArray(metadata.genre) ? metadata.genre.join(', ') : metadata.genre;
+            outputOptions.push('-metadata', `genre=${genreStr}`);
+        }
+        if (metadata.lyrics) {
+            outputOptions.push('-metadata', `lyrics=${metadata.lyrics}`);
+        }
+
+        command
+            .outputOptions(outputOptions)
+            .save(tempPath)
+            .on('end', async () => {
+                try {
+                    // Replace original with temp
+                    await fs.promises.rename(tempPath, filePath);
+                    console.log(`[Metadata] Updated file tags for: ${path.basename(filePath)}`);
+                    resolve(true);
+                } catch (err) {
+                    // Try to clean up temp if rename fails
+                    fs.unlink(tempPath, () => {});
+                    reject(err);
+                }
+            })
+            .on('error', (err) => {
+                // Clean up temp
+                fs.unlink(tempPath, () => {});
+                console.error(`[Metadata] Failed to update tags for ${path.basename(filePath)}: ${err.message}`);
+                reject(err);
+            });
     });
 }
 

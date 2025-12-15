@@ -10,6 +10,7 @@ import { identifySongMetadata, downloadCoverImage } from '../services/metadataSe
 import { searchSpotifyMetadata } from '../services/spotifyService.js';
 import { refineMetadataWithGemini } from '../services/geminiService.js';
 import { fetchSyncedLyrics } from '../services/lyricsService.js'; // Import Lyrics Service
+import { updateAudioTags } from '../services/audioService.js'; // Import Tag Writer
 import { identificationQueue } from '../services/taskQueue.js';
 import { config } from '../config/env.js';
 
@@ -438,6 +439,20 @@ router.post('/:id/lyrics/fetch', async (req, res, next) => {
         const transformed = results[0];
 
         broadcast('song:update', transformed);
+
+        // --- UPDATE PHYSICAL FILE METADATA ASYNC ---
+        if (song.file_path) {
+            identificationQueue.add(async () => {
+                try {
+                    await updateAudioTags(song.file_path, {
+                        lyrics: lyrics
+                    });
+                } catch (e) {
+                    console.error(`Failed to update lyrics tags for ${transformed.title}:`, e.message);
+                }
+            });
+        }
+
         res.json(transformed);
 
     } catch (err) {
@@ -615,6 +630,32 @@ router.put('/:id', async (req, res, next) => {
              broadcast('album:update', { ...albumData, isFavorite: Boolean(albumData.is_favorite) });
         }
 
+        // --- UPDATE PHYSICAL FILE METADATA ASYNC ---
+        if (currentSong.file_path) {
+            // Resolve cover path if available from update
+            let coverPath = null;
+            if (transformed.coverUrl && transformed.coverUrl.startsWith('/uploads/')) {
+                // Assuming coverUrl format: /uploads/covers/filename.jpg
+                const relativePath = transformed.coverUrl.replace(/^\/uploads\//, '');
+                coverPath = path.join(config.UPLOAD_DIR, relativePath);
+            }
+            
+            identificationQueue.add(async () => {
+                try {
+                    await updateAudioTags(currentSong.file_path, {
+                        title: transformed.title,
+                        artist: transformed.artist,
+                        album: transformed.album,
+                        year: year || undefined,
+                        genre: transformed.genre,
+                        coverPath: coverPath // Pass resolved cover path
+                    });
+                } catch (e) {
+                    console.error(`Failed to update file tags for ${transformed.title}:`, e.message);
+                }
+            });
+        }
+
         res.json(transformed);
     } catch (err) {
         next(err);
@@ -648,6 +689,12 @@ router.patch('/:id/favorite', async (req, res, next) => {
 router.patch('/:id/lyrics', async (req, res, next) => {
     try {
         const { lyrics } = req.body;
+        
+        const song = await db('songs').where({ id: req.params.id }).first();
+        if (!song) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
         await db('songs').where({ id: req.params.id }).update({ lyrics });
 
         const query = db('songs').where({ 'songs.id': req.params.id });
@@ -655,6 +702,20 @@ router.patch('/:id/lyrics', async (req, res, next) => {
         const transformed = results[0];
 
         broadcast('song:update', transformed);
+
+        // --- UPDATE PHYSICAL FILE METADATA ASYNC ---
+        if (song.file_path) {
+            identificationQueue.add(async () => {
+                try {
+                    await updateAudioTags(song.file_path, {
+                        lyrics: lyrics
+                    });
+                } catch (e) {
+                    console.error(`Failed to update lyrics tags for ${transformed.title}:`, e.message);
+                }
+            });
+        }
+
         res.json(transformed);
     } catch (err) {
         next(err);
@@ -701,6 +762,25 @@ router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
         if (song.album_id) {
              const album = await db('albums').where({ id: song.album_id }).first();
              broadcast('album:update', { ...album, isFavorite: Boolean(album.is_favorite) });
+        }
+
+        // --- UPDATE PHYSICAL FILE METADATA ASYNC ---
+        if (song && song.file_path) {
+            let coverPath = null;
+            if (coverUrl.startsWith('/uploads/')) {
+                const relativePath = coverUrl.replace(/^\/uploads\//, '');
+                coverPath = path.join(config.UPLOAD_DIR, relativePath);
+            }
+
+            identificationQueue.add(async () => {
+                try {
+                    await updateAudioTags(song.file_path, {
+                        coverPath: coverPath
+                    });
+                } catch (e) {
+                    console.error(`Failed to update file cover for ${transformed.title}:`, e.message);
+                }
+            });
         }
 
         res.json(transformed);
