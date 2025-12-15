@@ -6,13 +6,18 @@ export interface LrcLine {
 
 /**
  * Parses an LRC string into an array of LrcLine objects.
- * Format: [mm:ss.xx]Text
+ * Format: [mm:ss.xx]Text or [mm:ss:xx]Text or [mm:ss]Text
  */
 export function parseLrc(lrc: string): LrcLine[] {
   if (!lrc) return [];
 
   const lines = lrc.split('\n');
-  const regex = /^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)$/;
+  // Regex matches:
+  // Group 1: Minutes
+  // Group 2: Seconds
+  // Group 3: Milliseconds (optional, without separator)
+  // The separator can be . or :
+  const regex = /^\[(\d{2}):(\d{2})(?:[.:](\d{2,3}))?\](.*)$/;
   const result: LrcLine[] = [];
 
   for (const line of lines) {
@@ -23,13 +28,18 @@ export function parseLrc(lrc: string): LrcLine[] {
     if (match) {
       const minutes = parseInt(match[1], 10);
       const seconds = parseInt(match[2], 10);
-      const milliseconds = parseInt(match[3], 10);
+      const millisecondsStr = match[3];
       const text = match[4].trim();
 
-      // Normalize milliseconds (can be 2 or 3 digits)
-      const msNormalized = match[3].length === 2 ? milliseconds * 10 : milliseconds;
+      let milliseconds = 0;
+      if (millisecondsStr) {
+          milliseconds = parseInt(millisecondsStr, 10);
+          // Normalize milliseconds (can be 2 or 3 digits)
+          // If 2 digits (e.g. 50), it usually means 500ms (centiseconds)
+          if (millisecondsStr.length === 2) milliseconds *= 10;
+      }
 
-      const totalTime = minutes * 60 + seconds + msNormalized / 1000;
+      const totalTime = minutes * 60 + seconds + milliseconds / 1000;
 
       result.push({
         time: totalTime,

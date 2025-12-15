@@ -4,6 +4,7 @@ import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { broadcast } from '../services/sse.js';
 import { identifySongMetadata, downloadCoverImage } from '../services/metadataService.js';
 import { searchSpotifyMetadata } from '../services/spotifyService.js';
@@ -669,10 +670,25 @@ router.patch('/:id/cover', upload.single('cover'), async (req, res, next) => {
             return res.status(400).json({ error: 'No cover image provided' });
         }
 
-        const coverUrl = `/uploads/covers/${req.file.filename}`;
+        let coverUrl = `/uploads/covers/${req.file.filename}`;
         const song = await db('songs').where({ id: req.params.id }).first();
         
         if (song && song.album_id) {
+            // Rename uploaded file to match album_id
+            const ext = path.extname(req.file.originalname);
+            const newFilename = `${song.album_id}${ext}`;
+            const oldPath = req.file.path;
+            const newPath = path.join(config.UPLOAD_DIR, 'covers', newFilename);
+
+            try {
+                // Rename file
+                await fs.promises.rename(oldPath, newPath);
+                coverUrl = `/uploads/covers/${newFilename}`;
+            } catch (e) {
+                console.error("Failed to rename cover image:", e);
+                // Continue with original filename if rename fails
+            }
+
             await db('albums').where({ id: song.album_id }).update({
                 cover_url: coverUrl
             });

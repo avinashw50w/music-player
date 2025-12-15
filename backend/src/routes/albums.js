@@ -14,7 +14,12 @@ const storage = multer.diskStorage({
     destination: path.join(config.UPLOAD_DIR, 'covers'),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
-        cb(null, `album-${Date.now()}${ext}`);
+        // Use album ID as filename if available (standard update), otherwise fallback
+        if (req.params.id) {
+            cb(null, `${req.params.id}${ext}`);
+        } else {
+            cb(null, `album-${Date.now()}${ext}`);
+        }
     }
 });
 

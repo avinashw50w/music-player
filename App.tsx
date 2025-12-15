@@ -293,15 +293,18 @@ const App: React.FC = () => {
                     }
                     return [payload, ...prev]; // Handle new song creation via update if not strictly separate
                 });
-                if (currentSong?.id === payload.id) {
-                    setCurrentSong(payload);
-                }
+                
+                // Update currentSong if it matches using functional update
+                setCurrentSong(prev => prev?.id === payload.id ? payload : prev);
             } else if (type === 'song:delete') {
                 setSongs(prev => prev.filter(s => s.id !== payload.id));
-                if (currentSong?.id === payload.id) {
-                    setIsPlaying(false);
-                    setCurrentSong(null);
-                }
+                setCurrentSong(prev => {
+                    if (prev?.id === payload.id) {
+                        setIsPlaying(false);
+                        return null;
+                    }
+                    return prev;
+                });
             }
 
             // Album Events
@@ -349,7 +352,7 @@ const App: React.FC = () => {
     return () => {
         eventSource.close();
     };
-  }, [currentSong]); 
+  }, []); // Removed currentSong dependency to prevent reconnection loops
 
   // Initialize Wavis once audioRef is available
   useEffect(() => {
@@ -698,6 +701,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen text-white font-sans relative">
+      {/* ... (rest of render code unchanged) ... */}
       
       {/* Background Ambience */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">

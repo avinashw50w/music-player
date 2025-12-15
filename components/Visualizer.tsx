@@ -138,7 +138,6 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         }
 
         // Fallback: Binary search or full scan for seek/jumps
-        // Since list is small (<200 typically), findIndex is acceptable but we can optimize slightly by finding from scratch
         const index = parsedLyrics.findIndex((line, i) => {
             const next = parsedLyrics[i + 1];
             return currentTime >= line.time && (!next || currentTime < next.time);
@@ -261,7 +260,18 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                             ))}
                             <div className="h-[45vh]"></div> {/* Spacer */}
                         </div>
+                    ) : currentSong.lyrics ? (
+                        // Unsynced Lyrics View
+                        <div className="w-full max-w-4xl h-full overflow-y-auto px-8 text-center space-y-4 custom-scrollbar">
+                             <div className="h-[20vh]"></div>
+                             <p className="text-slate-400 text-sm mb-8 uppercase tracking-widest">Unsynced Lyrics</p>
+                             <p className="whitespace-pre-line text-white/80 text-xl md:text-2xl font-medium leading-relaxed">
+                                {currentSong.lyrics}
+                             </p>
+                             <div className="h-[20vh]"></div>
+                        </div>
                     ) : (
+                        // Empty State
                         <div className="text-center relative z-20">
                             <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
                                 <Mic2 className="w-10 h-10" />
