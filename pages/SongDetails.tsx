@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
@@ -22,7 +22,7 @@ interface DetailProps {
   onUpdateSong?: (song: Song) => void;
 }
 
-export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPlaying, onPlaySong, onToggleFavorite, onAddToPlaylist, onUpdateSong }) => {
+export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, currentSongId, isPlaying, onPlaySong, onToggleFavorite, onAddToPlaylist, onUpdateSong }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [song, setSong] = useState<Song | undefined>(songs.find(s => s.id === id));
@@ -30,6 +30,11 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
   const [lyrics, setLyrics] = useState<string>("");
   const [isEditingLyrics, setIsEditingLyrics] = useState(false);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+  
+  // Suggestions State
+  const [albumSuggestions, setAlbumSuggestions] = useState<string[]>([]);
+  const [artistSuggestions, setArtistSuggestions] = useState<string[]>([]);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Identify & Refine State
   const [isIdentifying, setIsIdentifying] = useState(false);
@@ -70,6 +75,15 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
       }
   }, [songs, id]);
 
+  useEffect(() => {
+      if (isEditingInfo && albums) {
+          setAlbumSuggestions(albums.map(a => a.title).slice(0, 20));
+      }
+      if (isEditingInfo && artists) {
+          setArtistSuggestions(artists.map(a => a.name).slice(0, 20));
+      }
+  }, [isEditingInfo, albums, artists]);
+
   if (loading) {
       return <SongDetailSkeleton />;
   }
@@ -81,6 +95,25 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
           </div>
       );
   }
+
+  const handleFieldChange = (name: string, value: string) => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      
+      searchTimeoutRef.current = setTimeout(async () => {
+          if (value.trim().length > 1) {
+              try {
+                  const results = await api.search(value);
+                  if (name === 'album') {
+                      setAlbumSuggestions(results.albums.map(a => a.title));
+                  } else if (name === 'artist') {
+                      setArtistSuggestions(results.artists.map(a => a.name));
+                  }
+              } catch (e) {
+                  console.error("Error searching suggestions", e);
+              }
+          }
+      }, 300);
+  };
 
   const handleSaveInfo = async (data: any) => {
     try {
@@ -485,10 +518,21 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
             title="Edit Song Info"
             onClose={() => setIsEditingInfo(false)}
             onSave={handleSaveInfo}
+            onFieldChange={handleFieldChange}
             fields={[
                 { name: 'title', label: 'Title', value: song.title },
-                { name: 'artist', label: 'Artist (comma separated)', value: song.artist },
-                { name: 'album', label: 'Album', value: song.album },
+                { 
+                    name: 'artist', 
+                    label: 'Artist (comma separated)', 
+                    value: song.artist, 
+                    suggestions: artistSuggestions
+                },
+                { 
+                    name: 'album', 
+                    label: 'Album', 
+                    value: song.album, 
+                    suggestions: albumSuggestions 
+                },
                 { name: 'genre', label: 'Genre (comma separated)', value: (song.genre || []).join(', ') }
             ]}
         />

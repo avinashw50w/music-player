@@ -17,6 +17,7 @@ interface DetailProps {
   onToggleFavorite: (id: string) => void;
   onAddToPlaylist: (song: Song) => void;
   onUpdateAlbum?: (album: Album) => void;
+  artists?: Artist[];
 }
 
 export const AlbumDetails: React.FC<DetailProps> = ({ 
@@ -26,7 +27,8 @@ export const AlbumDetails: React.FC<DetailProps> = ({
   onPlayContext, 
   onToggleFavorite, 
   onUpdateAlbum, 
-  onAddToPlaylist
+  onAddToPlaylist,
+  artists
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();

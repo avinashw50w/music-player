@@ -144,9 +144,12 @@ const App: React.FC = () => {
   // 2. Optimized Data Fetching based on Route
   useEffect(() => {
     const path = location.pathname;
+    const isSongDetails = path.startsWith('/song/');
+    const isAlbumDetails = path.startsWith('/album/');
+    const isArtistDetails = path.startsWith('/artist/');
 
-    // Fetch songs for Home, Browse, or Song Library (NOT Favorites anymore, it fetches its own)
-    if ((path === '/' || path === '/browse' || path === '/library/songs') && songs.length === 0 && !isFetching.current.songs) {
+    // Fetch songs for Home, Browse, Library or Detail pages
+    if ((path === '/' || path === '/browse' || path === '/library/songs' || isSongDetails) && songs.length === 0 && !isFetching.current.songs) {
         isFetching.current.songs = true;
         setIsLoading(prev => ({ ...prev, songs: true }));
         api.getSongs(PAGE_LIMIT, 0).then(data => {
@@ -159,8 +162,8 @@ const App: React.FC = () => {
           });
     }
 
-    // Fetch albums for Browse or Album Library
-    if ((path === '/browse' || path === '/library/albums') && albums.length === 0 && !isFetching.current.albums) {
+    // Fetch albums for Browse, Library or Detail pages (for suggestions)
+    if ((path === '/browse' || path === '/library/albums' || isSongDetails || isAlbumDetails) && albums.length === 0 && !isFetching.current.albums) {
         isFetching.current.albums = true;
         setIsLoading(prev => ({ ...prev, albums: true }));
         api.getAlbums(PAGE_LIMIT, 0).then(data => {
@@ -173,8 +176,8 @@ const App: React.FC = () => {
           });
     }
 
-    // Fetch artists for Browse or Artist Library
-    if ((path === '/browse' || path === '/library/artists') && artists.length === 0 && !isFetching.current.artists) {
+    // Fetch artists for Browse, Library or Detail pages (for suggestions)
+    if ((path === '/browse' || path === '/library/artists' || isSongDetails || isArtistDetails) && artists.length === 0 && !isFetching.current.artists) {
         isFetching.current.artists = true;
         setIsLoading(prev => ({ ...prev, artists: true }));
         api.getArtists(PAGE_LIMIT, 0).then(data => {
@@ -805,6 +808,7 @@ const App: React.FC = () => {
                         onToggleFavorite={handleToggleFavorite}
                         onAddToPlaylist={handleAddToPlaylist}
                         onUpdateAlbum={onUpdateAlbum}
+                        artists={artists} 
                     />
                 } />
                 <Route path="/artist/:id" element={
@@ -858,6 +862,8 @@ const App: React.FC = () => {
                 <Route path="/song/:id" element={
                     <SongDetails
                         songs={songs}
+                        albums={albums}
+                        artists={artists}
                         currentSongId={currentSong?.id}
                         isPlaying={isPlaying}
                         onPlaySong={handlePlaySong}
