@@ -97,6 +97,13 @@ export async function identifySong(id: string): Promise<Song> {
     return handleResponse<Song>(response);
 }
 
+export async function identifySongSpotify(id: string): Promise<Song> {
+    const response = await fetch(`${API_BASE_URL}/songs/${id}/identify-spotify`, {
+        method: 'POST'
+    });
+    return handleResponse<Song>(response);
+}
+
 export async function deleteSong(id: string): Promise<void> {
     await fetch(`${API_BASE_URL}/songs/${id}`, { method: 'DELETE' });
 }

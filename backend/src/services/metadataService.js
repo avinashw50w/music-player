@@ -149,7 +149,7 @@ export async function downloadCoverImage(url, filenamePrefix) {
             fs.mkdirSync(uploadsDir, { recursive: true });
         }
 
-        const filename = `${filenamePrefix}-${Date.now()}.jpg`;
+        const filename = `${filenamePrefix}.jpg`;
         const filepath = path.join(uploadsDir, filename);
         
         // @ts-ignore

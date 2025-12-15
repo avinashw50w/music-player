@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
-import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2 } from 'lucide-react';
+import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2, Sparkles } from 'lucide-react';
 import { SongDetailSkeleton } from '../components/Skeletons';
 import * as api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -32,6 +32,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
   
   // Identify State
   const [isIdentifying, setIsIdentifying] = useState(false);
+  const [isIdentifyingSpotify, setIsIdentifyingSpotify] = useState(false);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -129,6 +130,22 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
       }
   };
 
+  const handleIdentifySpotify = async () => {
+      if (isIdentifyingSpotify) return;
+      setIsIdentifyingSpotify(true);
+      setIdentifyError(null);
+      try {
+          const updated = await api.identifySongSpotify(song.id);
+          setSong(updated);
+          onUpdateSong?.(updated);
+      } catch (e: any) {
+          setIdentifyError(e.message || "Spotify identification failed");
+          setTimeout(() => setIdentifyError(null), 4000);
+      } finally {
+          setIsIdentifyingSpotify(false);
+      }
+  };
+
   const handleDelete = async () => {
       if (window.confirm(`Are you sure you want to delete "${song.title}" from your library?`)) {
           try {
@@ -212,6 +229,14 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                     >
                         <Wand2 className="w-5 h-5"/>
                     </button>
+                    <button 
+                        onClick={handleIdentifySpotify}
+                        disabled={isIdentifyingSpotify}
+                        title="Find Metadata on Spotify"
+                        className={`p-2 text-slate-300 hover:text-green-400 rounded-xl hover:bg-white/10 transition-all ${isIdentifyingSpotify ? 'animate-pulse text-green-400' : ''}`}
+                    >
+                        <Sparkles className="w-5 h-5"/>
+                    </button>
                     <button onClick={() => setIsEditingInfo(true)} className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10" title="Edit Info">
                         <Edit3 className="w-5 h-5"/>
                     </button>
@@ -221,7 +246,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                     </button>
                 </div>
                 {identifyError && (
-                    <div className="absolute top-0 right-0 bg-rose-500/90 text-white text-xs px-3 py-2 rounded-xl animate-in fade-in slide-in-from-bottom-1 shadow-lg border border-rose-400/50">
+                    <div className="absolute top-0 right-0 bg-rose-500/90 text-white text-xs px-3 py-2 rounded-xl animate-in fade-in slide-in-from-bottom-1 shadow-lg border border-rose-400/50 z-50">
                         {identifyError}
                     </div>
                 )}

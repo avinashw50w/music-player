@@ -10,6 +10,7 @@
         "migrate": "node src/config/migrate.js"
     },
     "dependencies": {
+        "@google/genai": "^1.33.0",
         "better-sqlite3": "^12.5.0",
         "cors": "^2.8.5",
         "dotenv": "^16.4.7",

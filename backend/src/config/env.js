@@ -21,5 +21,8 @@ export const config = {
     NODE_ENV: process.env.NODE_ENV || 'development',
     DB_PATH: resolvePath(process.env.DB_PATH, 'database.sqlite'),
     UPLOAD_DIR: resolvePath(process.env.UPLOAD_DIR, 'uploads'),
-    ACOUSTID_CLIENT_ID: process.env.ACOUSTID_CLIENT_ID || '8XaBELgH'
+    ACOUSTID_CLIENT_ID: process.env.ACOUSTID_CLIENT_ID || '8XaBELgH',
+    SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID || '',
+    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET || '',
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY || ''
 };

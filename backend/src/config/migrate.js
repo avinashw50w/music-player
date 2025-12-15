@@ -6,6 +6,16 @@ import process from 'process';
 export async function migrate() {
     console.log('Running migrations...');
 
+    // System Settings table for tokens/configs
+    if (!(await db.schema.hasTable('system_settings'))) {
+        await db.schema.createTable('system_settings', (table) => {
+            table.string('key').primary();
+            table.text('value');
+            table.bigInteger('expires_at'); // Unix timestamp in milliseconds
+        });
+        console.log('Created system_settings table');
+    }
+
     // Artists table
     if (!(await db.schema.hasTable('artists'))) {
         await db.schema.createTable('artists', (table) => {
@@ -49,7 +59,7 @@ export async function migrate() {
             table.string('format');
             table.timestamp('created_at').defaultTo(db.fn.now());
         });
-    } 
+    }
 
     // Playlists table
     if (!(await db.schema.hasTable('playlists'))) {
@@ -93,11 +103,6 @@ export async function migrate() {
             table.unique(['song_id', 'artist_id']);
         });
         console.log('Created song_artists table');
-    } else {
-        if (!(await db.schema.hasColumn('song_artists', 'is_primary'))) {
-            await db.schema.alterTable('song_artists', table => table.boolean('is_primary').defaultTo(false));
-            console.log('Added is_primary to song_artists');
-        }
     }
 
     // Genres table
@@ -125,6 +130,8 @@ export async function migrate() {
             ]);
         }
     }
+
+
 
     console.log('Migrations complete!');
 }
