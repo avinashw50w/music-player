@@ -639,9 +639,30 @@ router.put('/:id', async (req, res, next) => {
                 const relativePath = transformed.coverUrl.replace(/^\/uploads\//, '');
                 coverPath = path.join(config.UPLOAD_DIR, relativePath);
             }
-            
+
             identificationQueue.add(async () => {
+                // Construct new filename if title/artist changed to keep file system organized
+                let newFilePath = null;
                 try {
+                    const dir = path.dirname(currentSong.file_path);
+                    const ext = path.extname(currentSong.file_path);
+                    
+                    // Sanitize filename safe characters
+                    const safeArtist = (transformed.artist || 'Unknown Artist').replace(/[<>:"/\\|?*]/g, '').trim();
+                    const safeTitle = (transformed.title || 'Unknown Title').replace(/[<>:"/\\|?*]/g, '').trim();
+                    
+                    const newFilename = `${safeArtist} - ${safeTitle}${ext}`;
+                    const potentialPath = path.join(dir, newFilename);
+                    
+                    // Only rename if path is different and target doesn't exist
+                    if (potentialPath !== currentSong.file_path) {
+                        if (!fs.existsSync(potentialPath)) {
+                            newFilePath = potentialPath;
+                        } else {
+                            console.warn(`[Rename] Target file exists, skipping rename: ${newFilename}`);
+                        }
+                    }
+
                     await updateAudioTags(currentSong.file_path, {
                         title: transformed.title,
                         artist: transformed.artist,
@@ -649,9 +670,14 @@ router.put('/:id', async (req, res, next) => {
                         year: year || undefined,
                         genre: transformed.genre,
                         coverPath: coverPath // Pass resolved cover path
-                    });
+                    }, newFilePath);
+
+                    // Update DB with new path if renamed successfully
+                    if (newFilePath) {
+                        await db('songs').where({ id: req.params.id }).update({ file_path: newFilePath });
+                    }
                 } catch (e) {
-                    console.error(`Failed to update file tags for ${transformed.title}:`, e.message);
+                    console.error(`Failed to update file tags/name for ${transformed.title}:`, e.message);
                 }
             });
         }

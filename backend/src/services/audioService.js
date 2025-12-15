@@ -1,11 +1,53 @@
 
-import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import { promisify } from 'util';
 import fs from 'fs';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Execute ffprobe to get JSON metadata
+ * @param {string} filePath 
+ */
+async function probeFile(filePath) {
+    return new Promise((resolve, reject) => {
+        const ffprobe = spawn('ffprobe', [
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format',
+            '-show_streams',
+            filePath
+        ]);
+
+        let stdout = '';
+        let stderr = '';
+
+        ffprobe.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        ffprobe.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        ffprobe.on('close', (code) => {
+            if (code === 0) {
+                try {
+                    resolve(JSON.parse(stdout));
+                } catch (e) {
+                    reject(new Error('Failed to parse ffprobe output: ' + e.message));
+                }
+            } else {
+                reject(new Error(`ffprobe exited with code ${code}: ${stderr}`));
+            }
+        });
+
+        ffprobe.on('error', (err) => {
+            reject(err);
+        });
+    });
+}
 
 /**
  * Extract raw lyrics using specific ffprobe command that preserves newlines
@@ -14,7 +56,6 @@ const execFileAsync = promisify(execFile);
 async function extractLyricsRaw(filePath) {
     try {
         // Try 'lyrics' tag (Standard)
-        // Command verified by user: ffprobe -v quiet -show_entries format_tags=lyrics -of default=nw=1:nk=1 file.mp3
         let { stdout } = await execFileAsync('ffprobe', [
             '-v', 'quiet',
             '-show_entries', 'format_tags=lyrics',
@@ -40,33 +81,27 @@ async function extractLyricsRaw(filePath) {
 
         return null;
     } catch (e) {
-        // console.error(`Raw lyrics extraction failed for ${filePath}:`, e.message);
         return null;
     }
 }
 
 /**
- * Extract metadata from an audio file using FFmpeg
+ * Extract metadata from an audio file using system FFmpeg
  * @param {string} filePath - Path to the file on disk
  * @param {string} [originalFilename] - Original filename (if uploaded) to use for title fallback
  */
 export async function extractMetadata(filePath, originalFilename = null) {
     // Run probe and raw lyrics extraction in parallel
-    const [probeMetadata, rawLyrics] = await Promise.all([
-        new Promise((resolve, reject) => {
-            ffmpeg.ffprobe(filePath, (err, metadata) => {
-                if (err) reject(err);
-                else resolve(metadata);
-            });
-        }),
+    const [probeData, rawLyrics] = await Promise.all([
+        probeFile(filePath),
         extractLyricsRaw(filePath)
     ]);
 
-    const format = probeMetadata.format;
-    const audioStream = probeMetadata.streams.find(s => s.codec_type === 'audio');
+    const format = probeData.format || {};
+    const audioStream = (probeData.streams || []).find(s => s.codec_type === 'audio') || {};
 
     // Merge tags for general metadata
-    const mergedTags = { ...(format.tags || {}), ...(audioStream?.tags || {}) };
+    const mergedTags = { ...(format.tags || {}), ...(audioStream.tags || {}) };
 
     const durationSeconds = Math.floor(format.duration || 0);
     const minutes = Math.floor(durationSeconds / 60);
@@ -91,13 +126,11 @@ export async function extractMetadata(filePath, originalFilename = null) {
     const fallbackTitle = path.basename(filenameForTitle, path.extname(filenameForTitle));
 
     // Determine Lyrics
-    // Prefer raw extraction if successful (preserves newlines better)
-    // Fallback to probe tags if raw failed but probe has something (though likely truncated)
     let lyrics = rawLyrics;
 
     if (!lyrics) {
         let maxLen = 0;
-        const tagSources = [format.tags, audioStream?.tags].filter(t => t);
+        const tagSources = [format.tags, audioStream.tags].filter(t => t);
         tagSources.forEach(source => {
             Object.keys(source).forEach(key => {
                 if (key.match(/(lyrics|uslt|unsyncedlyrics)/i)) {
@@ -121,101 +154,165 @@ export async function extractMetadata(filePath, originalFilename = null) {
         duration,
         durationSeconds,
         bitrate: Math.floor((format.bit_rate || 0) / 1000),
-        format: audioStream?.codec_name?.toUpperCase() || path.extname(filePath).slice(1).toUpperCase(),
-        sampleRate: audioStream?.sample_rate,
-        channels: audioStream?.channels,
+        format: audioStream.codec_name?.toUpperCase() || path.extname(filePath).slice(1).toUpperCase(),
+        sampleRate: audioStream.sample_rate,
+        channels: audioStream.channels,
         lyrics: lyrics
     };
 }
 
 /**
- * Extract embedded cover art from audio file
+ * Extract embedded cover art from audio file using system FFmpeg
  */
 export async function extractCoverArt(audioPath, outputPath) {
     return new Promise((resolve, reject) => {
-        ffmpeg(audioPath)
-            .outputOptions(['-an', '-vcodec', 'copy'])
-            .output(outputPath)
-            .on('error', (err) => {
-                // No cover art embedded, return null
-                resolve(null);
-            })
-            .on('end', () => {
+        // ffmpeg -i input -an -vcodec copy output -y
+        const args = [
+            '-i', audioPath,
+            '-an',
+            '-vcodec', 'copy',
+            '-y',
+            outputPath
+        ];
+
+        const ffmpeg = spawn('ffmpeg', args);
+
+        ffmpeg.on('close', (code) => {
+            if (code === 0 && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
                 resolve(outputPath);
-            })
-            .run();
+            } else {
+                // No cover art embedded or error
+                resolve(null);
+            }
+        });
+
+        ffmpeg.on('error', () => {
+            resolve(null);
+        });
     });
 }
 
 /**
- * Update audio file tags (Title, Artist, Album, Year, Genre, Cover Art, Lyrics)
+ * Update audio file tags using system FFmpeg
  * This creates a temporary copy and replaces the original.
- * @param {string} filePath - Absolute path to the file
+ * @param {string} filePath - Absolute path to the source file
  * @param {Object} metadata - { title, artist, album, year, genre, coverPath, lyrics }
+ * @param {string} [newFilePath] - Optional new path to rename the file to (e.g. "Artist - Title.mp3")
  */
-export async function updateAudioTags(filePath, metadata) {
-    const tempPath = `${filePath}.tmp${path.extname(filePath)}`;
+export async function updateAudioTags(filePath, metadata, newFilePath = null) {
+    const targetPath = newFilePath || filePath;
+    // We write to a temp file in the same directory as the target to ensure atomic rename is possible
+    const tempPath = `${targetPath}.tmp${path.extname(targetPath)}`;
     
     return new Promise((resolve, reject) => {
-        const command = ffmpeg(filePath);
-        
-        // Base Output Options
-        const outputOptions = [
-            '-id3v2_version', '3', // Ensure generic ID3 compatibility for MP3
-            '-write_id3v1', '1',
-            '-c', 'copy' // Copy codec (no re-encoding for audio/video streams unless specified)
-        ];
+        const args = [];
 
-        // Handle Cover Art Embedding
+        // 1. INPUTS
+        // Main Audio File
+        args.push('-i', filePath);
+
+        // Cover Art File (if exists)
+        let hasCover = false;
         if (metadata.coverPath && fs.existsSync(metadata.coverPath)) {
-            command.input(metadata.coverPath);
-            outputOptions.push('-map', '0:a');
-            outputOptions.push('-map', '1');
-            outputOptions.push('-disposition:v', 'attached_pic');
-        } else {
-            outputOptions.push('-map', '0');
+            hasCover = true;
+            args.push('-i', metadata.coverPath);
         }
 
-        // Add Text Metadata
-        if (metadata.title !== undefined) outputOptions.push('-metadata', `title=${metadata.title}`);
-        if (metadata.artist !== undefined) outputOptions.push('-metadata', `artist=${metadata.artist}`);
-        if (metadata.album !== undefined) outputOptions.push('-metadata', `album=${metadata.album}`);
-        if (metadata.year !== undefined) outputOptions.push('-metadata', `date=${metadata.year}`);
-        if (metadata.genre !== undefined) {
-            const genreStr = Array.isArray(metadata.genre) ? metadata.genre.join(', ') : (metadata.genre || '');
-            outputOptions.push('-metadata', `genre=${genreStr}`);
+        // 2. MAPPING
+        if (hasCover) {
+            args.push('-map', '0:a'); // Use audio from input 0
+            args.push('-map', '1:0'); // Use video/image from input 1
+        } else {
+            args.push('-map', '0'); // Use all streams from input 0
         }
+
+        // 3. CODEC & FORMAT OPTIONS
+        args.push('-c', 'copy'); // Copy streams (don't re-encode audio)
+        args.push('-id3v2_version', '3'); // ID3v2.3 for best compatibility
+        args.push('-write_id3v1', '1');
+
+        // 4. METADATA
+        // Helper to add metadata args
+        const addMeta = (key, value) => {
+            if (value !== undefined && value !== null) {
+                const strVal = String(value);
+                args.push('-metadata', `${key}=${strVal}`);
+            }
+        };
+
+        addMeta('title', metadata.title);
+        addMeta('artist', metadata.artist);
+        addMeta('album', metadata.album);
+        addMeta('date', metadata.year);
         
+        if (metadata.genre) {
+            const genreStr = Array.isArray(metadata.genre) ? metadata.genre.join(', ') : metadata.genre;
+            addMeta('genre', genreStr);
+        }
+
         if (metadata.lyrics !== undefined) {
             const safeLyrics = metadata.lyrics ? metadata.lyrics.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : '';
             const ext = path.extname(filePath).toLowerCase();
-
+            
             if (ext === '.mp3' || ext === '.id3') {
-                outputOptions.push('-metadata', `unsyncedlyrics=${safeLyrics}`);
-                outputOptions.push('-metadata', 'lyrics=');
+                addMeta('unsyncedlyrics', safeLyrics);
+                // Clear standard lyrics tag to avoid duplicates/conflicts
+                args.push('-metadata', 'lyrics=');
             } else {
-                outputOptions.push('-metadata', `lyrics=${safeLyrics}`);
+                addMeta('lyrics', safeLyrics);
             }
         }
 
-        command
-            .outputOptions(outputOptions)
-            .save(tempPath)
-            .on('end', async () => {
+        // Cover Art Specific Metadata
+        if (hasCover) {
+            args.push('-metadata:s:v', 'title=Album cover');
+            args.push('-metadata:s:v', 'comment=Cover (front)');
+            args.push('-disposition:v', 'attached_pic');
+        }
+
+        // 5. OUTPUT
+        args.push('-y', tempPath);
+
+        const ffmpeg = spawn('ffmpeg', args);
+
+        let stderr = '';
+        ffmpeg.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        ffmpeg.on('close', async (code) => {
+            if (code === 0) {
                 try {
-                    await fs.promises.rename(tempPath, filePath);
-                    console.log(`[Metadata] Updated file tags for: ${path.basename(filePath)}`);
+                    // 1. Move temp file to target path
+                    await fs.promises.rename(tempPath, targetPath);
+                    
+                    // 2. If we renamed the file (target != source), delete the old source
+                    if (targetPath !== filePath) {
+                        try {
+                            await fs.promises.unlink(filePath);
+                        } catch (e) {
+                            console.warn(`[Metadata] Failed to delete old file ${path.basename(filePath)}: ${e.message}`);
+                        }
+                    }
+
+                    console.log(`[Metadata] Updated file tags for: ${path.basename(targetPath)}`);
                     resolve(true);
                 } catch (err) {
                     fs.unlink(tempPath, () => {});
                     reject(err);
                 }
-            })
-            .on('error', (err) => {
+            } else {
                 fs.unlink(tempPath, () => {});
-                console.error(`[Metadata] Failed to update tags for ${path.basename(filePath)}: ${err.message}`);
-                reject(err);
-            });
+                console.error(`[Metadata] FFmpeg Error for ${path.basename(filePath)}:`, stderr);
+                reject(new Error(`ffmpeg exited with code ${code}`));
+            }
+        });
+
+        ffmpeg.on('error', (err) => {
+            fs.unlink(tempPath, () => {});
+            console.error(`[Metadata] Failed to spawn ffmpeg:`, err);
+            reject(err);
+        });
     });
 }
 
