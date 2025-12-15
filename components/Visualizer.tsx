@@ -240,7 +240,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
             {/* Lyrics View */}
             {activeVisualizer === 'lyrics' && (
-                <div className="relative z-10 w-full h-full flex flex-col items-center justify-center pb-32 pt-20">
+                <div className="relative z-10 w-full h-full flex flex-col items-center justify-center pb-56 pt-20">
                     {parsedLyrics.length > 0 ? (
                         <div 
                             ref={lyricsContainerRef}
@@ -262,7 +262,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                             <div className="h-[45vh]"></div> {/* Spacer */}
                         </div>
                     ) : (
-                        <div className="text-center">
+                        <div className="text-center relative z-20">
                             <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
                                 <Mic2 className="w-10 h-10" />
                             </div>
@@ -273,7 +273,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                             <button
                                 onClick={handleFetchLyrics}
                                 disabled={isFetchingLyrics}
-                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 mx-auto disabled:opacity-50"
+                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 mx-auto disabled:opacity-50 relative pointer-events-auto"
                             >
                                 {isFetchingLyrics ? (
                                     <>
@@ -294,7 +294,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
             {/* Controls Overlay */}
             <div 
-                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 z-[100] ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 z-[100] pointer-events-none ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0'}`}
                 style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 20%, transparent 80%, rgba(0,0,0,0.8))' }}
             >
                 {/* Header */}
