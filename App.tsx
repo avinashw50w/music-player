@@ -654,7 +654,10 @@ const App: React.FC = () => {
   const handleCreatePlaylist = async (name: string) => {
       try {
           const newPlaylist = await api.createPlaylist(name);
-          setPlaylists(prev => [newPlaylist, ...prev]);
+          setPlaylists(prev => {
+              if (prev.some(p => p.id === newPlaylist.id)) return prev;
+              return [newPlaylist, ...prev];
+          });
           setShowCreatePlaylistModal(false);
           if (songToAdd) {
              handleConfirmAddToPlaylist(newPlaylist.id);
@@ -723,8 +726,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen text-white font-sans relative">
-      {/* ... (rest of render code unchanged) ... */}
-      
       {/* Background Ambience */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-900/20 blur-[150px]"></div>
