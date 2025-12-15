@@ -136,6 +136,7 @@ export async function identifySongMetadata(filePath) {
 
 /**
  * Downloads an image from a URL to the local uploads directory
+ * Ensures filename matches the prefix exactly (e.g. albumId.jpg)
  */
 export async function downloadCoverImage(url, filenamePrefix) {
     if (!url) return null;
@@ -149,6 +150,7 @@ export async function downloadCoverImage(url, filenamePrefix) {
             fs.mkdirSync(uploadsDir, { recursive: true });
         }
 
+        // Use prefix directly as filename to ensure Album ID match
         const filename = `${filenamePrefix}.jpg`;
         const filepath = path.join(uploadsDir, filename);
         

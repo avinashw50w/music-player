@@ -4,12 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../config/database.js';
+import { config } from '../config/env.js';
 import { extractMetadata, extractCoverArt } from '../services/audioService.js';
 import { addClient, removeClient, broadcast, updateScanStatus, currentScanStatus } from '../services/sse.js';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
@@ -103,6 +100,12 @@ router.post('/scan', async (req, res) => {
             const existingSongs = await db('songs').select('file_path');
             existingSongs.forEach(s => existingPaths.add(s.file_path));
 
+            // Ensure covers directory exists
+            const coversDir = path.join(config.UPLOAD_DIR, 'covers');
+            if (!fs.existsSync(coversDir)) {
+                fs.mkdirSync(coversDir, { recursive: true });
+            }
+
             // 3. Process files
             for (let i = 0; i < audioFiles.length; i++) {
                 const filePath = audioFiles[i];
@@ -128,41 +131,79 @@ router.post('/scan', async (req, res) => {
 
                 try {
                     const metadata = await extractMetadata(filePath);
-                    
                     const songId = uuidv4();
                     
-                    // Extract Cover Art
-                    let coverUrl = `https://picsum.photos/seed/${songId}/200/200`; // Fallback
-                    const coverFilename = `cover-${Date.now()}-${uuidv4().slice(0,8)}.jpg`;
-                    const coverPath = path.join(__dirname, '../../uploads/covers', coverFilename);
+                    // Extract Cover Art to temporary file
+                    let hasExtractedCover = false;
+                    const tempCoverFilename = `temp-${songId}.jpg`;
+                    const tempCoverPath = path.join(coversDir, tempCoverFilename);
                     
                     try {
-                        const extractedCover = await extractCoverArt(filePath, coverPath);
-                        if (extractedCover) {
-                            coverUrl = `/uploads/covers/${coverFilename}`;
-                        }
+                        const extractedPath = await extractCoverArt(filePath, tempCoverPath);
+                        if (extractedPath) hasExtractedCover = true;
                     } catch (e) {
                         // console.warn('Cover extraction failed', e);
                     }
 
                     // Album Logic
                     let albumId = null;
+                    let coverUrl = `https://picsum.photos/seed/${songId}/200/200`; // Default fallback
+
                     if (metadata.album) {
                         const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
+                        
                         if (existingAlbum) {
                             albumId = existingAlbum.id;
+                            
+                            // Check if album already has a proper local cover (named {albumId}.jpg)
+                            const finalCoverFilename = `${albumId}.jpg`;
+                            const finalCoverPath = path.join(coversDir, finalCoverFilename);
+                            
+                            if (fs.existsSync(finalCoverPath)) {
+                                // Use existing local cover
+                                coverUrl = `/uploads/covers/${finalCoverFilename}`;
+                                // Clean up temp extracted cover since we don't need it
+                                if (hasExtractedCover) fs.unlink(tempCoverPath, ()=>{});
+                            } else {
+                                // No local cover exists. If we extracted one, adopt it.
+                                if (hasExtractedCover) {
+                                    await fs.promises.rename(tempCoverPath, finalCoverPath);
+                                    coverUrl = `/uploads/covers/${finalCoverFilename}`;
+                                    // Update album record with new local cover
+                                    await db('albums').where({ id: albumId }).update({ cover_url: coverUrl });
+                                } else {
+                                    // Keep existing URL (remote or fallback)
+                                    coverUrl = existingAlbum.cover_url;
+                                }
+                            }
+                            
                             await db('albums').where({ id: albumId }).increment('track_count', 1);
                         } else {
+                            // Create New Album
                             albumId = uuidv4();
+                            
+                            if (hasExtractedCover) {
+                                const finalCoverFilename = `${albumId}.jpg`;
+                                const finalCoverPath = path.join(coversDir, finalCoverFilename);
+                                await fs.promises.rename(tempCoverPath, finalCoverPath);
+                                coverUrl = `/uploads/covers/${finalCoverFilename}`;
+                            } else {
+                                coverUrl = `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`;
+                            }
+
                             await db('albums').insert({
                                 id: albumId,
                                 title: metadata.album,
-                                cover_url: coverUrl, // Use extracted cover for album
+                                cover_url: coverUrl,
                                 year: metadata.year,
                                 genre: JSON.stringify(metadata.genre),
                                 track_count: 1
                             });
                         }
+                    } else {
+                        // No album metadata. 
+                        // Clean up temp cover if extracted (or could use for song-specific, but keeping it simple)
+                        if (hasExtractedCover) fs.unlink(tempCoverPath, ()=>{});
                     }
 
                     // Insert Song
@@ -171,12 +212,12 @@ router.post('/scan', async (req, res) => {
                         title: metadata.title,
                         album_id: albumId,
                         duration_seconds: metadata.durationSeconds,
-                        file_path: filePath, // STORE ABSOLUTE PATH
+                        file_path: filePath,
                         genre: JSON.stringify(metadata.genre),
                         is_favorite: false,
                         bitrate: metadata.bitrate,
                         format: metadata.format,
-                        lyrics: metadata.lyrics // Store extracted lyrics
+                        lyrics: metadata.lyrics
                     });
 
                     // Artist Logic (Multi-artist support)

@@ -47,7 +47,19 @@ export async function extractMetadata(filePath, originalFilename = null) {
             const fallbackTitle = path.basename(filenameForTitle, path.extname(filenameForTitle));
 
             // Extract Lyrics (Common keys)
-            const lyrics = tags.lyrics || tags.LYRICS || tags.unsyncedlyrics || tags.USLT || null;
+            // Enhanced to look for language specific keys like 'lyrics-eng'
+            let lyrics = tags.lyrics || tags.LYRICS || tags.unsyncedlyrics || tags.USLT || null;
+            
+            if (!lyrics) {
+                // Search for any key starting with lyrics- or ending with lyrics
+                const keys = Object.keys(tags);
+                for (const key of keys) {
+                    if (key.toLowerCase().startsWith('lyrics') || key.toLowerCase().endsWith('lyrics')) {
+                        lyrics = tags[key];
+                        break;
+                    }
+                }
+            }
 
             resolve({
                 title: tags.title || fallbackTitle,
@@ -134,7 +146,10 @@ export async function updateAudioTags(filePath, metadata) {
         }
         // Explicitly check for undefined to allow empty string (clearing lyrics)
         if (metadata.lyrics !== undefined) {
+            // Write to multiple common lyric tags to maximize compatibility
+            // 'lyrics' is generic, 'unsyncedlyrics' often maps to USLT in ID3v2
             outputOptions.push('-metadata', `lyrics=${metadata.lyrics}`);
+            outputOptions.push('-metadata', `unsyncedlyrics=${metadata.lyrics}`);
         }
 
         command
