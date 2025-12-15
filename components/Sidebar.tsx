@@ -27,7 +27,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onCreatePlaylist, playlists }) => {
     <div className="w-72 h-full flex flex-col flex-shrink-0 z-20">
       {/* Fixed Header/Logo */}
       <div className="p-8 pb-4 flex-shrink-0">
-        <div className="flex items-center gap-3 text-white px-2">
+        <div 
+            onClick={() => navigate('/')}
+            className="flex items-center gap-3 text-white px-2 cursor-pointer hover:opacity-80 transition-opacity"
+        >
           <Music className="w-8 h-8 text-indigo-500" />
           <span className="text-2xl font-bold tracking-tight">Myousic</span>
         </div>
