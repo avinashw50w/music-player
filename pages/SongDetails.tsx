@@ -186,9 +186,9 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
       setIsIdentifying(true);
       setIdentifyError(null);
       try {
-          const updated = await api.identifySong(song.id);
-          setSong(updated);
-          onUpdateSong?.(updated);
+          // Now returns candidate metadata, not updated song
+          const candidate = await api.identifySong(song.id);
+          setSuggestionData(candidate);
       } catch (e: any) {
           setIdentifyError(e.message || "Identification failed");
           setTimeout(() => setIdentifyError(null), 4000);
@@ -202,9 +202,9 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
       setIsIdentifyingSpotify(true);
       setIdentifyError(null);
       try {
-          const updated = await api.identifySongSpotify(song.id);
-          setSong(updated);
-          onUpdateSong?.(updated);
+          // Now returns candidate metadata
+          const candidate = await api.identifySongSpotify(song.id);
+          setSuggestionData(candidate);
       } catch (e: any) {
           setIdentifyError(e.message || "Spotify identification failed");
           setTimeout(() => setIdentifyError(null), 4000);
@@ -252,7 +252,9 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
               title: finalData.title,
               artist: finalData.artist,
               album: finalData.album,
-              genre: finalData.genre
+              genre: finalData.genre,
+              year: finalData.year,
+              remoteCoverUrl: finalData.coverUrl 
           });
           setSong(updated);
           onUpdateSong?.(updated);
@@ -582,7 +584,9 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
                   title: suggestionData.title,
                   artist: suggestionData.artist,
                   album: suggestionData.album || 'Unknown',
-                  genre: suggestionData.genre || []
+                  genre: suggestionData.genre || [],
+                  year: suggestionData.year,
+                  coverUrl: suggestionData.coverUrl
               }}
               onClose={() => setSuggestionData(null)}
               onConfirm={handleApplySuggestion}

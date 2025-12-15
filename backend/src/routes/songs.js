@@ -269,7 +269,7 @@ router.get('/:id/stream', async (req, res, next) => {
     }
 });
 
-// POST identify song using audio fingerprinting (AcoustID)
+// POST identify song using audio fingerprinting (AcoustID) - RETURNS CANDIDATE
 router.post('/:id/identify', async (req, res, next) => {
     try {
         const result = await identificationQueue.add(async () => {
@@ -280,66 +280,15 @@ router.post('/:id/identify', async (req, res, next) => {
 
             const metadata = await identifySongMetadata(song.file_path);
 
-            // Determine Cover
-            let coverUrl = null;
-            if (metadata.coverUrl) {
-                const downloaded = await downloadCoverImage(metadata.coverUrl, `${song.album_id}`);
-                if (downloaded) coverUrl = downloaded;
-            }
-
-            // Process Artists
-            await processSongArtists(song.id, metadata.artists || [metadata.artist]);
-
-            // Update/Create Album and Update Cover in Album
-            let albumId = song.album_id;
-            if (metadata.album) {
-                const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
-                
-                if (existingAlbum) {
-                    albumId = existingAlbum.id;
-                    // Update album metadata if we found better data
-                    const updates = {};
-                    if (metadata.year) updates.year = metadata.year;
-                    if (metadata.genre.length > 0) updates.genre = JSON.stringify(metadata.genre);
-                    if (coverUrl) updates.cover_url = coverUrl; // Update album cover
-                    
-                    if (Object.keys(updates).length > 0) {
-                        await db('albums').where({ id: albumId }).update(updates);
-                    }
-                } else {
-                    albumId = uuidv4();
-                    await db('albums').insert({
-                        id: albumId,
-                        title: metadata.album,
-                        cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
-                        year: metadata.year,
-                        genre: JSON.stringify(metadata.genre || []),
-                        track_count: 1
-                    });
-                }
-            }
-
-            // Update Song
-            await db('songs').where({ id: req.params.id }).update({
-                title: metadata.title || song.title,
-                album_id: albumId,
-                genre: JSON.stringify(metadata.genre || [])
-            });
-
-            // Return full updated song
-            const query = db('songs').where({ 'songs.id': song.id });
-            const results = await fetchSongsWithDetails(query, true);
-            const transformed = results[0];
-            
-            broadcast('song:update', transformed);
-            
-            // Also broadcast album update if we changed it
-            if (albumId) {
-                const album = await db('albums').where({ id: albumId }).first();
-                broadcast('album:update', { id: albumId, ...album }); 
-            }
-
-            return transformed;
+            // Return the candidate metadata to frontend for confirmation
+            return {
+                title: metadata.title,
+                artist: metadata.artist, // String representation
+                album: metadata.album,
+                year: metadata.year,
+                genre: metadata.genre,
+                coverUrl: metadata.coverUrl // Remote URL, processed on Apply
+            };
         });
 
         res.json(result);
@@ -355,7 +304,7 @@ router.post('/:id/identify', async (req, res, next) => {
     }
 });
 
-// POST identify song using Hybrid approach (Audio Fingerprint -> Spotify) with Gemini Fallback
+// POST identify song using Hybrid approach (Spotify) - RETURNS CANDIDATE
 router.post('/:id/identify-spotify', async (req, res, next) => {
     try {
         const result = await identificationQueue.add(async () => {
@@ -392,63 +341,15 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
             console.log(`[Hybrid] Searching Spotify for: ${searchTitle} - ${searchArtist}`);
             const metadata = await searchSpotifyMetadata(searchTitle, searchArtist);
 
-            // Download high-res cover
-            let coverUrl = null;
-            if (metadata.coverUrl) {
-                const downloaded = await downloadCoverImage(metadata.coverUrl, `${song.album_id}`);
-                if (downloaded) coverUrl = downloaded;
-            }
-
-            // Process Artists
-            await processSongArtists(song.id, metadata.artists);
-
-            // Handle Album Logic
-            let albumId = song.album_id;
-            if (metadata.album) {
-                const existingAlbum = await db('albums').where('title', 'like', metadata.album).first();
-                
-                if (existingAlbum) {
-                    albumId = existingAlbum.id;
-                    const updates = {};
-                    if (metadata.year) updates.year = metadata.year;
-                    if (metadata.genre && metadata.genre.length > 0) updates.genre = JSON.stringify(metadata.genre);
-                    if (coverUrl) updates.cover_url = coverUrl;
-                    
-                    if (Object.keys(updates).length > 0) {
-                        await db('albums').where({ id: albumId }).update(updates);
-                    }
-                } else {
-                    albumId = uuidv4();
-                    await db('albums').insert({
-                        id: albumId,
-                        title: metadata.album,
-                        cover_url: coverUrl || `https://picsum.photos/seed/${encodeURIComponent(metadata.album)}/300/300`,
-                        year: metadata.year,
-                        genre: JSON.stringify(metadata.genre || []),
-                        track_count: 1
-                    });
-                }
-            }
-
-            // Update Song
-            await db('songs').where({ id: req.params.id }).update({
+            // Return candidate metadata
+            return {
                 title: metadata.title,
-                album_id: albumId,
-                genre: JSON.stringify(metadata.genre || [])
-            });
-
-            const query = db('songs').where({ 'songs.id': song.id });
-            const results = await fetchSongsWithDetails(query, true);
-            const transformed = results[0];
-            
-            broadcast('song:update', transformed);
-            
-            if (albumId) {
-                const album = await db('albums').where({ id: albumId }).first();
-                broadcast('album:update', { id: albumId, ...album }); 
-            }
-
-            return transformed;
+                artist: metadata.artist, // String
+                album: metadata.album,
+                year: metadata.year,
+                genre: metadata.genre,
+                coverUrl: metadata.coverUrl // Remote URL
+            };
         });
 
         res.json(result);
@@ -462,7 +363,7 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
     }
 });
 
-// POST Refine Metadata (Gemini)
+// POST Refine Metadata (Gemini) - RETURNS CANDIDATE
 router.post('/:id/refine', async (req, res, next) => {
     try {
         const result = await identificationQueue.add(async () => {
@@ -611,7 +512,7 @@ router.post('/', async (req, res, next) => {
 // PUT update song
 router.put('/:id', async (req, res, next) => {
     try {
-        const { title, artist, album, genre, albumId: providedAlbumId } = req.body;
+        const { title, artist, album, genre, albumId: providedAlbumId, remoteCoverUrl, year } = req.body;
         
         // 1. Fetch current song state to track changes
         const currentSong = await db('songs').where({ id: req.params.id }).first();
@@ -646,7 +547,7 @@ router.put('/:id', async (req, res, next) => {
                      id: newAlbumId,
                      title: album,
                      cover_url: `https://picsum.photos/seed/${encodeURIComponent(album)}/300/300`,
-                     year: new Date().getFullYear(),
+                     year: year || new Date().getFullYear(),
                      genre: JSON.stringify(Array.isArray(genre) ? genre : [genre]),
                      track_count: 0 // Will increment later
                  });
@@ -666,7 +567,27 @@ router.put('/:id', async (req, res, next) => {
         // 4. Update Song
         await db('songs').where({ id: req.params.id }).update(updateData);
 
-        // 5. Maintain Track Counts if album changed
+        // 5. Handle Album Updates (Cover URL & Year)
+        const targetAlbumId = newAlbumId || oldAlbumId;
+        if (targetAlbumId) {
+            const albumUpdates = {};
+            
+            // If remote cover provided (from identification), download it
+            if (remoteCoverUrl) {
+                const downloaded = await downloadCoverImage(remoteCoverUrl, `${targetAlbumId}`);
+                if (downloaded) albumUpdates.cover_url = downloaded;
+            }
+
+            if (year) albumUpdates.year = year;
+            // Also update album genre to match song if helpful
+            if (genre && genre.length > 0) albumUpdates.genre = JSON.stringify(genre);
+
+            if (Object.keys(albumUpdates).length > 0) {
+                await db('albums').where({ id: targetAlbumId }).update(albumUpdates);
+            }
+        }
+
+        // 6. Maintain Track Counts if album changed
         if (newAlbumId && newAlbumId !== oldAlbumId) {
             // Decrement old album count
             if (oldAlbumId) {
@@ -687,6 +608,13 @@ router.put('/:id', async (req, res, next) => {
         const transformed = results[0];
 
         broadcast('song:update', transformed);
+        
+        // Also broadcast album update
+        if (targetAlbumId) {
+             const albumData = await db('albums').where({ id: targetAlbumId }).first();
+             broadcast('album:update', { ...albumData, isFavorite: Boolean(albumData.is_favorite) });
+        }
+
         res.json(transformed);
     } catch (err) {
         next(err);

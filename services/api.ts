@@ -65,7 +65,7 @@ export async function toggleSongFavorite(id: string): Promise<Song> {
   return handleResponse<Song>(response);
 }
 
-export async function updateSong(id: string, data: Partial<Song>): Promise<Song> {
+export async function updateSong(id: string, data: Partial<Song> & { year?: number; remoteCoverUrl?: string }): Promise<Song> {
     const response = await fetch(`${API_BASE_URL}/songs/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

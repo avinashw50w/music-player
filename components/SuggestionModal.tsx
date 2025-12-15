@@ -8,6 +8,8 @@ interface SuggestionData {
     artist: string;
     album: string;
     genre: string[];
+    year?: number;
+    coverUrl?: string;
 }
 
 interface SuggestionModalProps {
@@ -23,7 +25,8 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
       title: suggestedData.title || '',
       artist: suggestedData.artist || '',
       album: suggestedData.album || '',
-      genre: (suggestedData.genre || []).join(', ')
+      genre: (suggestedData.genre || []).join(', '),
+      year: suggestedData.year ? String(suggestedData.year) : ''
   });
 
   const handleChange = (field: string, value: string) => {
@@ -35,7 +38,9 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
           title: formData.title,
           artist: formData.artist,
           album: formData.album,
-          genre: formData.genre.split(',').map(g => g.trim()).filter(Boolean)
+          genre: formData.genre.split(',').map(g => g.trim()).filter(Boolean),
+          year: parseInt(formData.year) || undefined,
+          coverUrl: suggestedData.coverUrl // Pass through the cover URL if available
       });
   };
 
@@ -54,7 +59,7 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
                 <Sparkles className="w-6 h-6" />
             </div>
             <div>
-                <h3 className="text-2xl font-bold text-white">AI Suggestion</h3>
+                <h3 className="text-2xl font-bold text-white">Metadata Suggestion</h3>
                 <p className="text-slate-400">Review and edit changes before applying them.</p>
             </div>
         </div>
@@ -130,6 +135,16 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
                             value={formData.genre} 
                             onChange={(e) => handleChange('genre', e.target.value)}
                             placeholder="Genre1, Genre2"
+                            className="w-full bg-black/20 border border-indigo-500/30 rounded-lg px-3 py-2 text-indigo-100 font-medium focus:outline-none focus:border-indigo-400 transition-colors placeholder:text-indigo-500/30"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs text-indigo-300/70 mb-1">Year</label>
+                        <input 
+                            type="text" 
+                            value={formData.year} 
+                            onChange={(e) => handleChange('year', e.target.value)}
+                            placeholder="YYYY"
                             className="w-full bg-black/20 border border-indigo-500/30 rounded-lg px-3 py-2 text-indigo-100 font-medium focus:outline-none focus:border-indigo-400 transition-colors placeholder:text-indigo-500/30"
                         />
                     </div>
