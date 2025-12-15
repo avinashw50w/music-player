@@ -578,7 +578,8 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
                   title: song.title,
                   artist: song.artist,
                   album: song.album,
-                  genre: song.genre || []
+                  genre: song.genre || [],
+                  coverUrl: song.coverUrl
               }}
               suggestedData={{
                   title: suggestionData.title,
