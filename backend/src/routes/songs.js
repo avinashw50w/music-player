@@ -7,7 +7,8 @@ import path from 'path';
 import { broadcast } from '../services/sse.js';
 import { identifySongMetadata, downloadCoverImage } from '../services/metadataService.js';
 import { searchSpotifyMetadata } from '../services/spotifyService.js';
-import { refineMetadataWithGemini } from '../services/geminiService.js'; // Import Gemini Service
+import { refineMetadataWithGemini } from '../services/geminiService.js';
+import { fetchSyncedLyrics } from '../services/lyricsService.js'; // Import Lyrics Service
 import { identificationQueue } from '../services/taskQueue.js';
 import { config } from '../config/env.js';
 
@@ -469,6 +470,47 @@ router.post('/:id/refine', async (req, res, next) => {
     }
 });
 
+// POST fetch synced lyrics
+router.post('/:id/lyrics/fetch', async (req, res, next) => {
+    try {
+        const song = await db('songs')
+            .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
+            .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
+            .leftJoin('albums', 'songs.album_id', 'albums.id')
+            .where({ 'songs.id': req.params.id })
+            .orderBy('song_artists.is_primary', 'desc')
+            .select('songs.*', 'artists.name as artist_name', 'albums.title as album_title')
+            .first();
+
+        if (!song) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        const lyrics = await fetchSyncedLyrics(
+            song.title,
+            song.artist_name,
+            song.album_title,
+            song.duration_seconds
+        );
+
+        if (!lyrics) {
+            return res.status(404).json({ error: 'Lyrics not found' });
+        }
+
+        await db('songs').where({ id: req.params.id }).update({ lyrics });
+
+        const query = db('songs').where({ 'songs.id': req.params.id });
+        const results = await fetchSongsWithDetails(query);
+        const transformed = results[0];
+
+        broadcast('song:update', transformed);
+        res.json(transformed);
+
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST create song
 router.post('/', async (req, res, next) => {
     try {
@@ -476,8 +518,6 @@ router.post('/', async (req, res, next) => {
         const id = uuidv4();
 
         // 1. Process Artists
-        // We do this first to get IDs, but processSongArtists expects songId to exist in table for FK...
-        // Wait, FK constraint means song must exist first.
         
         // 2. Handle Album
         let albumId = null;

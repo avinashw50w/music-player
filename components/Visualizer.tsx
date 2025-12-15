@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Play, Pause, SkipBack, SkipForward, ChevronDown } from 'lucide-react';
+
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { X, Play, Pause, SkipBack, SkipForward, ChevronDown, Mic2, Search } from 'lucide-react';
 import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
+import { parseLrc, LrcLine } from '../lib/lrcParser';
+import * as api from '../services/api';
 
 interface VisualizerProps {
     currentSong: Song;
@@ -40,13 +43,19 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     onVisualizerChange
 }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const lyricsContainerRef = useRef<HTMLDivElement>(null);
     const [showControls, setShowControls] = useState(true);
-    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [visualizerOptions, setVisualizerOptions] = useState<any[]>([]);
+    
+    // Lyrics State
+    const [parsedLyrics, setParsedLyrics] = useState<LrcLine[]>([]);
+    const [activeLineIndex, setActiveLineIndex] = useState(-1);
+    const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
 
     useEffect(() => {
-        const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none';
+        const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && activeVisualizer !== 'lyrics';
         
         if (isCanvasVisualizer && canvasRef.current) {
             wavis.mount(canvasRef.current);
@@ -59,7 +68,6 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         // Get visualizers from original Wavis class (returns array of strings)
         if (wavis && wavis.getVisualizers) {
             const presets = wavis.getVisualizers();
-            // Map strings to object format for dropdown
             const formattedPresets = presets.map((p: string) => ({
                 name: p,
                 displayName: p.charAt(0).toUpperCase() + p.slice(1),
@@ -69,6 +77,39 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         }
         
     }, [activeVisualizer, wavis]);
+
+    // Parse Lyrics when song changes
+    useEffect(() => {
+        if (currentSong.lyrics) {
+            const parsed = parseLrc(currentSong.lyrics);
+            setParsedLyrics(parsed);
+        } else {
+            setParsedLyrics([]);
+        }
+    }, [currentSong.lyrics, currentSong.id]);
+
+    // Determine Active Lyric Line
+    useEffect(() => {
+        if (activeVisualizer !== 'lyrics' || parsedLyrics.length === 0) return;
+
+        // Find the line that corresponds to current time
+        const index = parsedLyrics.findIndex((line, i) => {
+            const nextLine = parsedLyrics[i + 1];
+            return currentTime >= line.time && (!nextLine || currentTime < nextLine.time);
+        });
+        
+        setActiveLineIndex(index);
+    }, [currentTime, parsedLyrics, activeVisualizer]);
+
+    // Auto-scroll lyrics
+    useEffect(() => {
+        if (activeVisualizer === 'lyrics' && activeLineIndex !== -1 && lyricsContainerRef.current) {
+             const activeEl = lyricsContainerRef.current.children[activeLineIndex + 1] as HTMLElement; // +1 because of spacer
+             if (activeEl) {
+                 activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+             }
+        }
+    }, [activeLineIndex, activeVisualizer]);
 
     const handleMouseMove = () => {
         setShowControls(true);
@@ -86,48 +127,137 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             window.removeEventListener('mousemove', handleMouseMove);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
-    }, [isDropdownOpen]); // Re-bind if dropdown state changes to update closure in handleMouseMove
+    }, [isDropdownOpen]); 
 
-    // Combine custom visualizers with static modes
+    const handleFetchLyrics = async () => {
+        if (isFetchingLyrics) return;
+        setIsFetchingLyrics(true);
+        try {
+            await api.fetchSyncedLyrics(currentSong.id);
+            // The global event listener in App.tsx will handle the update and trigger re-render
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsFetchingLyrics(false);
+        }
+    };
+
     const allOptions = [
-        { name: 'album cover', displayName: 'Album Cover', type: 'static' },
-        { name: 'none', displayName: 'None', type: 'static' },
         ...visualizerOptions,
+        { name: 'lyrics', displayName: 'Lyrics', type: 'mode' },
+        { name: 'album cover', displayName: 'Album Cover', type: 'static' },
+        { name: 'none', displayName: 'None', type: 'static' }
     ];
 
     return (
         <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden">
-            {/* Render Canvas if not album cover or none */}
-            {activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && (
+            {/* Render Canvas if a visualizer preset */}
+            {activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && activeVisualizer !== 'lyrics' && (
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
             )}
 
-            {/* Album Cover Mode */}
-            {activeVisualizer === 'album cover' && (
-                <div className="relative z-10 animate-in fade-in duration-700">
-                    <img 
-                        src={currentSong.coverUrl} 
-                        alt={currentSong.title} 
-                        className="w-[50vh] h-[50vh] object-cover rounded-[3rem] shadow-2xl shadow-indigo-500/20"
-                    />
-                    {/* Reflection */}
-                    <img 
-                        src={currentSong.coverUrl} 
-                        alt="" 
-                        className="absolute top-full left-0 w-full h-full object-cover rounded-[3rem] opacity-20 blur-xl transform scale-y-[-1] mask-linear-fade"
-                        style={{ maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1), transparent)' }}
-                    />
+            {/* Album Cover Mode or Background for Lyrics */}
+            {(activeVisualizer === 'album cover' || activeVisualizer === 'lyrics') && (
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                     {/* Blurred Background for Lyrics */}
+                     {activeVisualizer === 'lyrics' && (
+                        <>
+                            <img 
+                                src={currentSong.coverUrl} 
+                                className="absolute inset-0 w-full h-full object-cover blur-[80px] opacity-40 scale-110"
+                                alt=""
+                            />
+                            <div className="absolute inset-0 bg-black/60"></div>
+                        </>
+                     )}
+
+                     {activeVisualizer === 'album cover' && (
+                        <div className="relative z-10 w-full h-full flex items-center justify-center animate-in fade-in duration-700">
+                            <img 
+                                src={currentSong.coverUrl} 
+                                alt={currentSong.title} 
+                                className="w-[50vh] h-[50vh] object-cover rounded-[3rem] shadow-2xl shadow-indigo-500/20"
+                            />
+                             <img 
+                                src={currentSong.coverUrl} 
+                                alt="" 
+                                className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-[25vh] w-[50vh] h-[50vh] object-cover rounded-[3rem] opacity-20 blur-xl transform scale-y-[-1] mask-linear-fade pointer-events-none"
+                                style={{ maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1), transparent)' }}
+                            />
+                        </div>
+                     )}
+                </div>
+            )}
+
+            {/* Lyrics View */}
+            {activeVisualizer === 'lyrics' && (
+                <div className="relative z-10 w-full h-full flex flex-col items-center justify-center pb-32 pt-20">
+                    {parsedLyrics.length > 0 ? (
+                        <div 
+                            ref={lyricsContainerRef}
+                            className="w-full max-w-5xl h-full overflow-y-auto px-8 md:px-24 text-center space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                            style={{ 
+                                maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
+                            }}
+                        >
+                            <div className="h-[45vh]"></div> {/* Spacer for center alignment */}
+                            {parsedLyrics.map((line, i) => {
+                                const isActive = i === activeLineIndex;
+                                return (
+                                    <p 
+                                        key={i}
+                                        className={`transition-all duration-700 ease-out origin-center cursor-pointer py-2 select-none ${
+                                            isActive 
+                                              ? 'text-white text-2xl md:text-3xl font-bold opacity-100 scale-105 blur-0' 
+                                              : 'text-neutral-400 text-xl md:text-2xl font-medium opacity-30 blur-[1px] scale-95 hover:opacity-60 hover:blur-0'
+                                        }`}
+                                        onClick={() => onSeek(line.time)}
+                                    >
+                                        {line.text}
+                                    </p>
+                                );
+                            })}
+                            <div className="h-[45vh]"></div> {/* Spacer */}
+                        </div>
+                    ) : (
+                        <div className="text-center">
+                            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
+                                <Mic2 className="w-10 h-10" />
+                            </div>
+                            <h2 className="text-3xl font-bold text-white mb-2">No Synced Lyrics Found</h2>
+                            <p className="text-slate-400 mb-8 max-w-md mx-auto">
+                                We couldn't find time-synced lyrics for this track in your library.
+                            </p>
+                            <button
+                                onClick={handleFetchLyrics}
+                                disabled={isFetchingLyrics}
+                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 mx-auto disabled:opacity-50"
+                            >
+                                {isFetchingLyrics ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Searching...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Search className="w-5 h-5" />
+                                        Find Synced Lyrics
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
             {/* Controls Overlay */}
             <div 
-                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 z-[100] ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 20%, transparent 80%, rgba(0,0,0,0.8))' }}
             >
                 {/* Header */}
                 <div className="flex justify-between items-start relative z-50">
-                    <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/5 flex items-center gap-2 pointer-events-auto">
+                    <div className="bg-white/10 backdrop-blur-xl px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 pointer-events-auto shadow-lg">
                         <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Visualizer</span>
                         <div className="w-[1px] h-3 bg-white/20"></div>
                         <div className="relative">
@@ -152,7 +282,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                                     onClick={() => { onVisualizerChange(v.name); setIsDropdownOpen(false); }}
                                                     className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/10 transition-colors capitalize border-b border-white/5 last:border-0 ${activeVisualizer === v.name ? 'text-indigo-400 bg-white/5' : 'text-slate-300'}`}
                                                 >
-                                                    {v.displayName}
+                                                    <div className="flex items-center justify-between">
+                                                        {v.displayName}
+                                                        {v.name === 'lyrics' && <Mic2 className="w-3 h-3 opacity-50" />}
+                                                    </div>
                                                 </button>
                                             ))}
                                         </div>
@@ -163,47 +296,49 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors backdrop-blur-md pointer-events-auto"
+                        className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors backdrop-blur-xl border border-white/10 shadow-lg pointer-events-auto"
                     >
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
                 {/* Footer Controls */}
-                <div className="w-full max-w-3xl mx-auto space-y-6 pointer-events-auto">
-                    <div className="text-center space-y-2">
-                        <h1 className="text-4xl font-bold text-white tracking-tight drop-shadow-lg">{currentSong.title}</h1>
-                        <p className="text-xl text-indigo-300 font-medium drop-shadow-md">{currentSong.artist} • <span className="text-slate-400">{currentSong.album}</span></p>
-                    </div>
+                <div className="w-full max-w-3xl mx-auto pointer-events-auto">
+                    <div className="bg-black/40 backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl space-y-6">
+                        <div className="text-center space-y-2">
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-lg truncate">{currentSong.title}</h1>
+                            <p className="text-lg md:text-xl text-indigo-300 font-medium drop-shadow-md truncate">{currentSong.artist} • <span className="text-slate-400">{currentSong.album}</span></p>
+                        </div>
 
-                    <div className="flex items-center gap-4 w-full">
-                        <span className="text-sm font-bold text-slate-400 tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
-                        <ProgressBar 
-                            currentTime={currentTime} 
-                            duration={duration} 
-                            onSeek={onSeek} 
-                            className="bg-white/20"
-                        />
-                        <span className="text-sm font-bold text-slate-400 tabular-nums w-10">{formatTime(duration)}</span>
-                    </div>
+                        <div className="flex items-center gap-4 w-full">
+                            <span className="text-xs font-bold text-slate-400 tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
+                            <ProgressBar 
+                                currentTime={currentTime} 
+                                duration={duration} 
+                                onSeek={onSeek} 
+                                className="bg-white/20"
+                            />
+                            <span className="text-xs font-bold text-slate-400 tabular-nums w-10">{formatTime(duration)}</span>
+                        </div>
 
-                    <div className="flex items-center justify-center gap-10">
-                        <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform">
-                            <SkipBack className="w-8 h-8 fill-current" />
-                        </button>
-                        <button
-                            onClick={onPlayPause}
-                            className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl hover:shadow-indigo-500/50"
-                        >
-                            {isPlaying ? (
-                                <Pause className="w-7 h-7 text-black fill-current" />
-                            ) : (
-                                <Play className="w-7 h-7 text-black fill-current ml-1" />
-                            )}
-                        </button>
-                        <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform">
-                            <SkipForward className="w-8 h-8 fill-current" />
-                        </button>
+                        <div className="flex items-center justify-center gap-10">
+                            <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform">
+                                <SkipBack className="w-8 h-8 fill-current" />
+                            </button>
+                            <button
+                                onClick={onPlayPause}
+                                className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl hover:shadow-indigo-500/50"
+                            >
+                                {isPlaying ? (
+                                    <Pause className="w-7 h-7 text-black fill-current" />
+                                ) : (
+                                    <Play className="w-7 h-7 text-black fill-current ml-1" />
+                                )}
+                            </button>
+                            <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform">
+                                <SkipForward className="w-8 h-8 fill-current" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

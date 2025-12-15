@@ -80,6 +80,13 @@ export async function updateSongLyrics(id: string, lyrics: string): Promise<Song
     return handleResponse<Song>(response);
 }
 
+export async function fetchSyncedLyrics(id: string): Promise<Song> {
+    const response = await fetch(`${API_BASE_URL}/songs/${id}/lyrics/fetch`, {
+        method: 'POST'
+    });
+    return handleResponse<Song>(response);
+}
+
 export async function updateSongCover(id: string, file: File): Promise<Song> {
     const formData = new FormData();
     formData.append('cover', file);
