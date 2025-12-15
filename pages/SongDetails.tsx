@@ -33,7 +33,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
   
   // Suggestions State - Typed to handle both strings and rich objects
   const [albumSuggestions, setAlbumSuggestions] = useState<(string | SuggestionItem)[]>([]);
-  const [artistSuggestions, setArtistSuggestions] = useState<string[]>([]);
+  const [artistSuggestions, setArtistSuggestions] = useState<(string | SuggestionItem)[]>([]);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Identify & Refine State
@@ -85,7 +85,11 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
           })).slice(0, 20));
       }
       if (isEditingInfo && artists) {
-          setArtistSuggestions(artists.map(a => a.name).slice(0, 20));
+          setArtistSuggestions(artists.map(a => ({
+              text: a.name,
+              image: a.avatarUrl,
+              id: a.id
+          })).slice(0, 20));
       }
   }, [isEditingInfo, albums, artists]);
 
@@ -121,7 +125,11 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
                           id: a.id
                       })));
                   } else if (name === 'artist') {
-                      setArtistSuggestions(results.artists.map(a => a.name));
+                      setArtistSuggestions(results.artists.map(a => ({
+                          text: a.name,
+                          image: a.avatarUrl,
+                          id: a.id
+                      })));
                   }
               } catch (e) {
                   console.error("Error searching suggestions", e);

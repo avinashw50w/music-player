@@ -56,19 +56,24 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
           const parts = (formData[fieldName] || '').split(',');
           parts.pop(); // Remove the partial text currently being typed
           parts.push(suggestionValue); // Add the full suggestion
-          newValue = parts.map(p => p.trim()).filter(Boolean).join(', ');
-          // Add a trailing comma and space if user wants to continue typing immediately? 
-          // Usually auto-complete ends the interaction for that item.
+          // Join and add a trailing comma+space for next entry
+          newValue = parts.map(p => p.trim()).filter(Boolean).join(', ') + ', ';
       }
 
       setFormData(prev => ({ ...prev, [fieldName]: newValue }));
       
       // For multi-value fields, we typically don't track a single ID for the whole field.
-      // If we needed to track IDs for multiple artists, we'd need an array state, but backend currently parses names.
       if (id && !field?.isMulti) {
           setSelectedIds(prev => ({ ...prev, [fieldName]: id }));
       }
+      
+      // Keep focus on the field for multi-selects to allow continued typing, 
+      // but usually we want to close the dropdown for the current selection.
+      // We rely on the user typing to trigger the dropdown again.
       setFocusedField(null);
+      
+      // Trigger field change for search reset or update
+      if (onFieldChange) onFieldChange(fieldName, newValue);
   };
 
   const getSuggestionText = (s: string | SuggestionItem) => typeof s === 'string' ? s : s.text;
@@ -99,11 +104,10 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
                 ? field.suggestions!.filter(s => {
                     const text = getSuggestionText(s);
                     // Filter based on the active segment (searchTerm)
-                    // We check if searchTerm exists to avoid showing everything when just starting a new tag after comma
                     if (!searchTerm) return true;
                     
-                    return text.toLowerCase().includes(searchTerm.toLowerCase()) && 
-                           text.toLowerCase() !== searchTerm.toLowerCase();
+                    // Allow exact matches to appear so they can be selected (auto-complete casing/format)
+                    return text.toLowerCase().includes(searchTerm.toLowerCase());
                   }).slice(0, 5) 
                 : [];
 
@@ -118,7 +122,6 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
                         setFormData(prev => ({ ...prev, [field.name]: val }));
                         
                         // Clear selected ID if user types (assumes they are entering something new)
-                        // Only for single-value fields
                         if (!field.isMulti && selectedIds[field.name]) {
                             const newIds = { ...selectedIds };
                             delete newIds[field.name];
@@ -151,7 +154,7 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
                                     className="px-4 py-3 text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer text-sm transition-colors border-b border-white/5 last:border-0 flex items-center gap-3"
                                 >
                                     {image ? (
-                                        <img src={image} alt="" className="w-10 h-10 rounded-md object-cover flex-shrink-0 bg-white/5" />
+                                        <img src={image} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0 bg-white/5" />
                                     ) : null}
                                     <div className="flex flex-col min-w-0 flex-1">
                                         <span className="truncate font-medium text-white">{text}</span>
