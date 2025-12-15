@@ -775,6 +775,7 @@ const App: React.FC = () => {
                 <Route path="/" element={
                     <Home 
                         recentSongs={recentlyPlayed} 
+                        recentlyAdded={songs} // Pass current songs list which is sorted by date added
                         onPlaySong={handlePlaySong} 
                         currentSongId={currentSong?.id}
                         isPlaying={isPlaying}
