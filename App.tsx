@@ -87,40 +87,32 @@ const App: React.FC = () => {
   // --- CUSTOM SCROLL RESTORATION ---
   const scrollPositions = useRef<Record<string, number>>({});
 
-  useLayoutEffect(() => {
-    // 1. Force manual restoration to prevent browser interference
+  useEffect(() => {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
+  }, []);
 
+  useLayoutEffect(() => {
     const key = location.key;
     const savedPosition = scrollPositions.current[key];
 
-    // 2. Restore Scroll Position
-    // We explicitly disable smooth scrolling on the document level during restoration
-    // to ensure an 'instant' jump and avoid the visual "scrolling down" animation.
-    const originalScrollBehavior = document.documentElement.style.scrollBehavior;
-    document.documentElement.style.scrollBehavior = 'auto';
-
+    // Force instant scroll to avoid any smooth scrolling animations
     if (savedPosition !== undefined) {
-      window.scrollTo(0, savedPosition);
+      window.scrollTo({ top: savedPosition, behavior: 'instant' });
     } else {
-      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
 
-    // Restore original scroll behavior (microtask or immediate is fine as scrollTo is sync)
-    document.documentElement.style.scrollBehavior = originalScrollBehavior;
-
-    // 3. Setup Scroll Listener
-    // Use a robust listener that updates the ref.
-    // Important: We use useLayoutEffect cleanup to remove the listener BEFORE
-    // the DOM updates for the next route, preventing the "reset to 0" issue.
     const saveScrollPosition = () => {
       scrollPositions.current[key] = window.scrollY;
     };
 
-    window.addEventListener('scroll', saveScrollPosition);
-    return () => window.removeEventListener('scroll', saveScrollPosition);
+    window.addEventListener('scroll', saveScrollPosition, { passive: true });
+    
+    return () => {
+        window.removeEventListener('scroll', saveScrollPosition);
+    };
   }, [location.key]);
   // ---------------------------------
 
@@ -883,6 +875,12 @@ const App: React.FC = () => {
                         isPlaying={isPlaying} 
                         onToggleFavorite={handleToggleFavorite} 
                         onAddToPlaylist={handleAddToPlaylist}
+                        initialSearchQuery={(() => {
+                           if (location.pathname.includes('songs')) return listQueries.songs;
+                           if (location.pathname.includes('albums')) return listQueries.albums;
+                           if (location.pathname.includes('artists')) return listQueries.artists;
+                           return '';
+                        })()}
                         onLoadMore={() => {
                            const path = window.location.pathname;
                            if (path.includes('songs')) handleLoadMoreSongs();

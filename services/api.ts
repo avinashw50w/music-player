@@ -104,6 +104,13 @@ export async function identifySongSpotify(id: string): Promise<Song> {
     return handleResponse<Song>(response);
 }
 
+export async function getGeminiSuggestion(id: string): Promise<{ title: string; artist: string; album: string; genre: string[]; year?: number }> {
+    const response = await fetch(`${API_BASE_URL}/songs/${id}/refine`, {
+        method: 'POST'
+    });
+    return handleResponse<{ title: string; artist: string; album: string; genre: string[]; year?: number }>(response);
+}
+
 export async function deleteSong(id: string): Promise<void> {
     await fetch(`${API_BASE_URL}/songs/${id}`, { method: 'DELETE' });
 }

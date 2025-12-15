@@ -69,7 +69,10 @@ const transformAlbum = async (row) => {
         coverUrl: row.cover_url,
         year: row.year,
         genre: (() => { 
-            try { return JSON.parse(row.genre); } 
+            try { 
+                const parsed = JSON.parse(row.genre); 
+                return Array.isArray(parsed) ? parsed : (parsed ? [String(parsed)] : []);
+            } 
             catch { return row.genre ? [row.genre] : ['Unknown']; } 
         })(),
         trackCount: row.track_count,
@@ -182,7 +185,13 @@ router.get('/:id', async (req, res, next) => {
                     albumId: album.id,
                     duration: formatDuration(s.duration_seconds),
                     coverUrl: album.cover_url,
-                    genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
+                    genre: (() => { 
+                        try { 
+                            const parsed = JSON.parse(s.genre); 
+                            return Array.isArray(parsed) ? parsed : (parsed ? [String(parsed)] : []);
+                        } 
+                        catch { return s.genre ? [s.genre] : []; } 
+                    })(),
                     isFavorite: Boolean(s.is_favorite),
                     fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
                 }
@@ -227,7 +236,13 @@ router.get('/:id/songs', async (req, res, next) => {
                 albumId: album?.id,
                 duration: formatDuration(s.duration_seconds),
                 coverUrl: album?.cover_url,
-                genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
+                genre: (() => { 
+                    try { 
+                        const parsed = JSON.parse(s.genre); 
+                        return Array.isArray(parsed) ? parsed : (parsed ? [String(parsed)] : []);
+                    } 
+                    catch { return s.genre ? [s.genre] : []; } 
+                })(),
                 isFavorite: Boolean(s.is_favorite),
                 fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null
             }

@@ -121,17 +121,6 @@ export const AlbumDetails: React.FC<DetailProps> = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm(`Are you sure you want to delete the album "${album.title}"?`)) {
-        try {
-            await api.deleteAlbum(album.id);
-            navigate(-1);
-        } catch (e) {
-            console.error("Failed to delete album", e);
-        }
-    }
-  };
-
   const handlePlayToggle = () => {
     if (isContextPlaying && currentSongId) {
         const song = tracks.find(s => s.id === currentSongId);
@@ -166,7 +155,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({
             <span className="text-slate-400 font-normal">{album.year}</span>
           </div>
         }
-        meta={<>{album.trackCount} songs <span className="text-slate-600 mx-2">•</span> {album.genre.join(', ')}</>}
+        meta={<>{album.trackCount} songs <span className="text-slate-600 mx-2">•</span> {(album.genre || []).join(', ')}</>}
         image={album.coverUrl}
         type="Album"
         onBack={() => navigate(-1)}
@@ -178,7 +167,6 @@ export const AlbumDetails: React.FC<DetailProps> = ({
         onPlay={handlePlayToggle} 
         onFollow={() => { }} 
         onEdit={() => setIsEditing(true)}
-        onDelete={handleDelete}
         isFavorite={album.isFavorite}
         onToggleFavorite={() => handleToggleFavoriteInternal(album.id)}
       />
@@ -225,7 +213,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({
           fields={[
             { name: 'title', label: 'Title', value: album.title },
             { name: 'year', label: 'Year', value: String(album.year) },
-            { name: 'genre', label: 'Genre', value: album.genre.join(', ') }
+            { name: 'genre', label: 'Genre', value: (album.genre || []).join(', ') }
           ]}
         />
       )}

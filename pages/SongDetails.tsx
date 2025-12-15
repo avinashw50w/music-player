@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Song, Album, Artist } from '../types';
 import { BackButton } from '../components/BackButton';
 import { EditModal } from '../components/EditModal';
-import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2, Sparkles } from 'lucide-react';
+import { SuggestionModal } from '../components/SuggestionModal';
+import { Camera, Edit3, Heart, ListPlus, Mic2, Music, Pause, Play, Trash2, Wand2, Sparkles, Bot } from 'lucide-react';
 import { SongDetailSkeleton } from '../components/Skeletons';
 import * as api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -30,10 +31,14 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
   const [isEditingLyrics, setIsEditingLyrics] = useState(false);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   
-  // Identify State
+  // Identify & Refine State
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [isIdentifyingSpotify, setIsIdentifyingSpotify] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
+  
+  // Suggestion Modal State
+  const [suggestionData, setSuggestionData] = useState<any>(null);
 
   useEffect(() => {
     // If song is not found in initial props (e.g. refresh or direct link), fetch it
@@ -146,6 +151,37 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
       }
   };
 
+  const handleRefine = async () => {
+      if (isRefining) return;
+      setIsRefining(true);
+      setIdentifyError(null);
+      try {
+          const suggestion = await api.getGeminiSuggestion(song.id);
+          setSuggestionData(suggestion);
+      } catch (e: any) {
+          setIdentifyError(e.message || "Refinement failed");
+          setTimeout(() => setIdentifyError(null), 4000);
+      } finally {
+          setIsRefining(false);
+      }
+  };
+
+  const handleApplySuggestion = async (finalData: any) => {
+      try {
+          const updated = await api.updateSong(song.id, {
+              title: finalData.title,
+              artist: finalData.artist,
+              album: finalData.album,
+              genre: finalData.genre
+          });
+          setSong(updated);
+          onUpdateSong?.(updated);
+          setSuggestionData(null);
+      } catch (e) {
+          console.error("Failed to apply suggestion", e);
+      }
+  };
+
   const handleDelete = async () => {
       if (window.confirm(`Are you sure you want to delete "${song.title}" from your library?`)) {
           try {
@@ -237,10 +273,18 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                     >
                         <Sparkles className="w-5 h-5"/>
                     </button>
+                    <button 
+                        onClick={handleRefine}
+                        disabled={isRefining}
+                        title="Refine Metadata with AI"
+                        className={`p-2 text-slate-300 hover:text-indigo-300 rounded-xl hover:bg-white/10 transition-all ${isRefining ? 'animate-pulse text-indigo-300' : ''}`}
+                    >
+                        <Bot className="w-5 h-5"/>
+                    </button>
+                    <div className="w-[1px] h-5 bg-white/20 mx-1"></div>
                     <button onClick={() => setIsEditingInfo(true)} className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10" title="Edit Info">
                         <Edit3 className="w-5 h-5"/>
                     </button>
-                    <div className="w-[1px] h-5 bg-white/20 mx-1"></div>
                     <button onClick={handleDelete} className="p-2 text-rose-400 hover:text-rose-300 rounded-xl hover:bg-rose-500/20" title="Delete Song">
                         <Trash2 className="w-5 h-5"/>
                     </button>
@@ -280,7 +324,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                 </button>
              </div>
 
-             {/* Metadata Grid (Moved here) */}
+             {/* Metadata Grid */}
              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 w-full bg-white/5 p-6 rounded-3xl border border-white/5 mt-2">
                 <div className="flex flex-col gap-1 md:col-span-2">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Album</span>
@@ -294,7 +338,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
                 <div className="flex flex-col gap-1 md:col-span-2">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Genre</span>
                     <span className="text-white font-medium truncate">
-                    {song.genre.join(', ')}
+                    {(song.genre || []).join(', ')}
                     </span>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -387,11 +431,30 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, currentSongId, isPla
             onSave={handleSaveInfo}
             fields={[
                 { name: 'title', label: 'Title', value: song.title },
-                { name: 'artist', label: 'Artist', value: song.artist },
+                { name: 'artist', label: 'Artist (comma separated)', value: song.artist },
                 { name: 'album', label: 'Album', value: song.album },
-                { name: 'genre', label: 'Genre (comma separated)', value: song.genre.join(', ') }
+                { name: 'genre', label: 'Genre (comma separated)', value: (song.genre || []).join(', ') }
             ]}
         />
+      )}
+
+      {suggestionData && (
+          <SuggestionModal
+              currentData={{
+                  title: song.title,
+                  artist: song.artist,
+                  album: song.album,
+                  genre: song.genre || []
+              }}
+              suggestedData={{
+                  title: suggestionData.title,
+                  artist: suggestionData.artist,
+                  album: suggestionData.album || 'Unknown',
+                  genre: suggestionData.genre || []
+              }}
+              onClose={() => setSuggestionData(null)}
+              onConfirm={handleApplySuggestion}
+          />
       )}
     </div>
   );

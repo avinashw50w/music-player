@@ -340,8 +340,7 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
         // 1. Try to identify via AcoustID first to get Clean Title/Artist
         let searchTitle = song.title;
         let searchArtist = song.artist_name || 'Unknown Artist';
-        let acoustidSuccess = false;
-
+        
         try {
             console.log(`[Hybrid] Fingerprinting ${song.file_path}...`);
             const acoustidData = await identifySongMetadata(song.file_path);
@@ -349,30 +348,12 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
                 console.log(`[Hybrid] AcoustID Found: ${acoustidData.title} by ${acoustidData.artist}`);
                 searchTitle = acoustidData.title;
                 searchArtist = acoustidData.artist;
-                acoustidSuccess = true;
             }
         } catch (e) {
-            console.warn(`[Hybrid] AcoustID failed, attempting fallback: ${e.message}`);
+            console.warn(`[Hybrid] AcoustID failed, using existing metadata: ${e.message}`);
         }
 
-        // 2. If AcoustID failed, try Gemini Refinement
-        if (!acoustidSuccess) {
-            console.log("[Hybrid] Falling back to Gemini for metadata refinement...");
-            const filename = path.basename(song.file_path);
-            
-            try {
-                const refined = await refineMetadataWithGemini(filename, searchTitle, searchArtist, song.album_title);
-                if (refined && (refined.title || refined.artist)) {
-                    if (refined.title) searchTitle = refined.title;
-                    if (refined.artist) searchArtist = refined.artist;
-                    console.log(`[Hybrid] Gemini Refined: "${refined.title}" by "${refined.artist}"`);
-                } else {
-                    console.log("[Hybrid] Gemini returned null, using raw DB values.");
-                }
-            } catch (e) {
-                console.warn("[Hybrid] Gemini refinement error:", e);
-            }
-        }
+        // REMOVED: Automatic Gemini Fallback logic
 
         // 3. Search Spotify using the (hopefully clean) title and artist
         console.log(`[Hybrid] Searching Spotify for: ${searchTitle} - ${searchArtist}`);
@@ -439,6 +420,40 @@ router.post('/:id/identify-spotify', async (req, res, next) => {
     } catch (err) {
         console.error("Hybrid Identify Error", err);
         res.status(500).json({ error: err.message || 'Spotify identification failed' });
+    }
+});
+
+// POST Refine Metadata (Gemini)
+router.post('/:id/refine', async (req, res, next) => {
+    try {
+        const song = await db('songs')
+            .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
+            .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
+            .leftJoin('albums', 'songs.album_id', 'albums.id')
+            .where({ 'songs.id': req.params.id })
+            .orderBy('song_artists.is_primary', 'desc')
+            .select('songs.*', 'artists.name as artist_name', 'albums.title as album_title')
+            .first();
+
+        if (!song) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        const filename = path.basename(song.file_path);
+        const suggestion = await refineMetadataWithGemini(
+            filename, 
+            song.title, 
+            song.artist_name || 'Unknown Artist', 
+            song.album_title || 'Unknown Album'
+        );
+
+        if (!suggestion) {
+            return res.status(500).json({ error: 'Failed to generate suggestions' });
+        }
+
+        res.json(suggestion);
+    } catch (err) {
+        next(err);
     }
 });
 

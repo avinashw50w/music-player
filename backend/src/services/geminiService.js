@@ -16,22 +16,39 @@ export async function refineMetadataWithGemini(filename, currentTitle, currentAr
         return null;
     }
     const ai = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
-    let prompt = `Please identify this song.
-    Song Title: "${currentTitle || ''}"
-    `;
-    if (currentArtist !== 'Unknown Artist') prompt += `Artist Name: "${currentArtist || ''}"
-    `;
-    if (currentAlbum !== 'Unknown Album') prompt += `Song Album: "${currentAlbum || ''}"
-    `;
 
-    prompt += `.
-    Return JSON format:
-    {
-      "title": "Clean Title",
-      "artist": "Clean Artist"
-    }`;
+    // Construct context part of prompt
+    let context = `Song Title: "${currentTitle || ''}"
+`;
+    
+    if (currentArtist && currentArtist !== 'Unknown Artist') {
+        context += `Artist Name: "${currentArtist}"
+    `;
+    }
+    
+    if (currentAlbum && currentAlbum !== 'Unknown Album') {
+        context += `Song Album: "${currentAlbum}"
+    `;
+    }
+    const prompt = `Identify a song based on the input text. Return the song details in a JSON format.
+**Instructions**
+1. If a particular field is not available then return Unknown Artist or Unknown Album.
+2. If genre is not available then return empty array
+**Input Text (Song Data):**
+${context}
+
+**Required JSON Format:**
+\`\`\`json
+{
+  "title": "Clean Title",
+  "artist": "Clean Artist",
+  "album": "Album Name",
+  "genre": ["Genre1", "Genre2"],
+  "year": 2000
+}
+\`\`\`
+`;
     console.log({currentTitle, currentArtist, currentAlbum, prompt})
-
     // const prompt = `
     // I have an audio file with potential dirty metadata.
     // Filename: "${filename || ''}"
@@ -57,7 +74,7 @@ export async function refineMetadataWithGemini(filename, currentTitle, currentAr
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-flash-lite',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json'

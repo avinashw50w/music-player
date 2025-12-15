@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Route, createRoutesFromElements } from 'react-router-dom';
 import App from './App';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -11,7 +12,7 @@ if (!rootElement) {
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route path="*" element={<App />} />
+    <Route path="*" element={<App />} errorElement={<ErrorBoundary />} />
   )
 );
 

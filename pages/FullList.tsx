@@ -21,6 +21,7 @@ interface FullListProps {
   artists: Artist[];
   playlists: Playlist[];
   isLoadingMap: { songs: boolean; albums: boolean; artists: boolean; playlists: boolean };
+  initialSearchQuery?: string;
 }
 
 const SkeletonRow = () => (
@@ -45,15 +46,23 @@ const SkeletonCard = () => (
 
 const FullList: React.FC<FullListProps> = ({ 
     onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist, onLoadMore, hasMore, onSearch,
-    songs, albums, artists, playlists, isLoadingMap
+    songs, albums, artists, playlists, isLoadingMap, initialSearchQuery = ''
 }) => {
   const { type } = useParams<{ type: string }>(); // 'songs', 'albums', 'artists', 'playlists'
   const navigate = useNavigate();
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const isFirstRun = useRef(true);
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const previousQueryRef = useRef(initialSearchQuery);
   
+  // Fix 1: Delay observer activation to handle scroll restoration
+  const [isObserverActive, setIsObserverActive] = useState(false);
+  useEffect(() => {
+      // Increased delay slightly to ensure layout and scroll are fully settled
+      const timer = setTimeout(() => setIsObserverActive(true), 800);
+      return () => clearTimeout(timer);
+  }, []);
+
   // Resolve items and loading state based on URL param 'type'
   let items: any[] = [];
   let isLoading = false;
@@ -72,12 +81,14 @@ const FullList: React.FC<FullListProps> = ({
 
   // Debounce Search
   useEffect(() => {
-    // Skip the first run to avoid triggering a search (and API call) on mount,
-    // which duplicates the route-based fetch in App.tsx.
-    if (isFirstRun.current) {
-        isFirstRun.current = false;
+    // If the query hasn't changed from what we initialized with (or last ran), skip.
+    // This prevents the search from firing on mount or remount (navigation), 
+    // which would otherwise reset the list in App.tsx.
+    if (searchQuery === previousQueryRef.current) {
         return;
     }
+    
+    previousQueryRef.current = searchQuery;
 
     if (onSearchRef.current) {
         const timer = setTimeout(() => {
@@ -87,17 +98,35 @@ const FullList: React.FC<FullListProps> = ({
     }
   }, [searchQuery]); 
 
+  // Fix 2: Stable callback for observer to prevent re-creation on every render
+  const onLoadMoreRef = useRef(onLoadMore);
+  useEffect(() => {
+      onLoadMoreRef.current = onLoadMore;
+  }, [onLoadMore]);
+
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
       const target = entries[0];
-      if (target.isIntersecting && hasMore && onLoadMore) {
-          onLoadMore();
+      if (target.isIntersecting && hasMore && onLoadMoreRef.current) {
+          // Fix 3: Secondary check to ensure we are actually at the bottom of the document.
+          // This prevents the observer from firing if the viewport is at the top (0) 
+          // but the sentinel is theoretically 'intersecting' due to layout shifts or initialization.
+          const scrollBottom = window.innerHeight + window.scrollY;
+          const docHeight = document.documentElement.scrollHeight;
+          
+          // We allow a buffer of 1000px to start loading before hitting exact bottom.
+          // If the user is at top (scrollY=0) and doc is long (5000px), 1000 < 4000, so it won't fire.
+          if (scrollBottom >= docHeight - 1000) {
+              onLoadMoreRef.current();
+          }
       }
-  }, [hasMore, onLoadMore]);
+  }, [hasMore]); 
 
   useEffect(() => {
+      if (!isObserverActive) return;
+
       const option = {
           root: null,
-          rootMargin: "20px",
+          rootMargin: "100px", // Increased margin slightly
           threshold: 0
       };
       observerRef.current = new IntersectionObserver(handleObserver, option);
@@ -106,7 +135,7 @@ const FullList: React.FC<FullListProps> = ({
       return () => {
           if (observerRef.current) observerRef.current.disconnect();
       }
-  }, [handleObserver, items.length]); 
+  }, [handleObserver, isObserverActive, items.length]); 
 
   const getTitle = () => {
     switch(type) {
