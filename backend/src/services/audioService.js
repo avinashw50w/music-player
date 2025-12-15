@@ -3,6 +3,47 @@ import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import { promisify } from 'util';
 import fs from 'fs';
+import { execFile } from 'child_process';
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Extract raw lyrics using specific ffprobe command that preserves newlines
+ * @param {string} filePath 
+ */
+async function extractLyricsRaw(filePath) {
+    try {
+        // Try 'lyrics' tag (Standard)
+        // Command verified by user: ffprobe -v quiet -show_entries format_tags=lyrics -of default=nw=1:nk=1 file.mp3
+        let { stdout } = await execFileAsync('ffprobe', [
+            '-v', 'quiet',
+            '-show_entries', 'format_tags=lyrics',
+            '-of', 'default=nw=1:nk=1',
+            filePath
+        ]);
+
+        if (stdout && stdout.trim().length > 0) {
+            return stdout.trim();
+        }
+
+        // Try 'unsyncedlyrics' (Common for ID3v2 USLT frames in ffmpeg)
+        ({ stdout } = await execFileAsync('ffprobe', [
+            '-v', 'quiet',
+            '-show_entries', 'format_tags=unsyncedlyrics',
+            '-of', 'default=nw=1:nk=1',
+            filePath
+        ]));
+
+        if (stdout && stdout.trim().length > 0) {
+            return stdout.trim();
+        }
+
+        return null;
+    } catch (e) {
+        // console.error(`Raw lyrics extraction failed for ${filePath}:`, e.message);
+        return null;
+    }
+}
 
 /**
  * Extract metadata from an audio file using FFmpeg
@@ -10,74 +51,81 @@ import fs from 'fs';
  * @param {string} [originalFilename] - Original filename (if uploaded) to use for title fallback
  */
 export async function extractMetadata(filePath, originalFilename = null) {
-    return new Promise((resolve, reject) => {
-        ffmpeg.ffprobe(filePath, (err, metadata) => {
-            if (err) {
-                reject(err);
-                return;
-            }
+    // Run probe and raw lyrics extraction in parallel
+    const [probeMetadata, rawLyrics] = await Promise.all([
+        new Promise((resolve, reject) => {
+            ffmpeg.ffprobe(filePath, (err, metadata) => {
+                if (err) reject(err);
+                else resolve(metadata);
+            });
+        }),
+        extractLyricsRaw(filePath)
+    ]);
 
-            const format = metadata.format;
-            const audioStream = metadata.streams.find(s => s.codec_type === 'audio');
+    const format = probeMetadata.format;
+    const audioStream = probeMetadata.streams.find(s => s.codec_type === 'audio');
 
-            // Try to get tags from format or stream (format usually has global tags)
-            const tags = format.tags || audioStream?.tags || {};
+    // Merge tags for general metadata
+    const mergedTags = { ...(format.tags || {}), ...(audioStream?.tags || {}) };
 
-            const durationSeconds = Math.floor(format.duration || 0);
-            const minutes = Math.floor(durationSeconds / 60);
-            const seconds = durationSeconds % 60;
-            const duration = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const durationSeconds = Math.floor(format.duration || 0);
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    const duration = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
-            // Handle Multiple Genres
-            let genres = [];
-            const rawGenre = tags.genre || tags.GENRE || 'Unknown';
-            if (rawGenre) {
-                // Split by common delimiters (semicolon, comma, slash) and trim
-                genres = rawGenre.split(/[;,/]/).map(g => g.trim()).filter(Boolean);
-            }
-            if (genres.length === 0) genres = ['Unknown'];
+    // Handle Multiple Genres
+    let genres = [];
+    const rawGenre = mergedTags.genre || mergedTags.GENRE || 'Unknown';
+    if (rawGenre) {
+        genres = rawGenre.split(/[;,/]/).map(g => g.trim()).filter(Boolean);
+    }
+    if (genres.length === 0) genres = ['Unknown'];
 
-            // Handle Multiple Artists (simple split)
-            const rawArtist = tags.artist || tags.ARTIST || 'Unknown Artist';
-            const artistNames = rawArtist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
-            if (artistNames.length === 0) artistNames.push('Unknown Artist');
+    // Handle Multiple Artists
+    const rawArtist = mergedTags.artist || mergedTags.ARTIST || 'Unknown Artist';
+    const artistNames = rawArtist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
+    if (artistNames.length === 0) artistNames.push('Unknown Artist');
 
-            // Determine Title: Use tag, or fallback to original filename if provided, else current filepath
-            const filenameForTitle = originalFilename || filePath;
-            const fallbackTitle = path.basename(filenameForTitle, path.extname(filenameForTitle));
+    // Determine Title
+    const filenameForTitle = originalFilename || filePath;
+    const fallbackTitle = path.basename(filenameForTitle, path.extname(filenameForTitle));
 
-            // Extract Lyrics (Common keys)
-            // Enhanced to look for language specific keys like 'lyrics-eng'
-            let lyrics = tags.lyrics || tags.LYRICS || tags.unsyncedlyrics || tags.USLT || null;
-            
-            if (!lyrics) {
-                // Search for any key starting with lyrics- or ending with lyrics
-                const keys = Object.keys(tags);
-                for (const key of keys) {
-                    if (key.toLowerCase().startsWith('lyrics') || key.toLowerCase().endsWith('lyrics')) {
-                        lyrics = tags[key];
-                        break;
+    // Determine Lyrics
+    // Prefer raw extraction if successful (preserves newlines better)
+    // Fallback to probe tags if raw failed but probe has something (though likely truncated)
+    let lyrics = rawLyrics;
+
+    if (!lyrics) {
+        let maxLen = 0;
+        const tagSources = [format.tags, audioStream?.tags].filter(t => t);
+        tagSources.forEach(source => {
+            Object.keys(source).forEach(key => {
+                if (key.match(/(lyrics|uslt|unsyncedlyrics)/i)) {
+                    const val = source[key];
+                    if (typeof val === 'string' && val.length > maxLen) {
+                        maxLen = val.length;
+                        lyrics = val;
                     }
                 }
-            }
-
-            resolve({
-                title: tags.title || fallbackTitle,
-                artist: artistNames.join(', '), // Display string
-                artists: artistNames, // Array of names for logic
-                album: tags.album || tags.ALBUM || 'Unknown Album',
-                genre: genres, 
-                year: tags.date ? parseInt(tags.date.substring(0, 4)) : null,
-                duration,
-                durationSeconds,
-                bitrate: Math.floor((format.bit_rate || 0) / 1000), // Convert to kbps
-                format: audioStream?.codec_name?.toUpperCase() || path.extname(filePath).slice(1).toUpperCase(),
-                sampleRate: audioStream?.sample_rate,
-                channels: audioStream?.channels,
-                lyrics: lyrics
             });
         });
-    });
+    }
+
+    return {
+        title: mergedTags.title || fallbackTitle,
+        artist: artistNames.join(', '),
+        artists: artistNames,
+        album: mergedTags.album || mergedTags.ALBUM || 'Unknown Album',
+        genre: genres, 
+        year: mergedTags.date ? parseInt(mergedTags.date.substring(0, 4)) : null,
+        duration,
+        durationSeconds,
+        bitrate: Math.floor((format.bit_rate || 0) / 1000),
+        format: audioStream?.codec_name?.toUpperCase() || path.extname(filePath).slice(1).toUpperCase(),
+        sampleRate: audioStream?.sample_rate,
+        channels: audioStream?.channels,
+        lyrics: lyrics
+    };
 }
 
 /**
@@ -119,23 +167,16 @@ export async function updateAudioTags(filePath, metadata) {
         ];
 
         // Handle Cover Art Embedding
-        // Note: For best compatibility, we replace existing art if new art is provided
         if (metadata.coverPath && fs.existsSync(metadata.coverPath)) {
             command.input(metadata.coverPath);
-            
-            // Map 0:a (Audio from input 0)
             outputOptions.push('-map', '0:a');
-            // Map 1 (Image from input 1)
             outputOptions.push('-map', '1');
-            
             outputOptions.push('-disposition:v', 'attached_pic');
         } else {
-            // Keep original streams (preserves existing art if no new art provided)
             outputOptions.push('-map', '0');
         }
 
         // Add Text Metadata
-        // Note: We avoid manual quoting as spawn handles separate arguments.
         if (metadata.title !== undefined) outputOptions.push('-metadata', `title=${metadata.title}`);
         if (metadata.artist !== undefined) outputOptions.push('-metadata', `artist=${metadata.artist}`);
         if (metadata.album !== undefined) outputOptions.push('-metadata', `album=${metadata.album}`);
@@ -144,12 +185,17 @@ export async function updateAudioTags(filePath, metadata) {
             const genreStr = Array.isArray(metadata.genre) ? metadata.genre.join(', ') : (metadata.genre || '');
             outputOptions.push('-metadata', `genre=${genreStr}`);
         }
-        // Explicitly check for undefined to allow empty string (clearing lyrics)
+        
         if (metadata.lyrics !== undefined) {
-            // Write to multiple common lyric tags to maximize compatibility
-            // 'lyrics' is generic, 'unsyncedlyrics' often maps to USLT in ID3v2
-            outputOptions.push('-metadata', `lyrics=${metadata.lyrics}`);
-            outputOptions.push('-metadata', `unsyncedlyrics=${metadata.lyrics}`);
+            const safeLyrics = metadata.lyrics ? metadata.lyrics.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : '';
+            const ext = path.extname(filePath).toLowerCase();
+
+            if (ext === '.mp3' || ext === '.id3') {
+                outputOptions.push('-metadata', `unsyncedlyrics=${safeLyrics}`);
+                outputOptions.push('-metadata', 'lyrics=');
+            } else {
+                outputOptions.push('-metadata', `lyrics=${safeLyrics}`);
+            }
         }
 
         command
@@ -157,18 +203,15 @@ export async function updateAudioTags(filePath, metadata) {
             .save(tempPath)
             .on('end', async () => {
                 try {
-                    // Replace original with temp
                     await fs.promises.rename(tempPath, filePath);
                     console.log(`[Metadata] Updated file tags for: ${path.basename(filePath)}`);
                     resolve(true);
                 } catch (err) {
-                    // Try to clean up temp if rename fails
                     fs.unlink(tempPath, () => {});
                     reject(err);
                 }
             })
             .on('error', (err) => {
-                // Clean up temp
                 fs.unlink(tempPath, () => {});
                 console.error(`[Metadata] Failed to update tags for ${path.basename(filePath)}: ${err.message}`);
                 reject(err);
