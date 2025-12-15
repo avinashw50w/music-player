@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -29,6 +30,9 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
   
   // Refs for input elements to manage focus
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  
+  // Refs for field containers (input + dropdown) to handle click outside
+  const fieldContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Prevent background scrolling when modal is open
   useEffect(() => {
@@ -41,13 +45,18 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
   // Handle click outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-        if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-            setFocusedField(null);
+        // If a field is focused
+        if (focusedField) {
+            const container = fieldContainersRef.current[focusedField];
+            // If click is outside the specific field container, close dropdown
+            if (container && !container.contains(event.target as Node)) {
+                setFocusedField(null);
+            }
         }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [focusedField]);
 
   const handleSuggestionClick = (fieldName: string, suggestionValue: string, id?: string) => {
       const field = fields.find(f => f.name === fieldName);
@@ -71,10 +80,6 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
       
       // For multi-select, keep focus and re-set to allow continued typing
       if (field?.isMulti) {
-          // Keep field focused but maybe hide suggestions until user types again?
-          // Actually, if we just selected, the input value changed. The parent will trigger onFieldChange.
-          // If we want to hide suggestions immediately, we can check logic in render.
-          // But crucial part is keeping the input focused.
           const inputEl = inputRefs.current[fieldName];
           if (inputEl) {
               requestAnimationFrame(() => {
@@ -114,20 +119,26 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
                 : currentValue.trim();
 
             // Filter suggestions
-            const showSuggestions = focusedField === field.name && field.suggestions && field.suggestions.length > 0;
+            // Show only if focused, has suggestions, AND user has typed something
+            const showSuggestions = focusedField === field.name && 
+                                    field.suggestions && 
+                                    field.suggestions.length > 0 && 
+                                    searchTerm.length > 0;
+
             const filteredSuggestions = showSuggestions 
                 ? field.suggestions!.filter(s => {
                     const text = getSuggestionText(s);
                     // Filter based on the active segment (searchTerm)
-                    if (!searchTerm) return true;
-                    
-                    // Allow exact matches to appear so they can be selected (auto-complete casing/format)
                     return text.toLowerCase().includes(searchTerm.toLowerCase());
                   }).slice(0, 5) 
                 : [];
 
             return (
-                <div key={field.name} className="relative">
+                <div 
+                    key={field.name} 
+                    className="relative"
+                    ref={el => { fieldContainersRef.current[field.name] = el; }}
+                >
                 <label className="block text-sm font-medium text-slate-400 mb-2">{field.label}</label>
                 <input
                     ref={(el) => { inputRefs.current[field.name] = el; }}
