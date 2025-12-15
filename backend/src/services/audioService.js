@@ -5,8 +5,10 @@ import { promisify } from 'util';
 
 /**
  * Extract metadata from an audio file using FFmpeg
+ * @param {string} filePath - Path to the file on disk
+ * @param {string} [originalFilename] - Original filename (if uploaded) to use for title fallback
  */
-export async function extractMetadata(filePath) {
+export async function extractMetadata(filePath, originalFilename = null) {
     return new Promise((resolve, reject) => {
         ffmpeg.ffprobe(filePath, (err, metadata) => {
             if (err) {
@@ -39,8 +41,12 @@ export async function extractMetadata(filePath) {
             const artistNames = rawArtist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
             if (artistNames.length === 0) artistNames.push('Unknown Artist');
 
+            // Determine Title: Use tag, or fallback to original filename if provided, else current filepath
+            const filenameForTitle = originalFilename || filePath;
+            const fallbackTitle = path.basename(filenameForTitle, path.extname(filenameForTitle));
+
             resolve({
-                title: tags.title || path.basename(filePath, path.extname(filePath)),
+                title: tags.title || fallbackTitle,
                 artist: artistNames.join(', '), // Display string
                 artists: artistNames, // Array of names for logic
                 album: tags.album || tags.ALBUM || 'Unknown Album',

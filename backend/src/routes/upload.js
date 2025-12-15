@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../config/database.js';
 import { config } from '../config/env.js';
 import { extractMetadata } from '../services/audioService.js';
+import fs from 'fs';
 
 const router = express.Router();
 
@@ -99,8 +100,23 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
             const filePath = file.path;
 
             try {
-                // Extract metadata
-                const metadata = await extractMetadata(filePath);
+                // Extract metadata (Pass original filename for fallback title)
+                const metadata = await extractMetadata(filePath, file.originalname);
+
+                // Check for duplicates (Title + Artist match)
+                const existingSong = await db('songs')
+                    .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
+                    .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
+                    .where('songs.title', 'like', metadata.title)
+                    .andWhere('artists.name', 'like', metadata.artists[0] || metadata.artist)
+                    .first();
+
+                if (existingSong) {
+                    console.log(`Skipping duplicate: ${metadata.title}`);
+                    // Clean up uploaded file since we don't need it
+                    fs.unlink(filePath, () => {});
+                    continue;
+                }
 
                 const songId = uuidv4();
 
@@ -179,8 +195,6 @@ router.post('/audio', audioUpload.array('files', 50), async (req, res, next) => 
 
 // POST upload folder (same as audio but with folder structure indication)
 router.post('/folder', audioUpload.array('files', 200), async (req, res, next) => {
-    // Reusing same logic logic as audio upload, simplified for this response
-    // In a real app, you might want to DRY this up by calling a shared processing function.
     try {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: 'No audio files provided' });
@@ -194,7 +208,23 @@ router.post('/folder', audioUpload.array('files', 200), async (req, res, next) =
             const filePath = file.path;
 
             try {
-                const metadata = await extractMetadata(filePath);
+                // Extract metadata (Pass original filename for fallback title)
+                const metadata = await extractMetadata(filePath, file.originalname);
+                
+                // Check duplicate
+                const existingSong = await db('songs')
+                    .leftJoin('song_artists', 'songs.id', 'song_artists.song_id')
+                    .leftJoin('artists', 'song_artists.artist_id', 'artists.id')
+                    .where('songs.title', 'like', metadata.title)
+                    .andWhere('artists.name', 'like', metadata.artists[0] || metadata.artist)
+                    .first();
+
+                if (existingSong) {
+                    console.log(`Skipping duplicate: ${metadata.title}`);
+                    fs.unlink(filePath, () => {});
+                    continue;
+                }
+
                 const songId = uuidv4();
 
                 let albumId = null;

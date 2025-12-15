@@ -1,6 +1,6 @@
 
-import React, { useState, useRef } from 'react';
-import { FolderOpen, ArrowRight, Music, Play, Pause, ListMusic, RefreshCw, FolderSearch } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, Music, Play, Pause, ListMusic, RefreshCw, FolderSearch } from 'lucide-react';
 import { Song, Album, Artist, Playlist } from '../types';
 import PlayingIndicator from '../components/PlayingIndicator';
 import { scanLibrary, refreshLibrary, ScanStatus } from '../services/api';
@@ -41,8 +41,8 @@ const Browse: React.FC<BrowseProps> = ({
   const [scanPath, setScanPath] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleScan = async () => {
     if (!scanPath.trim()) return;
@@ -67,54 +67,6 @@ const Browse: React.FC<BrowseProps> = ({
           setRefreshMessage(`Failed: ${e.message}`);
       } finally {
           setIsRefreshing(false);
-      }
-  };
-
-  const handleBrowse = () => {
-      fileInputRef.current?.click();
-  };
-
-  const handleFolderSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files;
-      if (files && files.length > 0) {
-          // Attempt to extract absolute path if available (non-standard but common in Electron/local contexts)
-          const file = files[0] as any;
-          
-          if (file.path) {
-              // Try to reconstruct the root folder path from the file path + relative path
-              // file.path = "/User/Music/Album/Song.mp3"
-              // file.webkitRelativePath = "Album/Song.mp3" (relative to the selected folder)
-              // We want "/User/Music"
-              
-              const relative = file.webkitRelativePath || '';
-              const absolute = file.path;
-              
-              // If we have a relative path structure, try to match and slice
-              if (relative && absolute.endsWith(relative)) {
-                  // This usually works if the file path ends with the relative path
-                  // We also need to strip the leading folder name from relative path to get the *selected* folder
-                  // e.g. Selected "Music". File is "Music/Song.mp3". Relative "Music/Song.mp3".
-                  // Absolute "/User/Music/Song.mp3".
-                  // We want "/User/Music".
-                  
-                  // Simple approach: remove the relative path from the end of absolute path, 
-                  // then add back the first segment of relative path.
-                  const rootDirName = relative.split('/')[0];
-                  // remove relative part
-                  const basePath = absolute.slice(0, -relative.length);
-                  // add root name
-                  // Check separator (Windows \ or Unix /)
-                  const separator = absolute.includes('\\') ? '\\' : '/';
-                  // Construct path. Note: This heuristic works best if casing matches.
-                  const detectedPath = `${basePath}${rootDirName}`;
-                  setScanPath(detectedPath);
-              } else {
-                  // Fallback: Just take the directory of the file
-                  const separator = absolute.includes('\\') ? '\\' : '/';
-                  const dirPath = absolute.substring(0, absolute.lastIndexOf(separator));
-                  setScanPath(dirPath);
-              }
-          }
       }
   };
 
@@ -171,39 +123,21 @@ const Browse: React.FC<BrowseProps> = ({
                 </div>
                 <div>
                     <h2 className="text-2xl font-bold text-white">Scan Local Library</h2>
-                    <p className="text-slate-400">Add music from a folder on your computer</p>
+                    <p className="text-slate-400">Enter the absolute path to your music folder</p>
                 </div>
              </div>
 
              {/* Input Area */}
              {!isScanning ? (
                  <div className="flex gap-4">
-                    <div className="flex-1 relative flex gap-2">
-                        {/* Hidden File Input for Folder Selection */}
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFolderSelect}
-                            style={{ display: 'none' }}
-                            // @ts-ignore - Non-standard attribute for folder selection
-                            webkitdirectory=""
-                            directory=""
-                        />
-                        
+                    <div className="flex-1">
                         <input 
                             type="text" 
                             value={scanPath}
                             onChange={(e) => setScanPath(e.target.value)}
-                            placeholder="Enter path (e.g. C:\Music) or click browse"
-                            className="flex-1 w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono text-sm"
+                            placeholder="Enter path (e.g. C:\Music)"
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono text-sm"
                         />
-                        <button
-                            onClick={handleBrowse}
-                            className="bg-white/10 hover:bg-white/20 text-white px-5 rounded-xl transition-colors border border-white/10"
-                            title="Browse Folder"
-                        >
-                            <FolderOpen className="w-5 h-5" />
-                        </button>
                     </div>
                     <button 
                         onClick={handleScan}
@@ -233,7 +167,7 @@ const Browse: React.FC<BrowseProps> = ({
 
              {scanError && (
                  <div className="mt-4 text-rose-400 text-sm font-medium bg-rose-500/10 px-4 py-3 rounded-xl border border-rose-500/20">
-                     Error: {scanError}
+                     {scanError}
                  </div>
              )}
         </div>

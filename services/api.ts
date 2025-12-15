@@ -289,6 +289,17 @@ export async function scanLibrary(path: string): Promise<{ success: boolean; mes
     return handleResponse(response);
 }
 
+export async function uploadAudioFiles(files: File[]): Promise<UploadProgress> {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+
+    const response = await fetch(`${API_BASE_URL}/upload/folder`, {
+        method: 'POST',
+        body: formData
+    });
+    return handleResponse<UploadProgress>(response);
+}
+
 export async function getLibraryStatus(): Promise<ScanStatus> {
     const response = await fetch(`${API_BASE_URL}/library/status`);
     return handleResponse<ScanStatus>(response);
