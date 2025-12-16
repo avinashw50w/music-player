@@ -558,17 +558,26 @@ const App: React.FC = () => {
       finally { setIsRefreshing(false); }
   }, [location.pathname]);
 
-  const handleToggleFavorite = useCallback(async (id: string) => {
+  const handleToggleFavorite = useCallback(async (id: string, targetType?: 'song' | 'album' | 'artist' | 'playlist') => {
+    let resolvedType = targetType;
     let isSong = false;
+
+    // Check Current Song
     if (currentSong?.id === id) {
+        resolvedType = 'song';
         isSong = true;
         setCurrentSong(prev => prev ? { ...prev, isFavorite: !prev.isFavorite } : null);
     }
+
+    // Check Songs List
     const songIndex = songs.findIndex(s => s.id === id);
     if (songIndex !== -1) {
+        if (!resolvedType) resolvedType = 'song';
         isSong = true;
         setSongs(prev => prev.map((s, i) => i === songIndex ? { ...s, isFavorite: !s.isFavorite } : s));
     }
+
+    // Check History
     if (recentlyPlayed.some(s => s.id === id)) {
         setRecentlyPlayed(prev => {
             const updated = prev.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s);
@@ -576,27 +585,49 @@ const App: React.FC = () => {
             return updated;
         });
     }
-    if (isSong) {
-        try { await api.toggleSongFavorite(id); } catch (err) { console.warn(err); }
-        return;
+
+    // Check Albums
+    if (!resolvedType || resolvedType === 'album') {
+        const albumIndex = albums.findIndex(a => a.id === id);
+        if (albumIndex !== -1) {
+            resolvedType = 'album';
+            setAlbums(prev => prev.map((a, i) => i === albumIndex ? { ...a, isFavorite: !a.isFavorite } : a));
+        }
     }
-    const albumIndex = albums.findIndex(a => a.id === id);
-    if (albumIndex !== -1) {
-        setAlbums(prev => prev.map((a, i) => i === albumIndex ? { ...a, isFavorite: !a.isFavorite } : a));
-        try { await api.toggleAlbumFavorite(id); } catch (err) { console.warn(err); }
-        return;
+
+    // Check Artists
+    if (!resolvedType || resolvedType === 'artist') {
+        const artistIndex = artists.findIndex(a => a.id === id);
+        if (artistIndex !== -1) {
+            resolvedType = 'artist';
+            setArtists(prev => prev.map((a, i) => i === artistIndex ? { ...a, isFavorite: !a.isFavorite } : a));
+        }
     }
-    const artistIndex = artists.findIndex(a => a.id === id);
-    if (artistIndex !== -1) {
-        setArtists(prev => prev.map((a, i) => i === artistIndex ? { ...a, isFavorite: !a.isFavorite } : a));
-        try { await api.toggleArtistFavorite(id); } catch (err) { console.warn(err); }
-        return;
+
+    // Check Playlists
+    if (!resolvedType || resolvedType === 'playlist') {
+        const playlistIndex = playlists.findIndex(p => p.id === id);
+        if (playlistIndex !== -1) {
+            resolvedType = 'playlist';
+            setPlaylists(prev => prev.map((p, i) => i === playlistIndex ? { ...p, isFavorite: !p.isFavorite } : p));
+        }
     }
-    const playlistIndex = playlists.findIndex(p => p.id === id);
-    if (playlistIndex !== -1) {
-        setPlaylists(prev => prev.map((p, i) => i === playlistIndex ? { ...p, isFavorite: !p.isFavorite } : p));
-        try { await api.togglePlaylistFavorite(id); } catch (err) { console.warn(err); }
-        return;
+
+    // Perform API Call
+    try {
+        if (resolvedType === 'song' || isSong) {
+             await api.toggleSongFavorite(id);
+        } else if (resolvedType === 'album') {
+             await api.toggleAlbumFavorite(id);
+        } else if (resolvedType === 'artist') {
+             await api.toggleArtistFavorite(id);
+        } else if (resolvedType === 'playlist') {
+             await api.togglePlaylistFavorite(id);
+        } else {
+             console.warn("Unknown type for favorite toggle, API call skipped for id:", id);
+        }
+    } catch (err) { 
+        console.warn("Favorite toggle failed", err); 
     }
   }, [currentSong, songs, albums, artists, playlists, recentlyPlayed]);
 

@@ -14,7 +14,7 @@ interface PlaylistDetailsProps {
     isPlaying: boolean;
     onPlaySong: (song: Song, context?: Song[]) => void;
     onPlayContext: (context: Song[]) => void;
-    onToggleFavorite: (id: string) => void;
+    onToggleFavorite: (id: string, type?: 'song' | 'album' | 'artist' | 'playlist') => void;
     onAddToPlaylist: (song: Song) => void;
     onDeletePlaylist: (id: string) => void;
     onRenamePlaylist: (id: string, name: string) => void;
@@ -134,10 +134,11 @@ export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({
 
   // Internal favorite toggle wrapper to update local state
   const handleToggleFavoriteInternal = (targetId: string) => {
-      onToggleFavorite(targetId);
       if (targetId === playlist.id) {
+          onToggleFavorite(targetId, 'playlist');
           setPlaylist(prev => prev ? { ...prev, isFavorite: !prev.isFavorite } : null);
       } else {
+          onToggleFavorite(targetId, 'song');
           setSongs(prev => prev.map(s => s.id === targetId ? { ...s, isFavorite: !s.isFavorite } : s));
       }
   };

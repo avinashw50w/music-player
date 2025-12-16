@@ -14,7 +14,7 @@ interface DetailProps {
   isPlaying: boolean;
   onPlaySong: (song: Song, context?: Song[]) => void;
   onPlayContext: (context: Song[]) => void;
-  onToggleFavorite: (id: string) => void;
+  onToggleFavorite: (id: string, type?: 'song' | 'album' | 'artist' | 'playlist') => void;
   onAddToPlaylist: (song: Song) => void;
   onUpdateAlbum?: (album: Album) => void;
   artists?: Artist[];
@@ -149,14 +149,14 @@ export const AlbumDetails: React.FC<DetailProps> = ({
 
   // Wrapper for toggling favorite to update local state optimistically
   const handleToggleFavoriteInternal = (targetId: string) => {
-      onToggleFavorite(targetId);
-      
       // Update if it's the album
       if (targetId === album.id) {
+          onToggleFavorite(targetId, 'album');
           setAlbum(prev => prev ? { ...prev, isFavorite: !prev.isFavorite } : null);
       } 
       // Update if it's a song
       else {
+          onToggleFavorite(targetId, 'song');
           setTracks(prev => prev.map(s => s.id === targetId ? { ...s, isFavorite: !s.isFavorite } : s));
       }
   };

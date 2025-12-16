@@ -10,7 +10,7 @@ interface FavoritesProps {
   onPlaySong: (song: Song) => void;
   currentSongId?: string;
   isPlaying: boolean;
-  onToggleFavorite: (id: string) => void;
+  onToggleFavorite: (id: string, type?: 'song' | 'album' | 'artist' | 'playlist') => void;
   onAddToPlaylist: (song: Song) => void;
 }
 
@@ -59,7 +59,7 @@ const Favorites: React.FC<FavoritesProps> = ({ onPlaySong, currentSongId, isPlay
   }, []);
 
   const handleToggleFavoriteLocal = (id: string, type: 'song' | 'album' | 'artist' | 'playlist') => {
-      onToggleFavorite(id);
+      onToggleFavorite(id, type);
       // Optimistically remove from list
       if (type === 'song') setFavoriteSongs(prev => prev.filter(s => s.id !== id));
       if (type === 'album') setFavoriteAlbums(prev => prev.filter(a => a.id !== id));

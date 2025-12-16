@@ -14,7 +14,7 @@ interface DetailProps {
   isPlaying: boolean;
   onPlaySong: (song: Song, context?: Song[]) => void;
   onPlayContext: (context: Song[]) => void;
-  onToggleFavorite: (id: string) => void;
+  onToggleFavorite: (id: string, type?: 'song' | 'album' | 'artist' | 'playlist') => void;
   onAddToPlaylist: (song: Song) => void;
   onUpdateArtist?: (artist: Artist) => void;
   lastEvent?: LibraryEvent | null;
@@ -139,10 +139,11 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
   };
 
   const handleToggleFavoriteInternal = (targetId: string) => {
-      onToggleFavorite(targetId);
       if (targetId === artist.id) {
+          onToggleFavorite(targetId, 'artist');
           setArtist(prev => prev ? { ...prev, isFavorite: !prev.isFavorite } : null);
       } else {
+          onToggleFavorite(targetId, 'song');
           setSongs(prev => prev.map(s => s.id === targetId ? { ...s, isFavorite: !s.isFavorite } : s));
       }
   }
