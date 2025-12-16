@@ -979,6 +979,7 @@ const App: React.FC = () => {
             onNext={handleNext}
             onPrev={handlePrev}
             onToggleFavorite={handleToggleFavorite}
+            onAddToPlaylist={handleAddToPlaylist}
             currentTime={currentTime}
             duration={duration}
             onSeek={handleSeek}

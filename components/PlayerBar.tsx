@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Repeat1, Shuffle, Heart, Maximize2, VolumeX } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Repeat1, Shuffle, Heart, Maximize2, VolumeX, ListPlus } from 'lucide-react';
 import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,7 @@ interface PlayerBarProps {
   onNext: () => void;
   onPrev: () => void;
   onToggleFavorite: (id: string) => void;
+  onAddToPlaylist: (song: Song) => void;
   currentTime: number;
   duration: number;
   onSeek: (time: number) => void;
@@ -38,7 +39,8 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   onPlayPause, 
   onNext, 
   onPrev, 
-  onToggleFavorite, 
+  onToggleFavorite,
+  onAddToPlaylist,
   currentTime,
   duration,
   onSeek,
@@ -53,30 +55,6 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   const navigate = useNavigate();
   
   if (!currentSong) return null;
-
-  const renderArtists = () => {
-      if (currentSong.artists && currentSong.artists.length > 0) {
-          return currentSong.artists.map((artist, i) => (
-              <React.Fragment key={artist.id}>
-                  {i > 0 && <span className="text-slate-500 cursor-default">, </span>}
-                  <span 
-                      className="text-slate-400 hover:text-white cursor-pointer transition-colors text-sm"
-                      onClick={() => navigate(`/artist/${artist.id}`)}
-                  >
-                      {artist.name}
-                  </span>
-              </React.Fragment>
-          ));
-      }
-      return (
-          <p 
-            onClick={() => navigate(`/artist/${currentSong.artistId || 'ar1'}`)} 
-            className="text-slate-400 text-sm truncate hover:text-white cursor-pointer transition-colors w-fit"
-          >
-            {currentSong.artist}
-          </p>
-      );
-  };
 
   return (
     <div className="h-28 bg-black/40 backdrop-blur-2xl px-8 flex items-center justify-between z-[100] w-full shadow-2xl border-t border-white/5 flex-shrink-0 relative">
@@ -106,15 +84,26 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
           >
             {currentSong.title}
           </h4>
-          <div className="truncate">
-             {renderArtists()}
-          </div>
+          <p 
+            onClick={() => navigate(`/artist/${currentSong.artistId || 'ar1'}`)} 
+            className="text-slate-400 text-sm truncate hover:text-white cursor-pointer transition-colors w-fit"
+          >
+            {currentSong.artist}
+          </p>
         </div>
         <button 
           onClick={() => onToggleFavorite(currentSong.id)}
           className="ml-2 text-slate-400 hover:text-rose-500 transition-colors"
+          title="Favorite"
         >
           <Heart className={`w-6 h-6 ${currentSong.isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
+        </button>
+        <button 
+          onClick={() => onAddToPlaylist(currentSong)}
+          className="ml-2 text-slate-400 hover:text-white transition-colors"
+          title="Add to Playlist"
+        >
+          <ListPlus className="w-6 h-6" />
         </button>
       </div>
 
