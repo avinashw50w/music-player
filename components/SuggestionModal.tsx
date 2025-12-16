@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 
 interface SuggestionData {
     title: string;
@@ -16,7 +16,7 @@ interface SuggestionModalProps {
   currentData: SuggestionData;
   suggestedData: SuggestionData;
   onClose: () => void;
-  onConfirm: (data: SuggestionData) => void;
+  onConfirm: (data: SuggestionData) => Promise<void> | void;
 }
 
 export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, suggestedData, onClose, onConfirm }) => {
@@ -29,7 +29,6 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
   };
 
   // Local state for editing. Convert genre array to string for input.
-  // We initialize state lazily to run logic once
   const [formData, setFormData] = useState(() => ({
       title: getInitialValue(suggestedData.title, currentData.title, ['Unknown Title']),
       artist: getInitialValue(suggestedData.artist, currentData.artist, ['Unknown Artist', 'Unknown']),
@@ -40,19 +39,34 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
       year: suggestedData.year ? String(suggestedData.year) : (currentData.year ? String(currentData.year) : '')
   }));
 
+  const [isSaving, setIsSaving] = useState(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+      return () => { isMounted.current = false; };
+  }, []);
+
   const handleChange = (field: string, value: string) => {
       setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleConfirm = () => {
-      onConfirm({
-          title: formData.title,
-          artist: formData.artist,
-          album: formData.album,
-          genre: formData.genre.split(',').map(g => g.trim()).filter(Boolean),
-          year: parseInt(formData.year) || undefined,
-          coverUrl: suggestedData.coverUrl // Pass through the cover URL if available
-      });
+  const handleConfirm = async () => {
+      if (isSaving) return;
+      setIsSaving(true);
+      try {
+        await onConfirm({
+            title: formData.title,
+            artist: formData.artist,
+            album: formData.album,
+            genre: formData.genre.split(',').map(g => g.trim()).filter(Boolean),
+            year: parseInt(formData.year) || undefined,
+            coverUrl: suggestedData.coverUrl // Pass through the cover URL if available
+        });
+      } finally {
+        if (isMounted.current) {
+            setIsSaving(false);
+        }
+      }
   };
 
   return createPortal(
@@ -60,7 +74,7 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
-        onClick={onClose}
+        onClick={() => !isSaving && onClose()}
       />
       
       {/* Modal Content */}
@@ -184,16 +198,27 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
         <div className="flex justify-end gap-4 flex-shrink-0 mt-8">
           <button 
             onClick={onClose} 
-            className="px-6 py-3 text-slate-300 hover:text-white font-bold transition-colors"
+            disabled={isSaving}
+            className="px-6 py-3 text-slate-300 hover:text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button 
             onClick={handleConfirm} 
-            className="px-8 py-3 bg-white text-black rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-white/10 flex items-center gap-2"
+            disabled={isSaving}
+            className="px-8 py-3 bg-white text-black rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-white/10 flex items-center gap-2 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-wait"
           >
-            <Sparkles className="w-4 h-4 fill-current" />
-            Apply Changes
+            {isSaving ? (
+                <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Applying...
+                </>
+            ) : (
+                <>
+                    <Sparkles className="w-4 h-4 fill-current" />
+                    Apply Changes
+                </>
+            )}
           </button>
         </div>
       </div>
