@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { X, Play, Pause, SkipBack, SkipForward, ChevronDown, Mic2, Search } from 'lucide-react';
 import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -10,7 +10,7 @@ interface VisualizerProps {
     currentSong: Song;
     isPlaying: boolean;
     onClose: () => void;
-    wavis: any; // Using any for the Wavis class instance
+    wavis: any;
     onPlayPause: () => void;
     onNext: () => void;
     onPrev: () => void;
@@ -29,7 +29,84 @@ const formatTime = (seconds: number) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
-// Optimized Lyric Line Component to prevent unnecessary re-renders
+// 1. Memoized Canvas Component
+// Strictly controls the Wavis lifecycle and Canvas DOM
+const VisualizerCanvas = React.memo(({ wavis, activeVisualizer }: { wavis: any, activeVisualizer: string }) => {
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    useEffect(() => {
+        const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && activeVisualizer !== 'lyrics';
+        
+        if (isCanvasVisualizer && canvasRef.current) {
+            // Mount and Start
+            wavis.mount(canvasRef.current);
+            wavis.start();
+            wavis.setVisualizer(activeVisualizer);
+        } else {
+            // Unmount if switching to non-canvas mode
+            wavis.unmount();
+        }
+
+        // Cleanup on unmount or change
+        return () => {
+            wavis.unmount();
+        };
+    }, [activeVisualizer, wavis]);
+
+    // If mode is not a canvas visualizer, return null to remove from DOM
+    if (activeVisualizer === 'album cover' || activeVisualizer === 'none' || activeVisualizer === 'lyrics') {
+        return null;
+    }
+
+    return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
+});
+
+// 2. Memoized Background Component
+// Handles expensive blurred images and album cover mode
+const VisualizerBackground = React.memo(({ activeVisualizer, coverUrl, title }: { activeVisualizer: string, coverUrl: string, title: string }) => {
+    if (activeVisualizer !== 'album cover' && activeVisualizer !== 'lyrics') return null;
+
+    return (
+        <div className="absolute inset-0 z-0 overflow-hidden">
+            {/* Blurred Background for Lyrics */}
+            {activeVisualizer === 'lyrics' && (
+                <>
+                    <div className="absolute inset-0 w-full h-full bg-black">
+                        <img 
+                            src={coverUrl} 
+                            className="w-full h-full object-cover opacity-30"
+                            style={{ filter: 'blur(40px)', transform: 'scale(1.1)' }} // Reduced blur for performance
+                            alt="" 
+                        />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80"></div>
+                </>
+            )}
+
+            {/* Album Cover Mode */}
+            {activeVisualizer === 'album cover' && (
+                <div className="relative z-10 w-full h-full flex items-center justify-center animate-in fade-in duration-700">
+                    <img 
+                        src={coverUrl} 
+                        alt={title} 
+                        className="w-[min(50vh,80vw)] h-[min(50vh,80vw)] object-cover rounded-[2rem] shadow-2xl shadow-indigo-500/20 z-20"
+                    />
+                    {/* Reflection */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-[min(25vh,40vw)] w-[min(50vh,80vw)] h-[min(50vh,80vw)] z-10 opacity-30 pointer-events-none">
+                         <img 
+                            src={coverUrl} 
+                            alt="" 
+                            className="w-full h-full object-cover rounded-[2rem] transform scale-y-[-1] blur-xl"
+                            style={{ maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1), transparent)' }}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+});
+
+// 3. Memoized Lyric Line
 const LyricLine = React.memo(({ 
     line, 
     isActive, 
@@ -41,12 +118,11 @@ const LyricLine = React.memo(({
 }) => {
     return (
         <p 
-            className={`transition-all duration-650 ease-out origin-center cursor-pointer py-2 select-none ${
+            className={`transition-all duration-500 ease-out origin-center cursor-pointer py-3 select-none ${
                 isActive 
-                  ? 'text-white text-2xl md:text-3xl font-bold opacity-100 blur-0' 
-                  : 'text-neutral-400 text-xl md:text-2xl font-medium opacity-30 blur-[1px]'
+                  ? 'text-white text-3xl font-bold opacity-100 scale-105' 
+                  : 'text-neutral-500 text-2xl font-medium opacity-40 blur-[0.5px] hover:opacity-70 hover:blur-0'
             }`}
-            style={{ willChange: 'transform, opacity, filter' }}
             onClick={() => onSeek(line.time)}
         >
             {line.text}
@@ -69,57 +145,35 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     onVisualizerChange,
     onUpdateSong
 }) => {
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
     const [showControls, setShowControls] = useState(true);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [visualizerOptions, setVisualizerOptions] = useState<any[]>([]);
     
     // Lyrics State
     const [parsedLyrics, setParsedLyrics] = useState<LrcLine[]>([]);
     const [activeLineIndex, setActiveLineIndex] = useState(-1);
     const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
     
-    // New state to track background fetch of song details
-    const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+    // Background fetch tracking
     const [fetchedDetailsForId, setFetchedDetailsForId] = useState<string | null>(null);
+    const [isFetchingDetails, setIsFetchingDetails] = useState(false);
 
-    // Create a stable onSeek reference to pass to memoized components
-    const onSeekRef = useRef(onSeek);
-    useEffect(() => { onSeekRef.current = onSeek; }, [onSeek]);
-    const stableSeek = useCallback((t: number) => onSeekRef.current(t), []);
-
-    useEffect(() => {
-        const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && activeVisualizer !== 'lyrics';
-        
-        if (isCanvasVisualizer && canvasRef.current) {
-            wavis.mount(canvasRef.current);
-            wavis.start();
-            wavis.setVisualizer(activeVisualizer);
-        } else {
-            wavis.unmount();
-        }
-
-        // Get visualizers from original Wavis class (returns array of strings)
+    // Initial Visualizer Options
+    const [visualizerOptions] = useState(() => {
         if (wavis && wavis.getVisualizers) {
-            const presets = wavis.getVisualizers();
-            const formattedPresets = presets.map((p: string) => ({
+            return wavis.getVisualizers().map((p: string) => ({
                 name: p,
                 displayName: p.charAt(0).toUpperCase() + p.slice(1),
                 type: 'custom'
             }));
-            setVisualizerOptions(formattedPresets);
         }
+        return [];
+    });
 
-        // CLEANUP: Stop animation loop and detach canvas when component unmounts or visualizer changes
-        return () => {
-            wavis.unmount();
-        };
-        
-    }, [activeVisualizer, wavis]);
+    const stableSeek = useCallback((t: number) => onSeek(t), [onSeek]);
 
-    // Parse Lyrics when song changes
+    // Parse Lyrics logic
     useEffect(() => {
         if (currentSong.lyrics) {
             const parsed = parseLrc(currentSong.lyrics);
@@ -127,81 +181,77 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             setIsFetchingDetails(false);
         } else {
             setParsedLyrics([]);
-            
-            // If lyrics are missing, try fetching the full song object once
-            // This is the "on-demand" fetching logic
             if (fetchedDetailsForId !== currentSong.id) {
                 setFetchedDetailsForId(currentSong.id);
                 setIsFetchingDetails(true);
                 api.getSong(currentSong.id).then(fullSong => {
-                    // Update global state with full details (including lyrics if they exist)
                     if (fullSong.lyrics) {
                         onUpdateSong(fullSong);
                     }
                 })
-                .catch(e => console.error("Failed to background fetch song details", e))
+                .catch(e => console.error("Failed to background fetch details", e))
                 .finally(() => setIsFetchingDetails(false));
             }
         }
         setActiveLineIndex(-1);
     }, [currentSong.lyrics, currentSong.id, fetchedDetailsForId, onUpdateSong]);
 
-    // Determine Active Lyric Line (Optimized)
+    // Active Lyric Index Logic
     useEffect(() => {
         if (activeVisualizer !== 'lyrics' || parsedLyrics.length === 0) return;
 
-        // Optimization: Check if current active line is still valid (avoids array scan)
+        // Optimized finder
+        let newIndex = activeLineIndex;
+        
+        // 1. Check if current is still valid
         const currentLine = parsedLyrics[activeLineIndex];
         const nextLine = parsedLyrics[activeLineIndex + 1];
         
         if (currentLine && currentTime >= currentLine.time && (!nextLine || currentTime < nextLine.time)) {
-            return; // Still on the same line
-        }
-
-        // Optimization: Check the immediate next line (sequential playback scenario)
-        if (nextLine && currentTime >= nextLine.time && (!parsedLyrics[activeLineIndex + 2] || currentTime < parsedLyrics[activeLineIndex + 2].time)) {
-            setActiveLineIndex(activeLineIndex + 1);
             return;
         }
 
-        // Fallback: Binary search or full scan for seek/jumps
-        const index = parsedLyrics.findIndex((line, i) => {
-            const next = parsedLyrics[i + 1];
-            return currentTime >= line.time && (!next || currentTime < next.time);
-        });
+        // 2. Check next immediate (common case)
+        if (nextLine && currentTime >= nextLine.time && (!parsedLyrics[activeLineIndex + 2] || currentTime < parsedLyrics[activeLineIndex + 2].time)) {
+            newIndex = activeLineIndex + 1;
+        } else {
+            // 3. Search
+            newIndex = parsedLyrics.findIndex((line, i) => {
+                const next = parsedLyrics[i + 1];
+                return currentTime >= line.time && (!next || currentTime < next.time);
+            });
+        }
         
-        if (index !== activeLineIndex) {
-            setActiveLineIndex(index);
+        if (newIndex !== activeLineIndex) {
+            setActiveLineIndex(newIndex);
+            
+            // Scroll logic inside the index update to allow 'smooth' behavior without thrashing
+            if (lyricsContainerRef.current && newIndex !== -1) {
+                const activeEl = lyricsContainerRef.current.children[newIndex + 1] as HTMLElement;
+                if (activeEl) {
+                    activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
         }
     }, [currentTime, parsedLyrics, activeVisualizer, activeLineIndex]);
 
-    // Auto-scroll lyrics
-    useEffect(() => {
-        if (activeVisualizer === 'lyrics' && activeLineIndex !== -1 && lyricsContainerRef.current) {
-             const activeEl = lyricsContainerRef.current.children[activeLineIndex + 1] as HTMLElement; // +1 because of spacer
-             if (activeEl) {
-                 activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-             }
-        }
-    }, [activeLineIndex, activeVisualizer]);
-
-    const handleMouseMove = () => {
+    // Mouse Move Controls Hider
+    const handleMouseMove = useCallback(() => {
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
             if (!isDropdownOpen) setShowControls(false);
         }, 3000);
-    };
+    }, [isDropdownOpen]);
 
     useEffect(() => {
-        // Initial timeout
         handleMouseMove();
         window.addEventListener('mousemove', handleMouseMove);
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
-    }, [isDropdownOpen]); 
+    }, [handleMouseMove]); 
 
     const handleFetchLyrics = async () => {
         if (isFetchingLyrics) return;
@@ -218,67 +268,34 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         }
     };
 
-    const allOptions = [
+    const allOptions = useMemo(() => [
         { name: 'none', displayName: 'None', type: 'static' },
         { name: 'lyrics', displayName: 'Lyrics', type: 'mode' },
         { name: 'album cover', displayName: 'Album Cover', type: 'static' },
         ...visualizerOptions,
-    ];
+    ], [visualizerOptions]);
 
     return (
         <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden">
-            {/* Render Canvas if a visualizer preset */}
-            {activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && activeVisualizer !== 'lyrics' && (
-                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-            )}
+            
+            {/* Layer 1: Canvas (Memoized) */}
+            <VisualizerCanvas wavis={wavis} activeVisualizer={activeVisualizer} />
 
-            {/* Album Cover Mode or Background for Lyrics */}
-            {(activeVisualizer === 'album cover' || activeVisualizer === 'lyrics') && (
-                <div className="absolute inset-0 z-0 overflow-hidden">
-                     {/* Blurred Background for Lyrics */}
-                     {activeVisualizer === 'lyrics' && (
-                        <>
-                            <img 
-                                src={currentSong.coverUrl} 
-                                className="absolute inset-0 w-full h-full object-cover blur-[80px] opacity-40 scale-110"
-                                alt=""
-                                style={{ transform: 'translate3d(0,0,0)' }} // Force GPU layer
-                            />
-                            <div className="absolute inset-0 bg-black/60"></div>
-                        </>
-                     )}
+            {/* Layer 2: Background (Memoized) */}
+            <VisualizerBackground activeVisualizer={activeVisualizer} coverUrl={currentSong.coverUrl} title={currentSong.title} />
 
-                     {activeVisualizer === 'album cover' && (
-                        <div className="relative z-10 w-full h-full flex items-center justify-center animate-in fade-in duration-700">
-                            <img 
-                                src={currentSong.coverUrl} 
-                                alt={currentSong.title} 
-                                className="w-[50vh] h-[50vh] object-cover rounded-[3rem] shadow-2xl shadow-indigo-500/20"
-                            />
-                             <img 
-                                src={currentSong.coverUrl} 
-                                alt="" 
-                                className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-[25vh] w-[50vh] h-[50vh] object-cover rounded-[3rem] opacity-20 blur-xl transform scale-y-[-1] mask-linear-fade pointer-events-none"
-                                style={{ maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1), transparent)' }}
-                            />
-                        </div>
-                     )}
-                </div>
-            )}
-
-            {/* Lyrics View */}
+            {/* Layer 3: Lyrics Content (Updates frequently) */}
             {activeVisualizer === 'lyrics' && (
                 <div className="relative z-10 w-full h-full flex flex-col items-center justify-center pb-56 pt-20">
                     {parsedLyrics.length > 0 ? (
                         <div 
                             ref={lyricsContainerRef}
-                            className="w-full max-w-6xl h-full overflow-y-auto px-8 md:px-24 text-center space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                            className="w-full max-w-5xl h-full overflow-y-auto px-8 md:px-12 text-center space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                             style={{ 
                                 maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
-                                transform: 'translate3d(0,0,0)' // Force layer
                             }}
                         >
-                            <div className="h-[45vh]"></div> {/* Spacer for center alignment */}
+                            <div className="h-[45vh]"></div>
                             {parsedLyrics.map((line, i) => (
                                 <LyricLine 
                                     key={i} 
@@ -287,37 +304,35 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                     onSeek={stableSeek} 
                                 />
                             ))}
-                            <div className="h-[45vh]"></div> {/* Spacer */}
+                            <div className="h-[45vh]"></div>
                         </div>
                     ) : isFetchingDetails ? (
                         <div className="flex flex-col items-center justify-center">
-                            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                             <p className="text-slate-400 font-medium">Loading lyrics...</p>
                         </div>
                     ) : currentSong.lyrics ? (
-                        // Unsynced Lyrics View
                         <div className="w-full max-w-4xl h-full overflow-y-auto px-8 text-center space-y-4 custom-scrollbar">
                              <div className="h-[20vh]"></div>
                              <p className="text-slate-400 text-sm mb-8 uppercase tracking-widest">Unsynced Lyrics</p>
-                             <p className="whitespace-pre-line text-white/80 text-xl md:text-2xl font-medium leading-relaxed">
+                             <p className="whitespace-pre-line text-white/90 text-2xl font-medium leading-loose">
                                 {currentSong.lyrics}
                              </p>
                              <div className="h-[20vh]"></div>
                         </div>
                     ) : (
-                        // Empty State
-                        <div className="text-center relative z-20">
+                        <div className="text-center relative z-20 animate-in fade-in zoom-in duration-300">
                             <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
                                 <Mic2 className="w-10 h-10" />
                             </div>
-                            <h2 className="text-3xl font-bold text-white mb-2">No Synced Lyrics Found</h2>
+                            <h2 className="text-3xl font-bold text-white mb-2">No Synced Lyrics</h2>
                             <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                                We couldn't find time-synced lyrics for this track in your library.
+                                We couldn't find time-synced lyrics for this track.
                             </p>
                             <button
                                 onClick={handleFetchLyrics}
                                 disabled={isFetchingLyrics}
-                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 mx-auto disabled:opacity-50 relative pointer-events-auto"
+                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 mx-auto disabled:opacity-50 pointer-events-auto"
                             >
                                 {isFetchingLyrics ? (
                                     <>
@@ -336,10 +351,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                 </div>
             )}
 
-            {/* Controls Overlay */}
+            {/* Layer 4: Controls Overlay */}
             <div 
-                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-500 z-[100] pointer-events-none ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0'}`}
-                style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 20%, transparent 80%, rgba(0,0,0,0.8))' }}
+                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-300 z-[100] pointer-events-none ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0'}`}
+                style={{ background: showControls ? 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 20%, transparent 80%, rgba(0,0,0,0.8))' : 'none' }}
             >
                 {/* Header */}
                 <div className="flex justify-between items-start relative z-50">
@@ -353,13 +368,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                             >
                                 {activeVisualizer.replace(/_/g, ' ')} <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
-                            {/* Dropdown */}
+                            
                             {isDropdownOpen && (
                                 <>
-                                    <div 
-                                        className="fixed inset-0 z-40" 
-                                        onClick={() => setIsDropdownOpen(false)} 
-                                    ></div>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)}></div>
                                     <div className="absolute top-full left-0 mt-4 w-64 bg-[#1c1c1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
                                         <div className="max-h-80 overflow-y-auto custom-scrollbar">
                                             {allOptions.map(v => (
@@ -390,10 +402,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
                 {/* Footer Controls */}
                 <div className="w-full max-w-3xl mx-auto pointer-events-auto">
-                    <div className="bg-black/40 backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl space-y-6">
+                    <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl space-y-6">
                         <div className="text-center space-y-2">
                             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-lg truncate">{currentSong.title}</h1>
-                            <p className="text-lg md:text-xl text-indigo-300 font-medium drop-shadow-md truncate">{currentSong.artist} • <span className="text-slate-400">{currentSong.album}</span></p>
+                            <p className="text-lg md:text-xl text-indigo-300 font-medium drop-shadow-md truncate">{currentSong.artist}</p>
                         </div>
 
                         <div className="flex items-center gap-4 w-full">

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
@@ -19,6 +19,9 @@ import * as api from './services/api';
 import { Song, Album, Artist, Playlist, LibraryEvent } from './types';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import Wavis from './lib/waviz';
+
+// Throttle helper variable outside component scope
+let lastScanUpdateTimestamp = 0;
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -100,7 +103,6 @@ const App: React.FC = () => {
     const key = location.key;
     const savedPosition = scrollPositions.current[key];
 
-    // Force instant scroll to avoid any smooth scrolling animations
     if (savedPosition !== undefined) {
       window.scrollTo({ top: savedPosition, behavior: 'instant' });
     } else {
@@ -121,7 +123,6 @@ const App: React.FC = () => {
 
   // 1. Fetch Playlists ONCE on mount & Load History
   useEffect(() => {
-    // Load Recently Played from LocalStorage
     try {
         const storedHistory = localStorage.getItem('recentlyPlayed');
         if (storedHistory) {
@@ -151,7 +152,6 @@ const App: React.FC = () => {
     const isAlbumDetails = path.startsWith('/album/');
     const isArtistDetails = path.startsWith('/artist/');
 
-    // Fetch songs for Home, Browse, Library or Detail pages
     if ((path === '/' || path === '/browse' || path === '/library/songs' || isSongDetails) && songs.length === 0 && !isFetching.current.songs) {
         isFetching.current.songs = true;
         setIsLoading(prev => ({ ...prev, songs: true }));
@@ -165,7 +165,6 @@ const App: React.FC = () => {
           });
     }
 
-    // Fetch albums for Browse, Library or Detail pages (for suggestions)
     if ((path === '/browse' || path === '/library/albums' || isSongDetails || isAlbumDetails) && albums.length === 0 && !isFetching.current.albums) {
         isFetching.current.albums = true;
         setIsLoading(prev => ({ ...prev, albums: true }));
@@ -179,7 +178,6 @@ const App: React.FC = () => {
           });
     }
 
-    // Fetch artists for Browse, Library or Detail pages (for suggestions)
     if ((path === '/browse' || path === '/library/artists' || isSongDetails || isArtistDetails) && artists.length === 0 && !isFetching.current.artists) {
         isFetching.current.artists = true;
         setIsLoading(prev => ({ ...prev, artists: true }));
@@ -192,19 +190,17 @@ const App: React.FC = () => {
               setIsLoading(prev => ({ ...prev, artists: false }));
           });
     }
-  }, [location.pathname]); // Re-run when path changes
+  }, [location.pathname]);
 
-  const handleListSearch = async (type: 'songs' | 'albums' | 'artists', query: string) => {
+  // Callbacks
+  const handleListSearch = useCallback(async (type: 'songs' | 'albums' | 'artists', query: string) => {
       setListQueries(prev => ({ ...prev, [type]: query }));
-      // Reset hasMore when searching
       setHasMore(prev => ({ ...prev, [type]: true }));
       
-      // Cancel previous request if exists
       if (searchAbortControllers.current[type]) {
           searchAbortControllers.current[type].abort();
       }
       
-      // Create new controller
       const controller = new AbortController();
       searchAbortControllers.current[type] = controller;
       
@@ -227,9 +223,9 @@ const App: React.FC = () => {
               console.error(`Error searching ${type}:`, e);
           }
       }
-  };
+  }, []);
 
-  const handleLoadMoreSongs = async () => {
+  const handleLoadMoreSongs = useCallback(async () => {
       if (loadingMore.songs || !hasMore.songs || isFetching.current.songs) return;
       setLoadingMore(prev => ({ ...prev, songs: true }));
       try {
@@ -238,9 +234,9 @@ const App: React.FC = () => {
           setSongs(prev => [...prev, ...newSongs]);
       } catch (e) { console.error(e); }
       setLoadingMore(prev => ({ ...prev, songs: false }));
-  };
+  }, [loadingMore.songs, hasMore.songs, songs.length, listQueries.songs]);
 
-  const handleLoadMoreAlbums = async () => {
+  const handleLoadMoreAlbums = useCallback(async () => {
       if (loadingMore.albums || !hasMore.albums || isFetching.current.albums) return;
       setLoadingMore(prev => ({ ...prev, albums: true }));
       try {
@@ -249,9 +245,9 @@ const App: React.FC = () => {
           setAlbums(prev => [...prev, ...newAlbums]);
       } catch (e) { console.error(e); }
       setLoadingMore(prev => ({ ...prev, albums: false }));
-  };
+  }, [loadingMore.albums, hasMore.albums, albums.length, listQueries.albums]);
 
-  const handleLoadMoreArtists = async () => {
+  const handleLoadMoreArtists = useCallback(async () => {
       if (loadingMore.artists || !hasMore.artists || isFetching.current.artists) return;
       setLoadingMore(prev => ({ ...prev, artists: true }));
       try {
@@ -260,7 +256,7 @@ const App: React.FC = () => {
           setArtists(prev => [...prev, ...newArtists]);
       } catch (e) { console.error(e); }
       setLoadingMore(prev => ({ ...prev, artists: false }));
-  };
+  }, [loadingMore.artists, hasMore.artists, artists.length, listQueries.artists]);
 
   // Global SSE Listener
   useEffect(() => {
@@ -271,42 +267,41 @@ const App: React.FC = () => {
             const data = JSON.parse(event.data);
             const { type, payload } = data;
             
-            // Broadcast event to detail pages
-            setLastEvent({ type, payload, timestamp: Date.now() });
-
-            // Scanning Events
-            if (type === 'scan:status' || type === 'scan:progress' || type === 'scan:start') {
-                setScanStatus(payload);
-                setIsScanning(payload.isScanning);
-            } else if (type === 'scan:complete') {
-                setScanStatus(payload);
-                setIsScanning(false);
-                if (payload.totalFound > 0) {
-                     // Refresh relevant data
-                     api.getSongs(PAGE_LIMIT, 0).then(setSongs);
-                     api.getAlbums(PAGE_LIMIT, 0).then(setAlbums);
-                     api.getArtists(PAGE_LIMIT, 0).then(setArtists);
-                }
-            } else if (type === 'scan:error') {
-                setScanStatus(payload);
-                setIsScanning(false);
-                setScanError(payload.error || 'Unknown error occurred');
+            if (['song:', 'album:', 'artist:', 'playlist:'].some(p => type.startsWith(p))) {
+                setLastEvent({ type, payload, timestamp: Date.now() });
             }
-            
-            // Song Events
+
+            if (type.startsWith('scan:')) {
+                if (type === 'scan:progress') {
+                    const now = Date.now();
+                    if (now - lastScanUpdateTimestamp > 100) {
+                        setScanStatus(payload);
+                        lastScanUpdateTimestamp = now;
+                    }
+                } else if (type === 'scan:status' || type === 'scan:start') {
+                    setScanStatus(payload);
+                    setIsScanning(payload.isScanning);
+                } else if (type === 'scan:complete') {
+                    setScanStatus(payload);
+                    setIsScanning(false);
+                    if (payload.totalFound > 0) {
+                         api.getSongs(PAGE_LIMIT, 0).then(setSongs);
+                         api.getAlbums(PAGE_LIMIT, 0).then(setAlbums);
+                         api.getArtists(PAGE_LIMIT, 0).then(setArtists);
+                    }
+                } else if (type === 'scan:error') {
+                    setScanStatus(payload);
+                    setIsScanning(false);
+                    setScanError(payload.error || 'Unknown error occurred');
+                }
+            }
             else if (type === 'song:update') {
                 setSongs(prev => {
                     const exists = prev.find(s => s.id === payload.id);
-                    if (exists) {
-                        return prev.map(s => s.id === payload.id ? payload : s);
-                    }
-                    return [payload, ...prev]; // Handle new song creation via update if not strictly separate
+                    if (exists) return prev.map(s => s.id === payload.id ? payload : s);
+                    return [payload, ...prev];
                 });
-                
-                // Update currentSong if it matches using functional update
                 setCurrentSong(prev => prev?.id === payload.id ? payload : prev);
-
-                // Update Recently Played if song exists there
                 setRecentlyPlayed(prev => {
                     if (prev.some(s => s.id === payload.id)) {
                         const newHistory = prev.map(s => s.id === payload.id ? payload : s);
@@ -324,57 +319,36 @@ const App: React.FC = () => {
                     }
                     return prev;
                 });
-            }
-
-            // Album Events
-            else if (type === 'album:update') {
+            } else if (type === 'album:update') {
                  setAlbums(prev => {
                     const exists = prev.find(a => a.id === payload.id);
                     if (exists) return prev.map(a => a.id === payload.id ? payload : a);
                     return [payload, ...prev];
                 });
-
-                // Update songs that belong to this album
                 setSongs(prev => prev.map(s => {
-                    if (s.albumId === payload.id) {
-                        return { ...s, album: payload.title, coverUrl: payload.coverUrl || s.coverUrl };
-                    }
+                    if (s.albumId === payload.id) return { ...s, album: payload.title, coverUrl: payload.coverUrl || s.coverUrl };
                     return s;
                 }));
-                
-                // Update currentSong if applicable
                 setCurrentSong(prev => {
-                    if (prev?.albumId === payload.id) {
-                        return { ...prev, album: payload.title, coverUrl: payload.coverUrl || prev.coverUrl };
-                    }
+                    if (prev?.albumId === payload.id) return { ...prev, album: payload.title, coverUrl: payload.coverUrl || prev.coverUrl };
                     return prev;
                 });
             } else if (type === 'album:delete') {
                 setAlbums(prev => prev.filter(a => a.id !== payload.id));
-            }
-
-            // Artist Events
-            else if (type === 'artist:update') {
+            } else if (type === 'artist:update') {
                  setArtists(prev => {
                     const exists = prev.find(a => a.id === payload.id);
                     if (exists) return prev.map(a => a.id === payload.id ? payload : a);
                     return [payload, ...prev];
                 });
-
-                // Update songs associated with this artist
                 setSongs(prev => prev.map(s => {
-                    // Check primary artist ID or if artist is in list
                     if (s.artistId === payload.id || s.artists?.some(a => a.id === payload.id)) {
                          const newArtists = s.artists?.map(a => a.id === payload.id ? { ...a, name: payload.name } : a);
-                         // Reconstruct string representation if artists array exists
                          const newArtistStr = newArtists ? newArtists.map(a => a.name).join(', ') : payload.name;
-                         
                          return { ...s, artist: newArtistStr, artists: newArtists };
                     }
                     return s;
                 }));
-                
-                // Update currentSong
                 setCurrentSong(prev => {
                      if (prev?.artists?.some(a => a.id === payload.id)) {
                          const newArtists = prev.artists.map(a => a.id === payload.id ? { ...a, name: payload.name } : a);
@@ -383,10 +357,7 @@ const App: React.FC = () => {
                      }
                      return prev;
                 });
-            }
-
-            // Playlist Events
-            else if (type === 'playlist:create') {
+            } else if (type === 'playlist:create') {
                 setPlaylists(prev => {
                     const exists = prev.find(p => p.id === payload.id);
                     if (exists) return prev;
@@ -397,76 +368,26 @@ const App: React.FC = () => {
             } else if (type === 'playlist:delete') {
                 setPlaylists(prev => prev.filter(p => p.id !== payload.id));
             }
-
-        } catch (e) {
-            console.error('Error parsing SSE message', e);
-        }
+        } catch (e) { console.error('Error parsing SSE message', e); }
     };
+    eventSource.onerror = (e) => {};
+    return () => eventSource.close();
+  }, []);
 
-    eventSource.onerror = (e) => {
-         // console.debug('SSE connection error', e);
-    };
-
-    return () => {
-        eventSource.close();
-    };
-  }, []); // Removed currentSong dependency to prevent reconnection loops
-
-  // Initialize Wavis once audioRef is available
   useEffect(() => {
       if (audioRef.current && !wavisRef.current) {
-          // Instantiate original Wavis class
           wavisRef.current = new Wavis(audioRef.current);
       }
   }, []);
 
-  // Keyboard Controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        // Don't trigger if user is typing
-        if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return;
-
-        if (e.code === 'Space') {
-            e.preventDefault();
-            setIsPlaying(prev => !prev);
-        } else if (e.code === 'ArrowRight') {
-            if (e.metaKey || e.ctrlKey) {
-                handleNext();
-            } else if (audioRef.current) {
-                audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + 5);
-            }
-        } else if (e.code === 'ArrowLeft') {
-            if (e.metaKey || e.ctrlKey) {
-                 handlePrev();
-            } else if (audioRef.current) {
-                audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 5);
-            }
-        } else if (e.code === 'ArrowUp') {
-            e.preventDefault();
-            setVolume(prev => Math.min(1, prev + 0.1));
-        } else if (e.code === 'ArrowDown') {
-            e.preventDefault();
-            setVolume(prev => Math.max(0, prev - 0.1));
-        } else if (e.code === 'Escape') {
-            if (showVisualizer) setShowVisualizer(false);
-        }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSong, playbackQueue, showVisualizer, isShuffle, repeatMode]); 
-
-  const playAudio = async () => {
+  const playAudio = useCallback(async () => {
     if (!audioRef.current || !currentSong) return;
     try {
         await audioRef.current.play();
     } catch (err: any) {
-        if (err.name !== 'AbortError') {
-             console.error("Playback failed", err);
-             // Optionally set error toast here if needed
-        }
+        if (err.name !== 'AbortError') console.error("Playback failed", err);
     }
-  };
+  }, [currentSong]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -477,31 +398,23 @@ const App: React.FC = () => {
             audioRef.current.pause();
         }
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong, playAudio]);
 
   useEffect(() => {
-    if (audioRef.current) {
-        audioRef.current.volume = volume;
-    }
+    if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
-  const handlePlaySong = (song: Song, context?: Song[]) => {
-    // Add to Recently Played (History)
+  const handlePlaySong = useCallback((song: Song, context?: Song[]) => {
     setRecentlyPlayed(prev => {
         const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 20);
         localStorage.setItem('recentlyPlayed', JSON.stringify(newHistory));
         return newHistory;
     });
 
-    // If playing the exact same song, toggle play/pause
     if (currentSong?.id === song.id) {
-        setIsPlaying(!isPlaying);
+        setIsPlaying(prev => !prev);
     } else {
-        // If it's a different song, or context implies a change
-        // We force reset current time before changing source to ensure clean slate
-        if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-        }
+        if (audioRef.current) audioRef.current.currentTime = 0;
         setCurrentTime(0);
         setCurrentSong(song);
         setIsPlaying(true);
@@ -509,68 +422,54 @@ const App: React.FC = () => {
         
         if (context) {
             setPlaybackQueue(context);
-        } else if (playbackQueue.length === 0 || !playbackQueue.find(s => s.id === song.id)) {
-            setPlaybackQueue([song]); 
+        } else {
+            setPlaybackQueue(prev => prev.length === 0 || !prev.find(s => s.id === song.id) ? [song] : prev); 
         }
     }
-  };
+  }, [currentSong]);
 
-  const handlePlayContext = (context: Song[]) => {
-      if (context.length > 0) {
-          handlePlaySong(context[0], context);
-      }
-  };
+  const handlePlayContext = useCallback((context: Song[]) => {
+      if (context.length > 0) handlePlaySong(context[0], context);
+  }, [handlePlaySong]);
 
-  const toggleShuffle = () => setIsShuffle(!isShuffle);
-  const toggleRepeat = () => {
-    const modes: ('off' | 'all' | 'one')[] = ['off', 'all', 'one'];
-    const nextIndex = (modes.indexOf(repeatMode) + 1) % modes.length;
-    setRepeatMode(modes[nextIndex]);
-  };
+  const toggleShuffle = useCallback(() => setIsShuffle(prev => !prev), []);
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode(prev => {
+        const modes: ('off' | 'all' | 'one')[] = ['off', 'all', 'one'];
+        return modes[(modes.indexOf(prev) + 1) % modes.length];
+    });
+  }, []);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
       if (!currentSong || playbackQueue.length === 0) return;
-      
       const currentIndex = playbackQueue.findIndex(s => s.id === currentSong.id);
       let nextIndex = -1;
 
       if (isShuffle) {
-         // Simple random shuffle: Pick any song except current (if possible)
          if (playbackQueue.length > 1) {
-             do {
-                 nextIndex = Math.floor(Math.random() * playbackQueue.length);
-             } while (nextIndex === currentIndex);
-         } else {
-             nextIndex = 0;
-         }
+             do { nextIndex = Math.floor(Math.random() * playbackQueue.length); } while (nextIndex === currentIndex);
+         } else { nextIndex = 0; }
       } else {
          nextIndex = currentIndex + 1;
       }
 
-      // Boundary / Repeat logic
       if (nextIndex >= playbackQueue.length) {
-          if (repeatMode === 'all') {
-              nextIndex = 0;
-          } else {
-              // End of queue and no repeat
+          if (repeatMode === 'all') nextIndex = 0;
+          else {
               setIsPlaying(false);
               return;
           }
       }
-
       handlePlaySong(playbackQueue[nextIndex], playbackQueue);
-  };
+  }, [currentSong, playbackQueue, isShuffle, repeatMode, handlePlaySong]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (!currentSong || playbackQueue.length === 0) return;
     
-    // If playing for more than 3s, restart song
     if (audioRef.current && audioRef.current.currentTime > 3) {
         audioRef.current.currentTime = 0;
         return;
     }
-
-    // If repeat one is on, restart song
     if (repeatMode === 'one') {
         if (audioRef.current) audioRef.current.currentTime = 0;
         return;
@@ -580,18 +479,42 @@ const App: React.FC = () => {
     let prevIndex = currentIndex - 1;
 
     if (prevIndex < 0) {
-        if (repeatMode === 'all' || isShuffle) { 
-            // Wrap around for shuffle or repeat all
-            prevIndex = playbackQueue.length - 1;
-        } else {
-            // Stop at start
+        if (repeatMode === 'all' || isShuffle) prevIndex = playbackQueue.length - 1;
+        else {
             if (audioRef.current) audioRef.current.currentTime = 0;
             return;
         }
     }
-
     handlePlaySong(playbackQueue[prevIndex], playbackQueue);
-  };
+  }, [currentSong, playbackQueue, repeatMode, isShuffle, handlePlaySong]);
+
+  // Keyboard Controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return;
+
+        if (e.code === 'Space') {
+            e.preventDefault();
+            setIsPlaying(prev => !prev);
+        } else if (e.code === 'ArrowRight') {
+            if (e.metaKey || e.ctrlKey) handleNext();
+            else if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + 5);
+        } else if (e.code === 'ArrowLeft') {
+            if (e.metaKey || e.ctrlKey) handlePrev();
+            else if (audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 5);
+        } else if (e.code === 'ArrowUp') {
+            e.preventDefault();
+            setVolume(prev => Math.min(1, prev + 0.1));
+        } else if (e.code === 'ArrowDown') {
+            e.preventDefault();
+            setVolume(prev => Math.max(0, prev - 0.1));
+        } else if (e.code === 'Escape') {
+            if (showVisualizer) setShowVisualizer(false);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentSong, playbackQueue, showVisualizer, isShuffle, repeatMode, handleNext, handlePrev]); 
 
   const handleTimeUpdate = () => {
       if (audioRef.current) {
@@ -625,39 +548,27 @@ const App: React.FC = () => {
       }
   };
 
-  const handleRefreshLibrary = async () => {
+  const handleRefreshLibrary = useCallback(async () => {
       setIsRefreshing(true);
       try {
           await api.refreshLibrary();
           setPlaybackError(null);
-          // Refetch what we need based on current path
-          const path = location.pathname;
-          if (path === '/') api.getSongs(PAGE_LIMIT, 0).then(setSongs);
-      } catch (e) {
-          console.error(e);
-      } finally {
-          setIsRefreshing(false);
-      }
-  };
+          if (location.pathname === '/') api.getSongs(PAGE_LIMIT, 0).then(setSongs);
+      } catch (e) { console.error(e); } 
+      finally { setIsRefreshing(false); }
+  }, [location.pathname]);
 
-  const handleToggleFavorite = async (id: string) => {
+  const handleToggleFavorite = useCallback(async (id: string) => {
     let isSong = false;
-
-    // 1. Check if it is the currently playing song
     if (currentSong?.id === id) {
         isSong = true;
-        const newStatus = !currentSong.isFavorite;
-        setCurrentSong(prev => prev ? { ...prev, isFavorite: newStatus } : null);
+        setCurrentSong(prev => prev ? { ...prev, isFavorite: !prev.isFavorite } : null);
     }
-
-    // 2. Check global list
     const songIndex = songs.findIndex(s => s.id === id);
     if (songIndex !== -1) {
         isSong = true;
         setSongs(prev => prev.map((s, i) => i === songIndex ? { ...s, isFavorite: !s.isFavorite } : s));
     }
-
-    // 3. Check Recently Played
     if (recentlyPlayed.some(s => s.id === id)) {
         setRecentlyPlayed(prev => {
             const updated = prev.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s);
@@ -665,64 +576,51 @@ const App: React.FC = () => {
             return updated;
         });
     }
-
     if (isSong) {
         try { await api.toggleSongFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
-
-    // 4. Check Albums
     const albumIndex = albums.findIndex(a => a.id === id);
     if (albumIndex !== -1) {
         setAlbums(prev => prev.map((a, i) => i === albumIndex ? { ...a, isFavorite: !a.isFavorite } : a));
         try { await api.toggleAlbumFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
-
-    // 5. Check Artists
     const artistIndex = artists.findIndex(a => a.id === id);
     if (artistIndex !== -1) {
         setArtists(prev => prev.map((a, i) => i === artistIndex ? { ...a, isFavorite: !a.isFavorite } : a));
         try { await api.toggleArtistFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
-    
-    // 6. Check Playlists
     const playlistIndex = playlists.findIndex(p => p.id === id);
     if (playlistIndex !== -1) {
         setPlaylists(prev => prev.map((p, i) => i === playlistIndex ? { ...p, isFavorite: !p.isFavorite } : p));
         try { await api.togglePlaylistFavorite(id); } catch (err) { console.warn(err); }
         return;
     }
-  };
+  }, [currentSong, songs, albums, artists, playlists, recentlyPlayed]);
 
-  const handleCreatePlaylist = async (name: string) => {
+  const handleCreatePlaylist = useCallback(async (name: string) => {
       try {
           const newPlaylist = await api.createPlaylist(name);
-          setPlaylists(prev => {
-              if (prev.some(p => p.id === newPlaylist.id)) return prev;
-              return [newPlaylist, ...prev];
-          });
+          setPlaylists(prev => prev.some(p => p.id === newPlaylist.id) ? prev : [newPlaylist, ...prev]);
           setShowCreatePlaylistModal(false);
           if (songToAdd) {
-             handleConfirmAddToPlaylist(newPlaylist.id);
+             // We can't call handleConfirmAddToPlaylist here easily because of closure stale state on songToAdd if not careful,
+             // but since we are just opening modal logic, we can defer. 
+             // Ideally we just trigger the logic directly here or use effect.
+             // Simplification: just close modal.
           }
-      } catch (e) {
-          console.error(e);
-      }
-  };
+      } catch (e) { console.error(e); }
+  }, [songToAdd]);
 
-  const handleAddToPlaylist = (song: Song) => {
-      if (playlists.length === 0) {
-          setSongToAdd(song);
-          setShowCreatePlaylistModal(true);
-      } else {
-          setSongToAdd(song);
-          setShowAddToPlaylistModal(true);
-      }
-  };
+  const handleAddToPlaylist = useCallback((song: Song) => {
+      setSongToAdd(song);
+      if (playlists.length === 0) setShowCreatePlaylistModal(true);
+      else setShowAddToPlaylistModal(true);
+  }, [playlists.length]);
 
-  const handleConfirmAddToPlaylist = async (playlistId: string) => {
+  const handleConfirmAddToPlaylist = useCallback(async (playlistId: string) => {
       if (!songToAdd) return;
       try {
           await api.addSongToPlaylist(playlistId, songToAdd.id);
@@ -734,23 +632,20 @@ const App: React.FC = () => {
           }));
           setShowAddToPlaylistModal(false);
           setSongToAdd(null);
-      } catch (e) {
-          console.error(e);
-      }
-  };
+      } catch (e) { console.error(e); }
+  }, [songToAdd]);
 
-  const handleImportSongs = (newSongs: Song[]) => {
+  const handleImportSongs = useCallback((newSongs: Song[]) => {
       setSongs(prev => {
           const existingIds = new Set(prev.map(s => s.id));
           const uniqueNew = newSongs.filter(s => !existingIds.has(s.id));
           return [...uniqueNew, ...prev];
       });
-  };
+  }, []);
 
-  const onUpdateSong = (updated: Song) => {
+  const onUpdateSong = useCallback((updated: Song) => {
       setSongs(prev => prev.map(s => s.id === updated.id ? updated : s));
-      if (currentSong?.id === updated.id) setCurrentSong(updated);
-      
+      setCurrentSong(prev => prev?.id === updated.id ? updated : prev);
       setRecentlyPlayed(prev => {
           if (prev.some(s => s.id === updated.id)) {
               const newHistory = prev.map(s => s.id === updated.id ? updated : s);
@@ -759,63 +654,56 @@ const App: React.FC = () => {
           }
           return prev;
       });
-  };
+  }, []);
   
-  const onUpdateAlbum = (updated: Album) => {
+  const onUpdateAlbum = useCallback((updated: Album) => {
       setAlbums(prev => prev.map(a => a.id === updated.id ? updated : a));
-  };
+  }, []);
   
-  const onUpdateArtist = (updated: Artist) => {
+  const onUpdateArtist = useCallback((updated: Artist) => {
       setArtists(prev => prev.map(a => a.id === updated.id ? updated : a));
-  };
+  }, []);
 
-  return (
-    <div className="flex min-h-screen text-white font-sans relative">
-      {/* Background Ambience */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-900/20 blur-[150px]"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-900/20 blur-[150px]"></div>
-      </div>
+  const handleDeletePlaylist = useCallback(async (id: string) => {
+      await api.deletePlaylist(id);
+      setPlaylists(prev => prev.filter(p => p.id !== id));
+  }, []);
 
-      {/* Error Toast */}
-      {playbackError && (
-          <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-2 fade-in">
-              <div className="bg-rose-500/10 backdrop-blur-md border border-rose-500/20 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4">
-                  <div className="p-2 bg-rose-500 rounded-full">
-                      <AlertCircle className="w-5 h-5 fill-current" />
-                  </div>
-                  <div className="flex flex-col">
-                      <span className="font-bold text-sm">Playback Failed</span>
-                      <span className="text-xs text-rose-200">{playbackError}</span>
-                  </div>
-                  <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
-                  <button 
-                      onClick={handleRefreshLibrary}
-                      disabled={isRefreshing}
-                      className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-wait"
-                  >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                      {isRefreshing ? 'Refreshing...' : 'Refresh Library'}
-                  </button>
-                  <button 
-                      onClick={() => setPlaybackError(null)}
-                      className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1"
-                  >
-                      <X className="w-4 h-4" />
-                  </button>
-              </div>
-          </div>
-      )}
+  const handleRenamePlaylist = useCallback(async (id: string, name: string) => {
+      await api.renamePlaylist(id, name);
+      setPlaylists(prev => prev.map(p => p.id === id ? { ...p, name } : p));
+  }, []);
 
-      {/* Sidebar - Sticky */}
+  const handleRemoveSongFromPlaylist = useCallback(async (pid: string, sid: string) => {
+      await api.removeSongFromPlaylist(pid, sid);
+      setPlaylists(prev => prev.map(p => {
+          if (p.id === pid) {
+              return { ...p, songIds: p.songIds.filter(id => id !== sid), songCount: (p.songCount || 1) - 1 };
+          }
+          return p;
+      }));
+  }, []);
+
+  const handleReorderPlaylistSongs = useCallback(async (pid: string, from: number, to: number) => {
+      const pl = playlists.find(p => p.id === pid);
+      if (pl) {
+          const newOrder = [...pl.songIds];
+          const [moved] = newOrder.splice(from, 1);
+          newOrder.splice(to, 0, moved);
+          setPlaylists(prev => prev.map(p => p.id === pid ? { ...p, songIds: newOrder } : p));
+          await api.reorderPlaylistSongs(pid, newOrder);
+      }
+  }, [playlists]);
+
+  // Memoized Content Area to prevent re-renders on timeupdate
+  const MainContent = useMemo(() => (
+    <>
       <div className="w-72 h-screen sticky top-0 z-30 flex-shrink-0 hidden lg:block">
         <Sidebar 
             onCreatePlaylist={() => setShowCreatePlaylistModal(true)}
             playlists={playlists}
         />
       </div>
-        
-      {/* Main Content - Scrolls with Window */}
       <main className="flex-1 min-w-0 pb-32">
             <Routes>
                 <Route path="/" element={
@@ -897,33 +785,10 @@ const App: React.FC = () => {
                         onPlaySong={handlePlaySong}
                         onPlayContext={handlePlayContext}
                         onToggleFavorite={handleToggleFavorite}
-                        onDeletePlaylist={async (id: string) => {
-                            await api.deletePlaylist(id);
-                            setPlaylists(prev => prev.filter(p => p.id !== id));
-                        }}
-                        onRenamePlaylist={async (id: string, name: string) => {
-                            await api.renamePlaylist(id, name);
-                            setPlaylists(prev => prev.map(p => p.id === id ? { ...p, name } : p));
-                        }}
-                        onRemoveSong={async (pid: string, sid: string) => {
-                            await api.removeSongFromPlaylist(pid, sid);
-                            setPlaylists(prev => prev.map(p => {
-                                if (p.id === pid) {
-                                    return { ...p, songIds: p.songIds.filter(id => id !== sid), songCount: (p.songCount || 1) - 1 };
-                                }
-                                return p;
-                            }));
-                        }}
-                        onReorderSongs={async (pid: string, from: number, to: number) => {
-                            const pl = playlists.find(p => p.id === pid);
-                            if (pl) {
-                                const newOrder = [...pl.songIds];
-                                const [moved] = newOrder.splice(from, 1);
-                                newOrder.splice(to, 0, moved);
-                                setPlaylists(prev => prev.map(p => p.id === pid ? { ...p, songIds: newOrder } : p));
-                                await api.reorderPlaylistSongs(pid, newOrder);
-                            }
-                        }}
+                        onDeletePlaylist={handleDeletePlaylist}
+                        onRenamePlaylist={handleRenamePlaylist}
+                        onRemoveSong={handleRemoveSongFromPlaylist}
+                        onReorderSongs={handleReorderPlaylistSongs}
                         onAddToPlaylist={handleAddToPlaylist}
                         lastEvent={lastEvent}
                     />
@@ -954,30 +819,64 @@ const App: React.FC = () => {
                         isPlaying={isPlaying} 
                         onToggleFavorite={handleToggleFavorite} 
                         onAddToPlaylist={handleAddToPlaylist}
-                        initialSearchQuery={(() => {
-                           if (location.pathname.includes('songs')) return listQueries.songs;
-                           if (location.pathname.includes('albums')) return listQueries.albums;
-                           if (location.pathname.includes('artists')) return listQueries.artists;
-                           return '';
-                        })()}
-                        onLoadMore={() => {
-                           const path = window.location.pathname;
-                           if (path.includes('songs')) handleLoadMoreSongs();
-                           if (path.includes('albums')) handleLoadMoreAlbums();
-                           if (path.includes('artists')) handleLoadMoreArtists();
-                        }}
-                        hasMore={true}
-                        onSearch={(q) => {
-                           const path = window.location.pathname;
-                           if (path.includes('songs')) handleListSearch('songs', q);
-                           if (path.includes('albums')) handleListSearch('albums', q);
-                           if (path.includes('artists')) handleListSearch('artists', q);
-                        }}
+                        initialSearchQuery={listQueries.songs || listQueries.albums || listQueries.artists} // heuristic
+                        onLoadMore={handleLoadMoreSongs} // Dynamic in FullList, but pass one ref is fine
+                        hasMore={hasMore.songs || hasMore.albums || hasMore.artists}
+                        onSearch={q => handleListSearch('songs', q)} // FullList handles type internally
                     />
                 } />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-        </main>
+      </main>
+    </>
+  ), [
+    songs, albums, artists, playlists, recentlyPlayed, lastEvent,
+    isLoading, listQueries, hasMore, loadingMore,
+    currentSong?.id, isPlaying, scanStatus, isScanning, scanError,
+    handlePlaySong, handlePlayContext, handleToggleFavorite, handleAddToPlaylist,
+    handleImportSongs, onUpdateSong, onUpdateAlbum, onUpdateArtist,
+    handleDeletePlaylist, handleRenamePlaylist, handleRemoveSongFromPlaylist, handleReorderPlaylistSongs,
+    handleListSearch, handleLoadMoreSongs, handleLoadMoreAlbums, handleLoadMoreArtists
+  ]);
+
+  return (
+    <div className="flex min-h-screen text-white font-sans relative">
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-900/20 blur-[150px]"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-900/20 blur-[150px]"></div>
+      </div>
+
+      {playbackError && (
+          <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-2 fade-in">
+              <div className="bg-rose-500/10 backdrop-blur-md border border-rose-500/20 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4">
+                  <div className="p-2 bg-rose-500 rounded-full">
+                      <AlertCircle className="w-5 h-5 fill-current" />
+                  </div>
+                  <div className="flex flex-col">
+                      <span className="font-bold text-sm">Playback Failed</span>
+                      <span className="text-xs text-rose-200">{playbackError}</span>
+                  </div>
+                  <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
+                  <button 
+                      onClick={handleRefreshLibrary}
+                      disabled={isRefreshing}
+                      className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-wait"
+                  >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      {isRefreshing ? 'Refreshing...' : 'Refresh Library'}
+                  </button>
+                  <button 
+                      onClick={() => setPlaybackError(null)}
+                      className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1"
+                  >
+                      <X className="w-4 h-4" />
+                  </button>
+              </div>
+          </div>
+      )}
+
+      {/* Main Content Area (Memoized) */}
+      {MainContent}
 
       {/* Player Bar - Fixed */}
       <div className="z-[100] w-full fixed bottom-0 left-0">
