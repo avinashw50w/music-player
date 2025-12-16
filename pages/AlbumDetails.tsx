@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Song, Album, Artist } from '../types';
+import { Song, Album, Artist, LibraryEvent } from '../types';
 import * as api from '../services/api';
 import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
@@ -18,6 +18,7 @@ interface DetailProps {
   onAddToPlaylist: (song: Song) => void;
   onUpdateAlbum?: (album: Album) => void;
   artists?: Artist[];
+  lastEvent?: LibraryEvent | null;
 }
 
 export const AlbumDetails: React.FC<DetailProps> = ({ 
@@ -28,7 +29,8 @@ export const AlbumDetails: React.FC<DetailProps> = ({
   onToggleFavorite, 
   onUpdateAlbum, 
   onAddToPlaylist,
-  artists
+  artists,
+  lastEvent
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -67,6 +69,19 @@ export const AlbumDetails: React.FC<DetailProps> = ({
             .finally(() => setLoading(false));
     }
   }, [id]);
+
+  // Handle Real-time Updates
+  useEffect(() => {
+      if (!lastEvent || !album) return;
+
+      const { type, payload } = lastEvent;
+
+      if (type === 'song:update') {
+          setTracks(prev => prev.map(s => s.id === payload.id ? payload : s));
+      } else if (type === 'album:update' && payload.id === album.id) {
+          setAlbum(prev => prev ? { ...prev, ...payload } : null);
+      }
+  }, [lastEvent, album]);
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore || !album) return;

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Song, Playlist } from '../types';
+import { Song, Playlist, LibraryEvent } from '../types';
 import * as api from '../services/api';
 import { DetailHeader } from '../components/DetailHeader';
 import { ActionButtons } from '../components/ActionButtons';
@@ -20,11 +20,12 @@ interface PlaylistDetailsProps {
     onRenamePlaylist: (id: string, name: string) => void;
     onRemoveSong: (playlistId: string, songId: string) => void;
     onReorderSongs: (playlistId: string, from: number, to: number) => void;
+    lastEvent?: LibraryEvent | null;
 }
 
 export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({ 
     currentSongId, isPlaying, onPlaySong, onPlayContext, onToggleFavorite, onAddToPlaylist,
-    onDeletePlaylist, onRenamePlaylist, onRemoveSong, onReorderSongs
+    onDeletePlaylist, onRenamePlaylist, onRemoveSong, onReorderSongs, lastEvent
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -53,6 +54,30 @@ export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({
             .finally(() => setLoading(false));
       }
   }, [id]);
+
+  // Handle Real-time Updates
+  useEffect(() => {
+      if (!lastEvent || !playlist) return;
+
+      const { type, payload } = lastEvent;
+
+      if (type === 'song:update') {
+          // If song is in the playlist, update it
+          setSongs(prev => prev.map(s => s.id === payload.id ? payload : s));
+      } else if (type === 'playlist:update' && payload.id === playlist.id) {
+          // Update playlist metadata. Since payload might contain new songIds, 
+          // ideally we'd refetch songs if counts changed, but for renaming/cover updates this is enough.
+          // For adding/removing songs via SSE (multi-user/tab), payload needs to be handled carefully.
+          // Assuming payload is the full playlist object:
+          setPlaylist(prev => prev ? { ...prev, ...payload } : null);
+          
+          // If song count changed externally (SSE), we might want to refetch songs to stay in sync
+          // This logic depends on payload structure. If simple update, it's fine.
+          if (payload.songCount !== undefined && payload.songCount !== songs.length) {
+               api.getPlaylist(playlist.id).then(data => setSongs(data.songs));
+          }
+      }
+  }, [lastEvent, playlist, songs.length]);
 
   if (loading) {
       return <DetailSkeleton />;

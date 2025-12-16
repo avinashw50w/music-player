@@ -16,7 +16,7 @@ import { CreatePlaylistModal } from './components/CreatePlaylistModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { Visualizer } from './components/Visualizer';
 import * as api from './services/api';
-import { Song, Album, Artist, Playlist } from './types';
+import { Song, Album, Artist, Playlist, LibraryEvent } from './types';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import Wavis from './lib/waviz';
 
@@ -26,6 +26,9 @@ const App: React.FC = () => {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  
+  // Event Bus State
+  const [lastEvent, setLastEvent] = useState<LibraryEvent | null>(null);
   
   // Loading States
   const [isLoading, setIsLoading] = useState({
@@ -267,6 +270,9 @@ const App: React.FC = () => {
         try {
             const data = JSON.parse(event.data);
             const { type, payload } = data;
+            
+            // Broadcast event to detail pages
+            setLastEvent({ type, payload, timestamp: Date.now() });
 
             // Scanning Events
             if (type === 'scan:status' || type === 'scan:progress' || type === 'scan:start') {
@@ -815,7 +821,7 @@ const App: React.FC = () => {
                 <Route path="/" element={
                     <Home 
                         recentSongs={recentlyPlayed} 
-                        recentlyAdded={songs} // Pass current songs list which is sorted by date added
+                        recentlyAdded={songs} 
                         onPlaySong={handlePlaySong} 
                         currentSongId={currentSong?.id}
                         isPlaying={isPlaying}
@@ -869,6 +875,7 @@ const App: React.FC = () => {
                         onAddToPlaylist={handleAddToPlaylist}
                         onUpdateAlbum={onUpdateAlbum}
                         artists={artists} 
+                        lastEvent={lastEvent}
                     />
                 } />
                 <Route path="/artist/:id" element={
@@ -880,6 +887,7 @@ const App: React.FC = () => {
                         onToggleFavorite={handleToggleFavorite}
                         onAddToPlaylist={handleAddToPlaylist}
                         onUpdateArtist={onUpdateArtist}
+                        lastEvent={lastEvent}
                     />
                 } />
                 <Route path="/playlist/:id" element={
@@ -917,6 +925,7 @@ const App: React.FC = () => {
                             }
                         }}
                         onAddToPlaylist={handleAddToPlaylist}
+                        lastEvent={lastEvent}
                     />
                 } />
                 <Route path="/song/:id" element={

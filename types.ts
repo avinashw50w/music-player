@@ -49,3 +49,9 @@ export interface NavigationState {
   view: 'song_details' | 'album_details' | 'artist_details' | 'playlist_details' | string;
   id?: string;
 }
+
+export interface LibraryEvent {
+    type: 'song:update' | 'song:delete' | 'album:update' | 'artist:update' | 'playlist:update' | 'playlist:delete' | 'scan:complete' | string;
+    payload: any;
+    timestamp: number;
+}
