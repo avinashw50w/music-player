@@ -65,17 +65,17 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
 
   // Handle Real-time Updates
   useEffect(() => {
-      if (!lastEvent || !artist) return;
+      if (!lastEvent || !id) return;
 
       const { type, payload } = lastEvent;
 
       if (type === 'song:update') {
           // If song is in the list, update it
           setSongs(prev => prev.map(s => s.id === payload.id ? payload : s));
-      } else if (type === 'artist:update' && payload.id === artist.id) {
+      } else if (type === 'artist:update' && payload.id === id) {
           setArtist(prev => prev ? { ...prev, ...payload } : null);
       }
-  }, [lastEvent, artist]);
+  }, [lastEvent, id]);
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore || !artist) return;

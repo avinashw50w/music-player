@@ -111,6 +111,11 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             }));
             setVisualizerOptions(formattedPresets);
         }
+
+        // CLEANUP: Stop animation loop and detach canvas when component unmounts or visualizer changes
+        return () => {
+            wavis.unmount();
+        };
         
     }, [activeVisualizer, wavis]);
 

@@ -57,27 +57,32 @@ export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({
 
   // Handle Real-time Updates
   useEffect(() => {
-      if (!lastEvent || !playlist) return;
+      if (!lastEvent || !id) return;
 
       const { type, payload } = lastEvent;
 
       if (type === 'song:update') {
           // If song is in the playlist, update it
           setSongs(prev => prev.map(s => s.id === payload.id ? payload : s));
-      } else if (type === 'playlist:update' && payload.id === playlist.id) {
-          // Update playlist metadata. Since payload might contain new songIds, 
-          // ideally we'd refetch songs if counts changed, but for renaming/cover updates this is enough.
-          // For adding/removing songs via SSE (multi-user/tab), payload needs to be handled carefully.
-          // Assuming payload is the full playlist object:
+      } else if (type === 'playlist:update' && payload.id === id) {
+          // Update playlist metadata.
           setPlaylist(prev => prev ? { ...prev, ...payload } : null);
           
           // If song count changed externally (SSE), we might want to refetch songs to stay in sync
-          // This logic depends on payload structure. If simple update, it's fine.
-          if (payload.songCount !== undefined && payload.songCount !== songs.length) {
-               api.getPlaylist(playlist.id).then(data => setSongs(data.songs));
+          if (payload.songCount !== undefined) {
+               // We only refetch if we detect a drift, but comparing against local state in deps causes loop.
+               // Since we are in the effect handling 'playlist:update', we can assume the update is valid.
+               // For safety, let's just refetch songs if count is different in payload.
+               // Note: This relies on the fact that `api.getPlaylist` will update `songs` state,
+               // but since we removed `songs` from deps, it won't loop.
+               
+               // Using a functional state check to see if we need to fetch, 
+               // but we can't do async inside the setter. 
+               // We'll just optimistically fetch if the event says so.
+               api.getPlaylist(id).then(data => setSongs(data.songs));
           }
       }
-  }, [lastEvent, playlist, songs.length]);
+  }, [lastEvent, id]);
 
   if (loading) {
       return <DetailSkeleton />;

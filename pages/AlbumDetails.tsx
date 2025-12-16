@@ -72,16 +72,16 @@ export const AlbumDetails: React.FC<DetailProps> = ({
 
   // Handle Real-time Updates
   useEffect(() => {
-      if (!lastEvent || !album) return;
+      if (!lastEvent || !id) return;
 
       const { type, payload } = lastEvent;
 
       if (type === 'song:update') {
           setTracks(prev => prev.map(s => s.id === payload.id ? payload : s));
-      } else if (type === 'album:update' && payload.id === album.id) {
+      } else if (type === 'album:update' && payload.id === id) {
           setAlbum(prev => prev ? { ...prev, ...payload } : null);
       }
-  }, [lastEvent, album]);
+  }, [lastEvent, id]);
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore || !album) return;

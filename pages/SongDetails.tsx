@@ -156,7 +156,8 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
             title: data.title,
             artist: data.artist,
             album: data.album,
-            albumId: ids?.album, // Pass the captured album ID if selected
+            // Explicitly use the selected ID if available, otherwise undefined (backend will use text lookup)
+            albumId: ids?.album || undefined, 
             genre: genres
         });
         setSong(updated);
