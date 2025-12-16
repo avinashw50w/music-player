@@ -327,6 +327,22 @@ const App: React.FC = () => {
                     if (exists) return prev.map(a => a.id === payload.id ? payload : a);
                     return [payload, ...prev];
                 });
+
+                // Update songs that belong to this album
+                setSongs(prev => prev.map(s => {
+                    if (s.albumId === payload.id) {
+                        return { ...s, album: payload.title, coverUrl: payload.coverUrl || s.coverUrl };
+                    }
+                    return s;
+                }));
+                
+                // Update currentSong if applicable
+                setCurrentSong(prev => {
+                    if (prev?.albumId === payload.id) {
+                        return { ...prev, album: payload.title, coverUrl: payload.coverUrl || prev.coverUrl };
+                    }
+                    return prev;
+                });
             } else if (type === 'album:delete') {
                 setAlbums(prev => prev.filter(a => a.id !== payload.id));
             }
@@ -337,6 +353,29 @@ const App: React.FC = () => {
                     const exists = prev.find(a => a.id === payload.id);
                     if (exists) return prev.map(a => a.id === payload.id ? payload : a);
                     return [payload, ...prev];
+                });
+
+                // Update songs associated with this artist
+                setSongs(prev => prev.map(s => {
+                    // Check primary artist ID or if artist is in list
+                    if (s.artistId === payload.id || s.artists?.some(a => a.id === payload.id)) {
+                         const newArtists = s.artists?.map(a => a.id === payload.id ? { ...a, name: payload.name } : a);
+                         // Reconstruct string representation if artists array exists
+                         const newArtistStr = newArtists ? newArtists.map(a => a.name).join(', ') : payload.name;
+                         
+                         return { ...s, artist: newArtistStr, artists: newArtists };
+                    }
+                    return s;
+                }));
+                
+                // Update currentSong
+                setCurrentSong(prev => {
+                     if (prev?.artists?.some(a => a.id === payload.id)) {
+                         const newArtists = prev.artists.map(a => a.id === payload.id ? { ...a, name: payload.name } : a);
+                         const newArtistStr = newArtists.map(a => a.name).join(', ');
+                         return { ...prev, artist: newArtistStr, artists: newArtists };
+                     }
+                     return prev;
                 });
             }
 

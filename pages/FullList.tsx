@@ -259,46 +259,52 @@ const FullList: React.FC<FullListProps> = ({
   };
 
   return (
-    <div className="p-10 pb-10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-            <div className="flex items-center gap-4">
-                <BackButton />
-                <h1 className="text-4xl font-bold text-white tracking-tight">{getTitle()}</h1>
-            </div>
-            
-            {/* Search Input */}
-            {onSearch && (
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input 
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={`Search ${type}...`}
-                        className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-12 pr-10 text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-white/10 transition-all"
-                    />
-                    {searchQuery && (
-                        <button 
-                            onClick={() => setSearchQuery('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    )}
+    <div className="min-h-screen pb-10">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-white/5 px-10 py-6 mb-8 shadow-xl shadow-black/20">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                    <BackButton />
+                    <h1 className="text-4xl font-bold text-white tracking-tight">{getTitle()}</h1>
                 </div>
-            )}
+                
+                {/* Search Input */}
+                {onSearch && (
+                    <div className="relative w-full md:w-96">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                        <input 
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={`Search ${type}...`}
+                            className="w-full bg-white/10 border border-white/10 rounded-full py-3 pl-12 pr-10 text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-white/10 transition-all shadow-inner"
+                        />
+                        {searchQuery && (
+                            <button 
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
 
-        {renderContent()}
-        
-        <div ref={loadMoreRef} className="h-20 w-full flex items-center justify-center">
-            {hasMore && items.length > 0 && (
-                <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                    <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                    <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce"></div>
-                </div>
-            )}
+        {/* Content Area */}
+        <div className="px-10">
+            {renderContent()}
+            
+            <div ref={loadMoreRef} className="h-20 w-full flex items-center justify-center">
+                {hasMore && items.length > 0 && (
+                    <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce"></div>
+                    </div>
+                )}
+            </div>
         </div>
     </div>
   );

@@ -34,6 +34,7 @@ export async function refineMetadataWithGemini(filename, currentTitle, currentAr
 **Instructions**
 1. If a particular field is not available then return Unknown Artist or Unknown Album.
 2. If genre is not available then return empty array
+3. Don't include coverUrl in output json if not found.
 **Input Text (Song Data):**
 ${context}
 
@@ -44,7 +45,8 @@ ${context}
   "artist": "Clean Artist",
   "album": "Album Name",
   "genre": ["Genre1", "Genre2"],
-  "year": 2000
+  "year": 2000,
+  "coverUrl": "https://cover_url.jpg"
 }
 \`\`\`
 `;
