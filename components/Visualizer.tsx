@@ -70,9 +70,12 @@ const VisualizerBackground = React.memo(({
 }) => {
     const isModeWithBg = activeVisualizer === 'album cover' || activeVisualizer === 'lyrics' || activeVisualizer === 'none';
     
-    // Create a themed background style
-    const themedBgStyle = {
+    // Create a themed background style, only if we are in a mode that supports it
+    const themedBgStyle = isModeWithBg ? {
         background: `radial-gradient(circle at center, ${dominantColor} 0%, #000000 100%)`,
+        transition: 'background 1.5s ease-in-out'
+    } : {
+        background: '#000000',
         transition: 'background 1.5s ease-in-out'
     };
 
