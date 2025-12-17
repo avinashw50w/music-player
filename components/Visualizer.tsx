@@ -130,12 +130,14 @@ const LyricLine = React.memo(({
     isActive: boolean, 
     onSeek: (time: number) => void 
 }) => {
+    // Removed blur-[0.5px] to prevent flickering and heavy painting during resize
+    // Added will-change-transform to hint composition layer
     return (
         <p 
-            className={`transition-all duration-650 ease-out origin-center cursor-pointer py-3 select-none ${
+            className={`transition-all ease-out origin-center cursor-pointer py-3 select-none will-change-transform ${
                 isActive 
                   ? 'text-white text-3xl md:text-4xl font-bold opacity-100' 
-                  : 'text-neutral-500 text-2xl md:text-3xl font-medium opacity-30 blur-[0.5px]'
+                  : 'text-neutral-500 text-2xl md:text-3xl font-medium opacity-40 hover:opacity-60'
             }`}
             onClick={() => onSeek(line.time)}
         >
@@ -175,6 +177,17 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     // Background fetch tracking
     const [fetchedDetailsForId, setFetchedDetailsForId] = useState<string | null>(null);
     const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+
+    // Escape key handler
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     // Extract dominant color from image
     useEffect(() => {
@@ -227,7 +240,8 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             setIsFetchingDetails(false);
         } else {
             setParsedLyrics([]);
-            if (fetchedDetailsForId !== currentSong.id) {
+            // Only fetch if in lyrics mode and haven't fetched yet
+            if (activeVisualizer === 'lyrics' && fetchedDetailsForId !== currentSong.id) {
                 setFetchedDetailsForId(currentSong.id);
                 setIsFetchingDetails(true);
                 api.getSong(currentSong.id).then(fullSong => {
@@ -240,7 +254,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             }
         }
         setActiveLineIndex(-1);
-    }, [currentSong.lyrics, currentSong.id, fetchedDetailsForId, onUpdateSong]);
+    }, [currentSong.lyrics, currentSong.id, fetchedDetailsForId, onUpdateSong, activeVisualizer]);
 
     // Active Lyric Index Logic
     useEffect(() => {
@@ -250,6 +264,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         const currentLine = parsedLyrics[activeLineIndex];
         const nextLine = parsedLyrics[activeLineIndex + 1];
         
+        // Optimize finding the index: check current/next first
         if (currentLine && currentTime >= currentLine.time && (!nextLine || currentTime < nextLine.time)) {
             return;
         }
@@ -257,6 +272,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         if (nextLine && currentTime >= nextLine.time && (!parsedLyrics[activeLineIndex + 2] || currentTime < parsedLyrics[activeLineIndex + 2].time)) {
             newIndex = activeLineIndex + 1;
         } else {
+            // Fallback search
             newIndex = parsedLyrics.findIndex((line, i) => {
                 const next = parsedLyrics[i + 1];
                 return currentTime >= line.time && (!next || currentTime < next.time);
@@ -334,7 +350,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                     {parsedLyrics.length > 0 ? (
                         <div 
                             ref={lyricsContainerRef}
-                            className="w-full max-w-5xl h-full overflow-y-auto px-8 md:px-12 text-center space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                            className="w-full max-w-6xl h-full overflow-y-auto px-8 md:px-12 text-center space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                             style={{ 
                                 maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
                             }}

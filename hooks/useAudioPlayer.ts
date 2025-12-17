@@ -142,8 +142,15 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
 
       switch (e.code) {
         case 'Space':
+        case 'MediaPlayPause':
           e.preventDefault();
           setIsPlaying(prev => !prev);
+          break;
+        case 'MediaTrackNext':
+          handleNext();
+          break;
+        case 'MediaTrackPrevious':
+          handlePrev();
           break;
         case 'ArrowLeft':
           if (e.metaKey || e.ctrlKey) {
