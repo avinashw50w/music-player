@@ -296,15 +296,21 @@ const App: React.FC = () => {
                 }
             }
             else if (type === 'song:update') {
+                // If a song update comes in, bust cover cache if URL exists
+                const updatedPayload = { ...payload };
+                if (updatedPayload.coverUrl) {
+                    updatedPayload.coverUrl = `${updatedPayload.coverUrl.split('?')[0]}?t=${Date.now()}`;
+                }
+                
                 setSongs(prev => {
-                    const exists = prev.find(s => s.id === payload.id);
-                    if (exists) return prev.map(s => s.id === payload.id ? payload : s);
-                    return [payload, ...prev];
+                    const exists = prev.find(s => s.id === updatedPayload.id);
+                    if (exists) return prev.map(s => s.id === updatedPayload.id ? updatedPayload : s);
+                    return [updatedPayload, ...prev];
                 });
-                setCurrentSong(prev => prev?.id === payload.id ? payload : prev);
+                setCurrentSong(prev => prev?.id === updatedPayload.id ? updatedPayload : prev);
                 setRecentlyPlayed(prev => {
-                    if (prev.some(s => s.id === payload.id)) {
-                        const newHistory = prev.map(s => s.id === payload.id ? payload : s);
+                    if (prev.some(s => s.id === updatedPayload.id)) {
+                        const newHistory = prev.map(s => s.id === updatedPayload.id ? updatedPayload : s);
                         localStorage.setItem('recentlyPlayed', JSON.stringify(newHistory));
                         return newHistory;
                     }
@@ -320,17 +326,23 @@ const App: React.FC = () => {
                     return prev;
                 });
             } else if (type === 'album:update') {
+                 // Bust cover cache on album update
+                 const updatedPayload = { ...payload };
+                 if (updatedPayload.coverUrl) {
+                    updatedPayload.coverUrl = `${updatedPayload.coverUrl.split('?')[0]}?t=${Date.now()}`;
+                 }
+
                  setAlbums(prev => {
-                    const exists = prev.find(a => a.id === payload.id);
-                    if (exists) return prev.map(a => a.id === payload.id ? payload : a);
-                    return [payload, ...prev];
+                    const exists = prev.find(a => a.id === updatedPayload.id);
+                    if (exists) return prev.map(a => a.id === updatedPayload.id ? updatedPayload : a);
+                    return [updatedPayload, ...prev];
                 });
                 setSongs(prev => prev.map(s => {
-                    if (s.albumId === payload.id) return { ...s, album: payload.title, coverUrl: payload.coverUrl || s.coverUrl };
+                    if (s.albumId === updatedPayload.id) return { ...s, album: updatedPayload.title, coverUrl: updatedPayload.coverUrl || s.coverUrl };
                     return s;
                 }));
                 setCurrentSong(prev => {
-                    if (prev?.albumId === payload.id) return { ...prev, album: payload.title, coverUrl: payload.coverUrl || prev.coverUrl };
+                    if (prev?.albumId === updatedPayload.id) return { ...prev, album: updatedPayload.title, coverUrl: updatedPayload.coverUrl || prev.coverUrl };
                     return prev;
                 });
             } else if (type === 'album:delete') {
@@ -675,11 +687,17 @@ const App: React.FC = () => {
   }, []);
 
   const onUpdateSong = useCallback((updated: Song) => {
-      setSongs(prev => prev.map(s => s.id === updated.id ? updated : s));
-      setCurrentSong(prev => prev?.id === updated.id ? updated : prev);
+      // Append timestamp to coverUrl if it exists to bust cache
+      const withCacheBust = { ...updated };
+      if (withCacheBust.coverUrl) {
+          withCacheBust.coverUrl = `${withCacheBust.coverUrl.split('?')[0]}?t=${Date.now()}`;
+      }
+
+      setSongs(prev => prev.map(s => s.id === withCacheBust.id ? withCacheBust : s));
+      setCurrentSong(prev => prev?.id === withCacheBust.id ? withCacheBust : prev);
       setRecentlyPlayed(prev => {
-          if (prev.some(s => s.id === updated.id)) {
-              const newHistory = prev.map(s => s.id === updated.id ? updated : s);
+          if (prev.some(s => s.id === withCacheBust.id)) {
+              const newHistory = prev.map(s => s.id === withCacheBust.id ? withCacheBust : s);
               localStorage.setItem('recentlyPlayed', JSON.stringify(newHistory));
               return newHistory;
           }
@@ -688,7 +706,28 @@ const App: React.FC = () => {
   }, []);
   
   const onUpdateAlbum = useCallback((updated: Album) => {
-      setAlbums(prev => prev.map(a => a.id === updated.id ? updated : a));
+      // Append timestamp to coverUrl if it exists to bust cache
+      const withCacheBust = { ...updated };
+      if (withCacheBust.coverUrl) {
+          withCacheBust.coverUrl = `${withCacheBust.coverUrl.split('?')[0]}?t=${Date.now()}`;
+      }
+      setAlbums(prev => prev.map(a => a.id === withCacheBust.id ? withCacheBust : a));
+      
+      // Update covers for all songs in this album
+      setSongs(prev => prev.map(s => {
+          if (s.albumId === withCacheBust.id) {
+              return { ...s, coverUrl: withCacheBust.coverUrl, album: withCacheBust.title };
+          }
+          return s;
+      }));
+      
+      // Update current song if it belongs to this album
+      setCurrentSong(prev => {
+          if (prev?.albumId === withCacheBust.id) {
+              return { ...prev, coverUrl: withCacheBust.coverUrl, album: withCacheBust.title };
+          }
+          return prev;
+      });
   }, []);
   
   const onUpdateArtist = useCallback((updated: Artist) => {

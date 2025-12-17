@@ -30,7 +30,6 @@ const formatTime = (seconds: number) => {
 };
 
 // 1. Memoized Canvas Component
-// Strictly controls the Wavis lifecycle and Canvas DOM
 const VisualizerCanvas = React.memo(({ wavis, activeVisualizer }: { wavis: any, activeVisualizer: string }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -38,22 +37,18 @@ const VisualizerCanvas = React.memo(({ wavis, activeVisualizer }: { wavis: any, 
         const isCanvasVisualizer = activeVisualizer !== 'album cover' && activeVisualizer !== 'none' && activeVisualizer !== 'lyrics';
         
         if (isCanvasVisualizer && canvasRef.current) {
-            // Mount and Start
             wavis.mount(canvasRef.current);
             wavis.start();
             wavis.setVisualizer(activeVisualizer);
         } else {
-            // Unmount if switching to non-canvas mode
             wavis.unmount();
         }
 
-        // Cleanup on unmount or change
         return () => {
             wavis.unmount();
         };
     }, [activeVisualizer, wavis]);
 
-    // If mode is not a canvas visualizer, return null to remove from DOM
     if (activeVisualizer === 'album cover' || activeVisualizer === 'none' || activeVisualizer === 'lyrics') {
         return null;
     }
@@ -62,42 +57,61 @@ const VisualizerCanvas = React.memo(({ wavis, activeVisualizer }: { wavis: any, 
 });
 
 // 2. Memoized Background Component
-// Handles expensive blurred images and album cover mode
-const VisualizerBackground = React.memo(({ activeVisualizer, coverUrl, title }: { activeVisualizer: string, coverUrl: string, title: string }) => {
-    if (activeVisualizer !== 'album cover' && activeVisualizer !== 'lyrics') return null;
+const VisualizerBackground = React.memo(({ 
+    activeVisualizer, 
+    coverUrl, 
+    title,
+    dominantColor 
+}: { 
+    activeVisualizer: string, 
+    coverUrl: string, 
+    title: string,
+    dominantColor: string
+}) => {
+    const isModeWithBg = activeVisualizer === 'album cover' || activeVisualizer === 'lyrics' || activeVisualizer === 'none';
+    
+    // Create a themed background style
+    const themedBgStyle = {
+        background: `radial-gradient(circle at center, ${dominantColor} 0%, #000000 100%)`,
+        transition: 'background 1.5s ease-in-out'
+    };
 
     return (
-        <div className="absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute inset-0 z-0 overflow-hidden" style={themedBgStyle}>
             {/* Blurred Background for Lyrics */}
             {activeVisualizer === 'lyrics' && (
                 <>
                     <div className="absolute inset-0 w-full h-full bg-black">
                         <img 
                             src={coverUrl} 
-                            className="w-full h-full object-cover opacity-30"
-                            style={{ filter: 'blur(40px)', transform: 'scale(1.1)' }} // Reduced blur for performance
+                            className="w-full h-full object-cover opacity-40"
+                            style={{ filter: 'blur(60px)', transform: 'scale(1.2)' }}
                             alt="" 
                         />
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80"></div>
+                    {/* Color Overlay to deepen the theme */}
+                    <div 
+                        className="absolute inset-0 opacity-40 transition-colors duration-1000" 
+                        style={{ backgroundColor: dominantColor }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-black/80"></div>
                 </>
             )}
 
             {/* Album Cover Mode */}
             {activeVisualizer === 'album cover' && (
-                <div className="relative z-10 w-full h-full flex items-center justify-center animate-in fade-in duration-700">
-                    <img 
-                        src={coverUrl} 
-                        alt={title} 
-                        className="w-[min(50vh,80vw)] h-[min(50vh,80vw)] object-cover rounded-[2rem] shadow-2xl shadow-indigo-500/20 z-20"
-                    />
-                    {/* Reflection */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-[min(25vh,40vw)] w-[min(50vh,80vw)] h-[min(50vh,80vw)] z-10 opacity-30 pointer-events-none">
-                         <img 
+                <div className="relative z-10 w-full h-full flex items-center justify-center animate-in fade-in duration-1000">
+                    <div className="relative group">
+                        {/* Glow behind the cover */}
+                        <div 
+                            className="absolute inset-0 blur-[100px] opacity-50 scale-110 rounded-full transition-colors duration-1000"
+                            style={{ backgroundColor: dominantColor }}
+                        />
+                        
+                        <img 
                             src={coverUrl} 
-                            alt="" 
-                            className="w-full h-full object-cover rounded-[2rem] transform scale-y-[-1] blur-xl"
-                            style={{ maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1), transparent)' }}
+                            alt={title} 
+                            className="w-[min(50vh,80vw)] h-[min(50vh,80vw)] object-cover rounded-[2.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] z-20 relative border border-white/10"
                         />
                     </div>
                 </div>
@@ -120,8 +134,8 @@ const LyricLine = React.memo(({
         <p 
             className={`transition-all duration-500 ease-out origin-center cursor-pointer py-3 select-none ${
                 isActive 
-                  ? 'text-white text-3xl font-bold opacity-100 scale-105' 
-                  : 'text-neutral-500 text-2xl font-medium opacity-40 blur-[0.5px] hover:opacity-70 hover:blur-0'
+                  ? 'text-white text-3xl md:text-4xl font-bold opacity-100 scale-105' 
+                  : 'text-neutral-500 text-2xl md:text-3xl font-medium opacity-30 blur-[0.5px] hover:opacity-60 hover:blur-0'
             }`}
             onClick={() => onSeek(line.time)}
         >
@@ -150,6 +164,9 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
+    // Dynamic Color State
+    const [dominantColor, setDominantColor] = useState('rgba(30, 30, 40, 0.5)');
+    
     // Lyrics State
     const [parsedLyrics, setParsedLyrics] = useState<LrcLine[]>([]);
     const [activeLineIndex, setActiveLineIndex] = useState(-1);
@@ -158,6 +175,35 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     // Background fetch tracking
     const [fetchedDetailsForId, setFetchedDetailsForId] = useState<string | null>(null);
     const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+
+    // Extract dominant color from image
+    useEffect(() => {
+        if (!currentSong.coverUrl) return;
+
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            
+            // Draw to a 1x1 canvas to get average color
+            canvas.width = 1;
+            canvas.height = 1;
+            ctx.drawImage(img, 0, 0, 1, 1);
+            
+            try {
+                const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+                // Set the color with a dark multiplier to keep it background-friendly
+                setDominantColor(`rgba(${Math.floor(r * 0.6)}, ${Math.floor(g * 0.6)}, ${Math.floor(b * 0.6)}, 0.4)`);
+            } catch (e) {
+                console.warn("Could not extract pixel data due to CORS or other issue");
+                setDominantColor('rgba(40, 40, 60, 0.4)');
+            }
+        };
+        img.onerror = () => setDominantColor('rgba(40, 40, 60, 0.4)');
+        img.src = currentSong.coverUrl;
+    }, [currentSong.coverUrl]);
 
     // Initial Visualizer Options
     const [visualizerOptions] = useState(() => {
@@ -200,10 +246,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     useEffect(() => {
         if (activeVisualizer !== 'lyrics' || parsedLyrics.length === 0) return;
 
-        // Optimized finder
         let newIndex = activeLineIndex;
-        
-        // 1. Check if current is still valid
         const currentLine = parsedLyrics[activeLineIndex];
         const nextLine = parsedLyrics[activeLineIndex + 1];
         
@@ -211,11 +254,9 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             return;
         }
 
-        // 2. Check next immediate (common case)
         if (nextLine && currentTime >= nextLine.time && (!parsedLyrics[activeLineIndex + 2] || currentTime < parsedLyrics[activeLineIndex + 2].time)) {
             newIndex = activeLineIndex + 1;
         } else {
-            // 3. Search
             newIndex = parsedLyrics.findIndex((line, i) => {
                 const next = parsedLyrics[i + 1];
                 return currentTime >= line.time && (!next || currentTime < next.time);
@@ -225,7 +266,6 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         if (newIndex !== activeLineIndex) {
             setActiveLineIndex(newIndex);
             
-            // Scroll logic inside the index update to allow 'smooth' behavior without thrashing
             if (lyricsContainerRef.current && newIndex !== -1) {
                 const activeEl = lyricsContainerRef.current.children[newIndex + 1] as HTMLElement;
                 if (activeEl) {
@@ -235,7 +275,6 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         }
     }, [currentTime, parsedLyrics, activeVisualizer, activeLineIndex]);
 
-    // Mouse Move Controls Hider
     const handleMouseMove = useCallback(() => {
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -276,15 +315,20 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     ], [visualizerOptions]);
 
     return (
-        <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden">
+        <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden font-sans">
             
-            {/* Layer 1: Canvas (Memoized) */}
+            {/* Layer 1: Background & Themed Gradient (Dynamic) */}
+            <VisualizerBackground 
+                activeVisualizer={activeVisualizer} 
+                coverUrl={currentSong.coverUrl} 
+                title={currentSong.title}
+                dominantColor={dominantColor}
+            />
+
+            {/* Layer 2: Canvas (Visualizer Bars/Waves) */}
             <VisualizerCanvas wavis={wavis} activeVisualizer={activeVisualizer} />
 
-            {/* Layer 2: Background (Memoized) */}
-            <VisualizerBackground activeVisualizer={activeVisualizer} coverUrl={currentSong.coverUrl} title={currentSong.title} />
-
-            {/* Layer 3: Lyrics Content (Updates frequently) */}
+            {/* Layer 3: Lyrics Content */}
             {activeVisualizer === 'lyrics' && (
                 <div className="relative z-10 w-full h-full flex flex-col items-center justify-center pb-56 pt-20">
                     {parsedLyrics.length > 0 ? (
@@ -358,7 +402,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             >
                 {/* Header */}
                 <div className="flex justify-between items-start relative z-50">
-                    <div className="bg-white/10 backdrop-blur-xl px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 pointer-events-auto shadow-lg">
+                    <div className="bg-black/40 backdrop-blur-xl px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 pointer-events-auto shadow-lg">
                         <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Visualizer</span>
                         <div className="w-[1px] h-3 bg-white/20"></div>
                         <div className="relative">
@@ -394,7 +438,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors backdrop-blur-xl border border-white/10 shadow-lg pointer-events-auto"
+                        className="p-3 bg-black/40 hover:bg-white/10 rounded-full text-white transition-colors backdrop-blur-xl border border-white/10 shadow-lg pointer-events-auto"
                     >
                         <X className="w-6 h-6" />
                     </button>
@@ -402,7 +446,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
                 {/* Footer Controls */}
                 <div className="w-full max-w-3xl mx-auto pointer-events-auto">
-                    <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl space-y-6">
+                    <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl space-y-6">
                         <div className="text-center space-y-2">
                             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-lg truncate">{currentSong.title}</h1>
                             <p className="text-lg md:text-xl text-indigo-300 font-medium drop-shadow-md truncate">{currentSong.artist}</p>
@@ -414,7 +458,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                 currentTime={currentTime} 
                                 duration={duration} 
                                 onSeek={onSeek} 
-                                className="bg-white/20"
+                                className="bg-white/10"
                             />
                             <span className="text-md font-bold text-slate-400 tabular-nums w-10">{formatTime(duration)}</span>
                         </div>

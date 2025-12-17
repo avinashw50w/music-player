@@ -182,8 +182,13 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
   const handleCoverUpload = async (file: File) => {
     try {
       const updated = await api.updateSongCover(song.id, file);
-      setSong(updated);
-      onUpdateSong?.(updated);
+      // Append timestamp to bust cache
+      const withCacheBust = { 
+          ...updated, 
+          coverUrl: `${updated.coverUrl.split('?')[0]}?t=${Date.now()}` 
+      };
+      setSong(withCacheBust);
+      onUpdateSong?.(withCacheBust);
     } catch (err) {
       console.error("Failed to update song cover", err);
     }
@@ -264,8 +269,13 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
               year: finalData.year,
               remoteCoverUrl: finalData.coverUrl 
           });
-          setSong(updated);
-          onUpdateSong?.(updated);
+          // Cache bust after applying suggestion which might download new cover
+          const withCacheBust = { 
+              ...updated, 
+              coverUrl: `${updated.coverUrl.split('?')[0]}?t=${Date.now()}` 
+          };
+          setSong(withCacheBust);
+          onUpdateSong?.(withCacheBust);
           setSuggestionData(null);
       } catch (e) {
           console.error("Failed to apply suggestion", e);

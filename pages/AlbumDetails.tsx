@@ -79,7 +79,12 @@ export const AlbumDetails: React.FC<DetailProps> = ({
       if (type === 'song:update') {
           setTracks(prev => prev.map(s => s.id === payload.id ? payload : s));
       } else if (type === 'album:update' && payload.id === id) {
-          setAlbum(prev => prev ? { ...prev, ...payload } : null);
+          // If the cover URL is being updated via SSE, append a timestamp to bust cache
+          const updatedPayload = { ...payload };
+          if (updatedPayload.coverUrl) {
+              updatedPayload.coverUrl = `${updatedPayload.coverUrl.split('?')[0]}?t=${Date.now()}`;
+          }
+          setAlbum(prev => prev ? { ...prev, ...updatedPayload } : null);
       }
   }, [lastEvent, id]);
 
@@ -131,8 +136,13 @@ export const AlbumDetails: React.FC<DetailProps> = ({
   const handleCoverUpload = async (file: File) => {
     try {
       const updated = await api.updateAlbumCover(album.id, file);
-      setAlbum(prev => prev ? { ...prev, coverUrl: updated.coverUrl } : null);
-      onUpdateAlbum?.(updated);
+      // Append cache-busting timestamp to the cover URL
+      const withCacheBust = { 
+          ...updated, 
+          coverUrl: `${updated.coverUrl.split('?')[0]}?t=${Date.now()}` 
+      };
+      setAlbum(prev => prev ? { ...prev, coverUrl: withCacheBust.coverUrl } : null);
+      onUpdateAlbum?.(withCacheBust);
     } catch (err) {
       console.error("Failed to update album cover", err);
     }
