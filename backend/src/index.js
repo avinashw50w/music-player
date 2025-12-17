@@ -89,6 +89,7 @@ app.get('/api/search', async (req, res, next) => {
                 .where(function() {
                     this.where('title', 'like', searchTerm);
                 })
+                .andWhere('track_count', '>', 0)
                 .limit(10)
                 .select('*');
         }
