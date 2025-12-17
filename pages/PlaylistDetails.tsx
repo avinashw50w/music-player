@@ -19,7 +19,8 @@ interface PlaylistDetailsProps {
     onDeletePlaylist: (id: string) => void;
     onRenamePlaylist: (id: string, name: string) => void;
     onRemoveSong: (playlistId: string, songId: string) => void;
-    onReorderSongs: (playlistId: string, from: number, to: number) => void;
+    // Fix: Updated signature to take the full array of song IDs as required by api.reorderPlaylistSongs
+    onReorderSongs: (playlistId: string, songIds: string[]) => void;
     lastEvent?: LibraryEvent | null;
 }
 
@@ -129,7 +130,8 @@ export const PlaylistDetails: React.FC<PlaylistDetailsProps> = ({
       const [moved] = newSongs.splice(from, 1);
       newSongs.splice(to, 0, moved);
       setSongs(newSongs);
-      onReorderSongs(playlist.id, from, to);
+      // Fix: Call onReorderSongs with the new list of IDs instead of indices
+      onReorderSongs(playlist.id, newSongs.map(s => s.id));
   };
 
   // Internal favorite toggle wrapper to update local state

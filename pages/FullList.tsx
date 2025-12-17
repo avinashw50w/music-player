@@ -7,15 +7,20 @@ import { BackButton } from '../components/BackButton';
 import { useNavigate, useParams } from 'react-router-dom';
 
 interface FullListProps {
-  items?: Song[] | Album[] | Artist[] | Playlist[]; 
   onPlaySong?: (song: Song, context?: Song[]) => void;
   currentSongId?: string;
   isPlaying?: boolean;
   onToggleFavorite?: (id: string) => void;
   onAddToPlaylist?: (song: Song) => void;
-  onLoadMore?: () => void;
-  hasMore?: boolean;
-  onSearch?: (query: string) => void;
+  
+  // Handlers for dynamic types
+  onLoadMoreSongs?: () => void;
+  onLoadMoreAlbums?: () => void;
+  onLoadMoreArtists?: () => void;
+  hasMoreMap?: { songs: boolean; albums: boolean; artists: boolean };
+  onSearchGlobal?: (type: 'songs' | 'albums' | 'artists', query: string) => void;
+
+  // Data
   songs: Song[];
   albums: Album[];
   artists: Artist[];
@@ -26,13 +31,13 @@ interface FullListProps {
 
 const SkeletonRow = () => (
   <div className="flex items-center gap-4 px-4 py-3 rounded-xl border border-transparent">
-     <div className="w-10 h-6 bg-white/5 rounded animate-pulse" /> {/* Index */}
-     <div className="w-12 h-12 rounded-lg bg-white/10 animate-pulse flex-shrink-0" /> {/* Image */}
+     <div className="w-10 h-6 bg-white/5 rounded animate-pulse" />
+     <div className="w-12 h-12 rounded-lg bg-white/10 animate-pulse flex-shrink-0" />
      <div className="flex-1 space-y-2">
         <div className="h-4 w-48 bg-white/10 rounded animate-pulse" />
         <div className="h-3 w-32 bg-white/5 rounded animate-pulse" />
      </div>
-     <div className="w-12 h-4 bg-white/5 rounded animate-pulse" /> {/* Time */}
+     <div className="w-12 h-4 bg-white/5 rounded animate-pulse" />
   </div>
 );
 
@@ -45,7 +50,8 @@ const SkeletonCard = () => (
 );
 
 const FullList: React.FC<FullListProps> = ({ 
-    onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist, onLoadMore, hasMore, onSearch,
+    onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist,
+    onLoadMoreSongs, onLoadMoreAlbums, onLoadMoreArtists, hasMoreMap, onSearchGlobal,
     songs, albums, artists, playlists, isLoadingMap, initialSearchQuery = ''
 }) => {
   const { type } = useParams<{ type: string }>(); // 'songs', 'albums', 'artists', 'playlists'
@@ -55,78 +61,75 @@ const FullList: React.FC<FullListProps> = ({
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const previousQueryRef = useRef(initialSearchQuery);
   
-  // Fix 1: Delay observer activation to handle scroll restoration
   const [isObserverActive, setIsObserverActive] = useState(false);
   useEffect(() => {
-      // Increased delay slightly to ensure layout and scroll are fully settled
       const timer = setTimeout(() => setIsObserverActive(true), 800);
       return () => clearTimeout(timer);
   }, []);
 
-  // Resolve items and loading state based on URL param 'type'
+  // Resolve items and loading state based on type
   let items: any[] = [];
   let isLoading = false;
+  let activeHasMore = false;
 
-  if (type === 'songs') { items = songs; isLoading = isLoadingMap.songs; }
-  else if (type === 'albums') { items = albums; isLoading = isLoadingMap.albums; }
-  else if (type === 'artists') { items = artists; isLoading = isLoadingMap.artists; }
-  else if (type === 'playlists') { items = playlists; isLoading = isLoadingMap.playlists; }
-
-  // Use a ref for onSearch to avoid effect re-triggering when the function prop changes
-  const onSearchRef = useRef(onSearch);
-  
-  useEffect(() => {
-      onSearchRef.current = onSearch;
-  }, [onSearch]);
+  if (type === 'songs') { 
+    items = songs; 
+    isLoading = isLoadingMap.songs; 
+    activeHasMore = hasMoreMap?.songs || false;
+  }
+  else if (type === 'albums') { 
+    items = albums; 
+    isLoading = isLoadingMap.albums; 
+    activeHasMore = hasMoreMap?.albums || false;
+  }
+  else if (type === 'artists') { 
+    items = artists; 
+    isLoading = isLoadingMap.artists; 
+    activeHasMore = hasMoreMap?.artists || false;
+  }
+  else if (type === 'playlists') { 
+    items = playlists; 
+    isLoading = isLoadingMap.playlists; 
+    activeHasMore = false; // No pagination for local playlists usually
+  }
 
   // Debounce Search
   useEffect(() => {
-    // If the query hasn't changed from what we initialized with (or last ran), skip.
-    // This prevents the search from firing on mount or remount (navigation), 
-    // which would otherwise reset the list in App.tsx.
-    if (searchQuery === previousQueryRef.current) {
-        return;
-    }
-    
+    if (searchQuery === previousQueryRef.current) return;
     previousQueryRef.current = searchQuery;
 
-    if (onSearchRef.current) {
+    if (onSearchGlobal && type && type !== 'playlists') {
         const timer = setTimeout(() => {
-            if (onSearchRef.current) onSearchRef.current(searchQuery);
+            onSearchGlobal(type as any, searchQuery);
         }, 500);
         return () => clearTimeout(timer);
     }
-  }, [searchQuery]); 
+  }, [searchQuery, type, onSearchGlobal]); 
 
-  // Fix 2: Stable callback for observer to prevent re-creation on every render
-  const onLoadMoreRef = useRef(onLoadMore);
-  useEffect(() => {
-      onLoadMoreRef.current = onLoadMore;
-  }, [onLoadMore]);
+  // Stable Load More Wrapper
+  const handleLoadMoreInternal = useCallback(() => {
+    if (type === 'songs') onLoadMoreSongs?.();
+    else if (type === 'albums') onLoadMoreAlbums?.();
+    else if (type === 'artists') onLoadMoreArtists?.();
+  }, [type, onLoadMoreSongs, onLoadMoreAlbums, onLoadMoreArtists]);
 
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
       const target = entries[0];
-      if (target.isIntersecting && hasMore && onLoadMoreRef.current) {
-          // Fix 3: Secondary check to ensure we are actually at the bottom of the document.
-          // This prevents the observer from firing if the viewport is at the top (0) 
-          // but the sentinel is theoretically 'intersecting' due to layout shifts or initialization.
+      if (target.isIntersecting && activeHasMore && !isLoading) {
           const scrollBottom = window.innerHeight + window.scrollY;
           const docHeight = document.documentElement.scrollHeight;
-          
-          // We allow a buffer of 1000px to start loading before hitting exact bottom.
-          // If the user is at top (scrollY=0) and doc is long (5000px), 1000 < 4000, so it won't fire.
-          if (scrollBottom >= docHeight - 1000) {
-              onLoadMoreRef.current();
+          if (scrollBottom >= docHeight - 1200) {
+              handleLoadMoreInternal();
           }
       }
-  }, [hasMore]); 
+  }, [activeHasMore, isLoading, handleLoadMoreInternal]); 
 
   useEffect(() => {
       if (!isObserverActive) return;
 
       const option = {
           root: null,
-          rootMargin: "100px", // Increased margin slightly
+          rootMargin: "200px",
           threshold: 0
       };
       observerRef.current = new IntersectionObserver(handleObserver, option);
@@ -148,7 +151,6 @@ const FullList: React.FC<FullListProps> = ({
   };
 
   const renderContent = () => {
-    // Show skeleton if loading and no items yet
     if (isLoading && items.length === 0) {
         if (type === 'songs') {
             return (
@@ -260,7 +262,6 @@ const FullList: React.FC<FullListProps> = ({
 
   return (
     <div className="min-h-screen pb-10">
-        {/* Sticky Header */}
         <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-white/5 px-10 py-6 mb-8 shadow-xl shadow-black/20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
@@ -268,8 +269,7 @@ const FullList: React.FC<FullListProps> = ({
                     <h1 className="text-4xl font-bold text-white tracking-tight">{getTitle()}</h1>
                 </div>
                 
-                {/* Search Input */}
-                {onSearch && (
+                {onSearchGlobal && type !== 'playlists' && (
                     <div className="relative w-full md:w-96">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                         <input 
@@ -292,16 +292,18 @@ const FullList: React.FC<FullListProps> = ({
             </div>
         </div>
 
-        {/* Content Area */}
         <div className="px-10">
             {renderContent()}
             
-            <div ref={loadMoreRef} className="h-20 w-full flex items-center justify-center">
-                {hasMore && items.length > 0 && (
-                    <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                        <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                        <div className="w-2 h-2 bg-slate-600 rounded-full animate-bounce"></div>
+            <div ref={loadMoreRef} className="h-40 w-full flex items-center justify-center">
+                {activeHasMore && items.length > 0 && (
+                    <div className="flex flex-col items-center gap-4">
+                         <div className="flex gap-1">
+                            <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                            <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-bounce"></div>
+                         </div>
+                         <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Loading more {type}</span>
                     </div>
                 )}
             </div>
