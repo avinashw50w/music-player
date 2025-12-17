@@ -19,6 +19,7 @@ import * as api from './services/api';
 import { Song, Album, Artist, Playlist, LibraryEvent } from './types';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import Wavis from './lib/waviz';
+import { getCookie, setCookie } from './lib/cookies';
 
 // Throttle helper variable outside component scope
 let lastScanUpdateTimestamp = 0;
@@ -57,12 +58,28 @@ const App: React.FC = () => {
   
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(1);
+  
+  // Persistent Preferences loaded from cookies
+  const [volume, setVolume] = useState(() => {
+    const saved = getCookie('myousic_volume');
+    return saved !== '' ? parseFloat(saved) : 1;
+  });
+  
+  const [isShuffle, setIsShuffle] = useState(() => {
+    return getCookie('myousic_shuffle') === 'true';
+  });
+
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>(() => {
+    const saved = getCookie('myousic_repeat');
+    return (saved as any) || 'off';
+  });
+
+  const [activeVisualizer, setActiveVisualizer] = useState(() => {
+    return getCookie('myousic_visualizer') || 'bars';
+  });
+
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  
-  const [isShuffle, setIsShuffle] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   
   const [playbackQueue, setPlaybackQueue] = useState<Song[]>([]);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
@@ -72,7 +89,6 @@ const App: React.FC = () => {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showVisualizer, setShowVisualizer] = useState(false);
-  const [activeVisualizer, setActiveVisualizer] = useState('bars');
 
   const [scanStatus, setScanStatus] = useState<api.ScanStatus | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -82,6 +98,12 @@ const App: React.FC = () => {
   const wavisRef = useRef<any>(null);
 
   const scrollPositions = useRef<Record<string, number>>({});
+
+  // Sync Preferences to Cookies
+  useEffect(() => { setCookie('myousic_volume', volume.toString()); }, [volume]);
+  useEffect(() => { setCookie('myousic_visualizer', activeVisualizer); }, [activeVisualizer]);
+  useEffect(() => { setCookie('myousic_shuffle', isShuffle.toString()); }, [isShuffle]);
+  useEffect(() => { setCookie('myousic_repeat', repeatMode); }, [repeatMode]);
 
   useEffect(() => {
     if ('scrollRestoration' in window.history) {
@@ -315,10 +337,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (audioRef.current) {
+        audioRef.current.volume = volume;
         if (isPlaying) playAudio();
         else audioRef.current.pause();
     }
-  }, [isPlaying, currentSong, playAudio]);
+  }, [isPlaying, currentSong, playAudio, volume]);
 
   const handlePlaySong = useCallback((song: Song, context?: Song[]) => {
     setRecentlyPlayed(prev => [song, ...prev.filter(s => s.id !== song.id)].slice(0, 20));
@@ -334,14 +357,12 @@ const App: React.FC = () => {
     }
   }, [currentSong]);
 
-  // Fix: Add handlePlayContext to match the expected prop signature in detail views
   const handlePlayContext = useCallback((context: Song[]) => {
     if (context.length > 0) {
       handlePlaySong(context[0], context);
     }
   }, [handlePlaySong]);
 
-  // Fix: Add handleSeek to handle scrubbing
   const handleSeek = useCallback((time: number) => {
     if (audioRef.current) {
         audioRef.current.currentTime = time;
@@ -381,10 +402,98 @@ const App: React.FC = () => {
     } catch (err) { console.warn("Favorite toggle failed", err); }
   }, []);
 
-  // Fix: Move these callback definitions ABOVE MainContent to avoid TDZ errors
   const onUpdateSong = useCallback((u: Song) => setSongs(prev => prev.map(s => s.id === u.id ? u : s)), []);
   const onUpdateAlbum = useCallback((u: Album) => setAlbums(prev => prev.map(a => a.id === u.id ? u : a)), []);
   const onUpdateArtist = useCallback((u: Artist) => setArtists(prev => prev.map(a => a.id === u.id ? u : a)), []);
+
+  const handleToggleRepeat = useCallback(() => {
+    setRepeatMode(prev => {
+        if (prev === 'off') return 'all';
+        if (prev === 'all') return 'one';
+        return 'off';
+    });
+  }, []);
+
+  // Update time and duration handlers
+  const handleTimeUpdate = useCallback(() => {
+      if (audioRef.current) {
+          setCurrentTime(audioRef.current.currentTime);
+          if (audioRef.current.duration && !isNaN(audioRef.current.duration) && audioRef.current.duration !== duration) {
+              setDuration(audioRef.current.duration);
+          }
+      }
+  }, [duration]);
+
+  const handleLoadedMetadata = useCallback(() => {
+      if (audioRef.current && !isNaN(audioRef.current.duration)) {
+          setDuration(audioRef.current.duration);
+      }
+  }, []);
+
+  // Keyboard Controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) {
+        return;
+      }
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          setIsPlaying(prev => !prev);
+          break;
+        case 'ArrowLeft':
+          if (e.metaKey || e.ctrlKey) {
+             handlePrev();
+          } else {
+             if (audioRef.current) {
+                 audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 5);
+                 setCurrentTime(audioRef.current.currentTime);
+             }
+          }
+          break;
+        case 'ArrowRight':
+          if (e.metaKey || e.ctrlKey) {
+             handleNext();
+          } else {
+             if (audioRef.current) {
+                 audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 5);
+                 setCurrentTime(audioRef.current.currentTime);
+             }
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleNext, handlePrev, duration]);
+
+  // Media Session API
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentSong) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist,
+        album: currentSong.album,
+        artwork: [
+          { src: currentSong.coverUrl, sizes: '512x512', type: 'image/jpeg' }
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+      navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+      navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
+      navigator.mediaSession.setActionHandler('nexttrack', handleNext);
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details.seekTime && audioRef.current) {
+              audioRef.current.currentTime = details.seekTime;
+              setCurrentTime(details.seekTime);
+          }
+      });
+    }
+  }, [currentSong, handleNext, handlePrev]);
 
   const MainContent = useMemo(() => (
     <>
@@ -439,10 +548,18 @@ const App: React.FC = () => {
             onNext={handleNext} onPrev={handlePrev} onToggleFavorite={handleToggleFavorite}
             onAddToPlaylist={setSongToAdd} currentTime={currentTime} duration={duration} onSeek={handleSeek}
             volume={volume} onVolumeChange={setVolume} onExpand={() => setShowVisualizer(true)}
-            isShuffle={isShuffle} repeatMode={repeatMode} onToggleShuffle={() => setIsShuffle(!isShuffle)} onToggleRepeat={() => {}}
+            isShuffle={isShuffle} repeatMode={repeatMode} onToggleShuffle={() => setIsShuffle(!isShuffle)} onToggleRepeat={handleToggleRepeat}
         />
       </div>
-      <audio ref={audioRef} src={currentSong?.fileUrl} crossOrigin="anonymous" onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)} onEnded={handleNext} />
+      <audio 
+        ref={audioRef} 
+        src={currentSong?.fileUrl} 
+        crossOrigin="anonymous" 
+        onTimeUpdate={handleTimeUpdate} 
+        onLoadedMetadata={handleLoadedMetadata}
+        onDurationChange={handleLoadedMetadata}
+        onEnded={handleNext} 
+      />
       {showVisualizer && currentSong && wavisRef.current && (
           <Visualizer currentSong={currentSong} isPlaying={isPlaying} onClose={() => setShowVisualizer(false)} wavis={wavisRef.current} onPlayPause={() => setIsPlaying(!isPlaying)} onNext={handleNext} onPrev={handlePrev} currentTime={currentTime} duration={duration} onSeek={handleSeek} activeVisualizer={activeVisualizer} onVisualizerChange={setActiveVisualizer} onUpdateSong={onUpdateSong} />
       )}
