@@ -172,6 +172,14 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
              }
           }
           break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setVolume(prev => Math.min(1, prev + 0.05));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setVolume(prev => Math.max(0, prev - 0.05));
+          break;
       }
     };
 
