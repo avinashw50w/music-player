@@ -613,7 +613,8 @@ router.put('/:id', async (req, res, next) => {
         }
 
         // Process artists
-        if (artist) {
+        // IMPORTANT: Check if artist is provided specifically (empty string is valid update to remove artists)
+        if (artist !== undefined) {
             const artistNames = artist.split(/[;,/]/).map(a => a.trim()).filter(Boolean);
             await processSongArtists(req.params.id, artistNames);
         }

@@ -59,7 +59,15 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
   useEffect(() => {
       const propSong = songs.find(s => s.id === id);
       if (propSong) {
-          setSong(prev => (prev?.lyrics && propSong.lyrics === undefined) ? { ...propSong, lyrics: prev.lyrics } : propSong);
+          // Compare if effectively different to avoid loops or unnecessary resets
+          setSong(prev => {
+              // If we have local state and it matches ID, and propSong is newer (has lyrics when local didn't), update.
+              // Or if we just want to keep in sync.
+              if (prev?.lyrics && propSong.lyrics === undefined) {
+                  return { ...propSong, lyrics: prev.lyrics };
+              }
+              return propSong;
+          });
           if (propSong.lyrics) setLyrics(propSong.lyrics);
       }
   }, [songs, id]);
@@ -90,14 +98,19 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
     try {
         const genres = data.genre.split(',').map((g: string) => g.trim()).filter(Boolean);
         const updated = await api.updateSong(song.id, { title: data.title, artist: data.artist, album: data.album, albumId: ids?.album, genre: genres });
-        setSong(updated); onUpdateSong?.(updated); setIsEditingInfo(false);
+        // Force a new object reference spread to ensure React sees the change immediately
+        setSong({ ...updated }); 
+        onUpdateSong?.(updated); 
+        setIsEditingInfo(false);
     } catch (err) { console.error(err); }
   };
 
   const handleSaveLyrics = async () => {
     try {
         const updated = await api.updateSongLyrics(song.id, lyrics);
-        setSong(updated); onUpdateSong?.(updated); setIsEditingLyrics(false);
+        setSong({ ...updated }); 
+        onUpdateSong?.(updated); 
+        setIsEditingLyrics(false);
     } catch (err) { console.error(err); }
   };
 
@@ -168,7 +181,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
         />
       </div>
       {isEditingInfo && <EditModal title="Edit Song" onClose={() => setIsEditingInfo(false)} onSave={handleSaveInfo} onFieldChange={handleFieldChange} fields={[{ name: 'title', label: 'Title', value: song.title }, { name: 'artist', label: 'Artist', value: song.artist, isMulti: true, suggestions: artistSuggestions }, { name: 'album', label: 'Album', value: song.album, suggestions: albumSuggestions }, { name: 'genre', label: 'Genre', value: (song.genre || []).join(', '), isMulti: true }]} />}
-      {suggestionData && <SuggestionModal currentData={song} suggestedData={suggestionData} onClose={() => setSuggestionData(null)} onConfirm={async (d) => { const u = await api.updateSong(song.id, { ...d, remoteCoverUrl: d.coverUrl }); setSong(u); onUpdateSong?.(u); setSuggestionData(null); }} />}
+      {suggestionData && <SuggestionModal currentData={song} suggestedData={suggestionData} onClose={() => setSuggestionData(null)} onConfirm={async (d) => { const u = await api.updateSong(song.id, { ...d, remoteCoverUrl: d.coverUrl }); setSong({ ...u }); onUpdateSong?.(u); setSuggestionData(null); }} />}
     </div>
   );
 };
