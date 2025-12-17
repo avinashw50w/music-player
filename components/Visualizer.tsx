@@ -132,10 +132,10 @@ const LyricLine = React.memo(({
 }) => {
     return (
         <p 
-            className={`transition-all duration-500 ease-out origin-center cursor-pointer py-3 select-none ${
+            className={`transition-all duration-650 ease-out origin-center cursor-pointer py-3 select-none ${
                 isActive 
-                  ? 'text-white text-3xl md:text-4xl font-bold opacity-100 scale-105' 
-                  : 'text-neutral-500 text-2xl md:text-3xl font-medium opacity-30 blur-[0.5px] hover:opacity-60 hover:blur-0'
+                  ? 'text-white text-3xl md:text-4xl font-bold opacity-100' 
+                  : 'text-neutral-500 text-2xl md:text-3xl font-medium opacity-30 blur-[0.5px]'
             }`}
             onClick={() => onSeek(line.time)}
         >
