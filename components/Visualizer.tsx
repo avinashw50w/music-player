@@ -5,6 +5,7 @@ import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
 import { parseLrc, LrcLine } from '../lib/lrcParser';
 import * as api from '../services/api';
+import ColorThief from 'colorthief';
 
 interface VisualizerProps {
     currentSong: Song;
@@ -192,33 +193,31 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onClose]);
 
-    // Extract dominant color from image
+    // Extract dominant color from image using ColorThief
     useEffect(() => {
         if (!currentSong.coverUrl) return;
 
         const img = new Image();
         img.crossOrigin = "Anonymous";
+        img.src = currentSong.coverUrl;
+
         img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-            
-            // Draw to a 1x1 canvas to get average color
-            canvas.width = 1;
-            canvas.height = 1;
-            ctx.drawImage(img, 0, 0, 1, 1);
-            
             try {
-                const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-                // Set the color with a dark multiplier to keep it background-friendly
-                setDominantColor(`rgba(${Math.floor(r * 0.6)}, ${Math.floor(g * 0.6)}, ${Math.floor(b * 0.6)}, 0.4)`);
+                const colorThief = new ColorThief();
+                // getColor returns [r, g, b]
+                const color = colorThief.getColor(img);
+                
+                if (color) {
+                    // Set color with some opacity for the background overlay
+                    setDominantColor(`rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.4)`);
+                }
             } catch (e) {
-                console.warn("Could not extract pixel data due to CORS or other issue");
+                console.warn("Could not extract color via ColorThief", e);
                 setDominantColor('rgba(40, 40, 60, 0.4)');
             }
         };
+
         img.onerror = () => setDominantColor('rgba(40, 40, 60, 0.4)');
-        img.src = currentSong.coverUrl;
     }, [currentSong.coverUrl]);
 
     // Initial Visualizer Options

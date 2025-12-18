@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "colorthief": "^2.6.0",
     "concurrently": "^9.2.1",
     "lucide-react": "^0.560.0",
     "react": "^19.2.3",
