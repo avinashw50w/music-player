@@ -20,6 +20,12 @@ export interface ScanStatus {
     error?: string;
 }
 
+export interface Genre {
+    id: string;
+    name: string;
+    color: string;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -41,6 +47,12 @@ export async function search(query: string, options?: { type?: 'song' | 'album' 
     
     const response = await fetch(`${API_BASE_URL}/search?${params.toString()}`, { signal: options?.signal });
     return handleResponse<SearchResults>(response);
+}
+
+// Genres
+export async function getGenres(): Promise<Genre[]> {
+    const response = await fetch(`${API_BASE_URL}/genres`);
+    return handleResponse<Genre[]>(response);
 }
 
 // Songs

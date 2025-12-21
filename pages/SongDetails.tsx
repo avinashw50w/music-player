@@ -34,6 +34,7 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
   
   const [albumSuggestions, setAlbumSuggestions] = useState<(string | SuggestionItem)[]>([]);
   const [artistSuggestions, setArtistSuggestions] = useState<(string | SuggestionItem)[]>([]);
+  const [genreSuggestions, setGenreSuggestions] = useState<string[]>([]);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [isIdentifying, setIsIdentifying] = useState(false);
@@ -76,6 +77,10 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
       if (isEditingInfo) {
           if (albums) setAlbumSuggestions(albums.map(a => ({ text: a.title, subtext: `${a.trackCount} songs`, image: a.coverUrl, id: a.id })).slice(0, 20));
           if (artists) setArtistSuggestions(artists.map(a => ({ text: a.name, image: a.avatarUrl, id: a.id })).slice(0, 20));
+          
+          api.getGenres().then(genres => {
+              setGenreSuggestions(genres.map(g => g.name));
+          });
       }
   }, [isEditingInfo, albums, artists]);
 
@@ -87,9 +92,11 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
           const query = (name === 'artist' || name === 'genre') ? value.split(',').pop()?.trim() : value.trim();
           if (query && query.length > 1) {
               const type = name === 'artist' ? 'artist' : (name === 'album' ? 'album' : undefined);
-              const results = await api.search(query, type ? { type } : undefined);
-              if (name === 'album') setAlbumSuggestions(results.albums.map(a => ({ text: a.title, subtext: `${a.trackCount} songs`, image: a.coverUrl, id: a.id })));
-              else if (name === 'artist') setArtistSuggestions(results.artists.map(a => ({ text: a.name, image: a.avatarUrl, id: a.id })));
+              if (type) {
+                  const results = await api.search(query, { type });
+                  if (name === 'album') setAlbumSuggestions(results.albums.map(a => ({ text: a.title, subtext: `${a.trackCount} songs`, image: a.coverUrl, id: a.id })));
+                  else if (name === 'artist') setArtistSuggestions(results.artists.map(a => ({ text: a.name, image: a.avatarUrl, id: a.id })));
+              }
           }
       }, 300);
   };
@@ -180,7 +187,20 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
           onLyricsChange={setLyrics} onEditToggle={setIsEditingLyrics} onFetchSynced={handleFetchSyncedLyrics} onSave={handleSaveLyrics}
         />
       </div>
-      {isEditingInfo && <EditModal title="Edit Song" onClose={() => setIsEditingInfo(false)} onSave={handleSaveInfo} onFieldChange={handleFieldChange} fields={[{ name: 'title', label: 'Title', value: song.title }, { name: 'artist', label: 'Artist', value: song.artist, isMulti: true, suggestions: artistSuggestions }, { name: 'album', label: 'Album', value: song.album, suggestions: albumSuggestions }, { name: 'genre', label: 'Genre', value: (song.genre || []).join(', '), isMulti: true }]} />}
+      {isEditingInfo && (
+        <EditModal 
+            title="Edit Song" 
+            onClose={() => setIsEditingInfo(false)} 
+            onSave={handleSaveInfo} 
+            onFieldChange={handleFieldChange} 
+            fields={[
+                { name: 'title', label: 'Title', value: song.title }, 
+                { name: 'artist', label: 'Artist', value: song.artist, isMulti: true, suggestions: artistSuggestions }, 
+                { name: 'album', label: 'Album', value: song.album, suggestions: albumSuggestions }, 
+                { name: 'genre', label: 'Genre', value: (song.genre || []).join(', '), isMulti: true, suggestions: genreSuggestions }
+            ]} 
+        />
+      )}
       {suggestionData && <SuggestionModal currentData={song} suggestedData={suggestionData} onClose={() => setSuggestionData(null)} onConfirm={async (d) => { const u = await api.updateSong(song.id, { ...d, remoteCoverUrl: d.coverUrl }); setSong({ ...u }); onUpdateSong?.(u); setSuggestionData(null); }} />}
     </div>
   );

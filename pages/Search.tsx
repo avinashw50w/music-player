@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Search as SearchIcon, X, TrendingUp, Clock, Disc, Mic2, Music } from 'lucide-react';
 import { Song, Album, Artist } from '../types';
 import * as api from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface SearchProps {
   songs: Song[];
@@ -16,7 +16,10 @@ interface SearchProps {
 }
 
 const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get('q') || '';
+  
+  const [searchTerm, setSearchTerm] = useState(query);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const navigate = useNavigate();
   
@@ -42,11 +45,24 @@ const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
     }
   }, []);
 
+  // Update URL when searchTerm changes (optional, but good for linking)
+  // If we update URL on every keystroke it might be too much, but keeping it in sync is good for reload.
+  // Instead, we just use the local state for searching and only set URL if needed or initial load.
+  // Actually, standard pattern is input -> local state -> debounce -> search.
+  
+  // Update local state if URL changes
+  useEffect(() => {
+      setSearchTerm(query);
+  }, [query]);
+
   // Server-side search debounce
   useEffect(() => {
       const delayDebounceFn = setTimeout(async () => {
           if (searchTerm.trim()) {
               setIsSearching(true);
+              // Update URL without reloading to reflect current search
+              setSearchParams({ q: searchTerm }, { replace: true });
+              
               try {
                   const data = await api.search(searchTerm);
                   setResults(data);
@@ -57,11 +73,12 @@ const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
               }
           } else {
               setResults({ songs: [], albums: [], artists: [] });
+              setSearchParams({}, { replace: true });
           }
       }, 500);
 
       return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+  }, [searchTerm, setSearchParams]);
 
   const addToRecent = (term: string) => {
     const updated = [term, ...recentSearches.filter(t => t !== term)].slice(0, 10);

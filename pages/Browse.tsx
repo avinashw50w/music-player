@@ -1,9 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
-import { ArrowRight, Music, Play, Pause, ListMusic, RefreshCw, Mic2, Disc, Tags } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, Music, Play, RefreshCw, Mic2, Disc, Tags } from 'lucide-react';
 import { Song, Album, Artist, Playlist } from '../types';
 import PlayingIndicator from '../components/PlayingIndicator';
-import { refreshLibrary, ScanStatus } from '../services/api';
+import { refreshLibrary, ScanStatus, getGenres, Genre } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { LibraryScanner } from '../components/LibraryScanner';
 
@@ -26,7 +26,12 @@ interface BrowseProps {
 const Browse: React.FC<BrowseProps> = (props) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [genres, setGenres] = useState<Genre[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+      getGenres().then(setGenres).catch(err => console.error("Failed to load genres", err));
+  }, []);
 
   const handleRefreshLibrary = async () => {
       try {
@@ -47,20 +52,6 @@ const Browse: React.FC<BrowseProps> = (props) => {
     return song?.album === albumTitle;
   };
 
-  // Derive Top Genres from Songs
-  const genres = useMemo(() => {
-    const genreCounts: Record<string, number> = {};
-    props.songs.forEach(s => {
-      s.genre?.forEach(g => {
-        if (g && g !== 'Unknown') genreCounts[g] = (genreCounts[g] || 0) + 1;
-      });
-    });
-    return Object.entries(genreCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 8) // Top 8
-      .map(([name]) => name);
-  }, [props.songs]);
-
   const genreColors = [
     'from-pink-500 to-rose-500',
     'from-purple-500 to-indigo-500',
@@ -69,7 +60,9 @@ const Browse: React.FC<BrowseProps> = (props) => {
     'from-emerald-500 to-teal-500',
     'from-amber-500 to-yellow-500',
     'from-fuchsia-500 to-purple-600',
-    'from-sky-500 to-blue-600'
+    'from-sky-500 to-blue-600',
+    'from-indigo-500 to-blue-600',
+    'from-teal-500 to-green-600'
   ];
 
   return (
@@ -162,7 +155,7 @@ const Browse: React.FC<BrowseProps> = (props) => {
         </div>
       )}
 
-       {/* Artists */}
+      {/* Artists */}
       {props.artists.length > 0 && (
         <div className="mb-14 animate-fade-in-up delay-200">
           <div className="flex items-center justify-between mb-6">
@@ -202,11 +195,12 @@ const Browse: React.FC<BrowseProps> = (props) => {
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
                 {genres.map((genre, i) => (
                     <div 
-                        key={genre} 
+                        key={genre.id}
+                        onClick={() => navigate(`/search?q=${encodeURIComponent(genre.name)}`)}
                         className={`h-24 rounded-2xl bg-gradient-to-r ${genreColors[i % genreColors.length]} relative overflow-hidden group cursor-pointer shadow-lg hover:scale-[1.02] transition-transform`}
                     >
                         <div className="absolute inset-0 flex items-center justify-start p-6">
-                            <span className="text-white font-bold text-xl drop-shadow-md z-10">{genre}</span>
+                            <span className="text-white font-bold text-xl drop-shadow-md z-10">{genre.name}</span>
                         </div>
                         {/* Decorative circle */}
                         <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/20 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500"></div>

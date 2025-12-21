@@ -116,22 +116,41 @@ export async function migrate() {
 
     // Insert default genres
     if (await db.schema.hasTable('genres')) {
-        const genresExist = await db('genres').first();
-        if (!genresExist) {
-            await db('genres').insert([
-                { id: 'pop', name: 'Pop', color: 'bg-purple-600' },
-                { id: 'rock', name: 'Rock', color: 'bg-red-600' },
-                { id: 'jazz', name: 'Jazz', color: 'bg-blue-600' },
-                { id: 'hiphop', name: 'Hip Hop', color: 'bg-orange-600' },
-                { id: 'classical', name: 'Classical', color: 'bg-slate-600' },
-                { id: 'electronic', name: 'Electronic', color: 'bg-emerald-600' },
-                { id: 'rnb', name: 'R&B', color: 'bg-pink-600' },
-                { id: 'indie', name: 'Indie', color: 'bg-teal-600' }
-            ]);
+        // Clear existing to re-seed with full list or check individually (simplest is to upsert if ID matches, but IDs are strings here)
+        // We will just insert ignore
+        const genres = [
+            { id: 'pop', name: 'Pop', color: 'bg-purple-600' },
+            { id: 'rock', name: 'Rock', color: 'bg-red-600' },
+            { id: 'jazz', name: 'Jazz', color: 'bg-blue-600' },
+            { id: 'hiphop', name: 'Hip Hop', color: 'bg-orange-600' },
+            { id: 'classical', name: 'Classical', color: 'bg-slate-600' },
+            { id: 'electronic', name: 'Electronic', color: 'bg-emerald-600' },
+            { id: 'rnb', name: 'R&B', color: 'bg-pink-600' },
+            { id: 'indie', name: 'Indie', color: 'bg-teal-600' },
+            { id: 'country', name: 'Country', color: 'bg-amber-700' },
+            { id: 'folk', name: 'Folk', color: 'bg-yellow-700' },
+            { id: 'soul', name: 'Soul', color: 'bg-rose-700' },
+            { id: 'punk', name: 'Punk', color: 'bg-red-800' },
+            { id: 'metal', name: 'Metal', color: 'bg-stone-800' },
+            { id: 'blues', name: 'Blues', color: 'bg-sky-800' },
+            { id: 'reggae', name: 'Reggae', color: 'bg-green-600' },
+            { id: 'funk', name: 'Funk', color: 'bg-orange-500' },
+            { id: 'disco', name: 'Disco', color: 'bg-fuchsia-600' },
+            { id: 'house', name: 'House', color: 'bg-indigo-600' },
+            { id: 'techno', name: 'Techno', color: 'bg-cyan-600' },
+            { id: 'trance', name: 'Trance', color: 'bg-violet-600' },
+            { id: 'ambient', name: 'Ambient', color: 'bg-teal-800' },
+            { id: 'lofi', name: 'Lo-Fi', color: 'bg-amber-200' },
+            { id: 'soundtrack', name: 'Soundtrack', color: 'bg-slate-800' }
+        ];
+
+        for (const genre of genres) {
+            const exists = await db('genres').where({ id: genre.id }).first();
+            if (!exists) {
+                await db('genres').insert(genre);
+            }
         }
     }
-
-
 
     console.log('Migrations complete!');
 }

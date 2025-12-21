@@ -73,6 +73,7 @@ app.get('/api/search', async (req, res, next) => {
             songs = await db('songs')
                 .leftJoin('albums', 'songs.album_id', 'albums.id')
                 .where('songs.title', 'like', searchTerm)
+                .orWhere('songs.genre', 'like', searchTerm) // Search Genre
                 .orWhereIn('songs.id', function() {
                     this.select('song_id').from('song_artists')
                         .join('artists', 'song_artists.artist_id', 'artists.id')
@@ -87,7 +88,8 @@ app.get('/api/search', async (req, res, next) => {
         if (!type || type === 'album') {
             albums = await db('albums')
                 .where(function() {
-                    this.where('title', 'like', searchTerm);
+                    this.where('title', 'like', searchTerm)
+                        .orWhere('genre', 'like', searchTerm); // Search Genre
                 })
                 .andWhere('track_count', '>', 0)
                 .limit(10)
@@ -166,7 +168,7 @@ app.get('/api/search', async (req, res, next) => {
 app.get('/api/genres', async (req, res, next) => {
     try {
         const db = (await import('./config/database.js')).default;
-        const genres = await db('genres').select('*');
+        const genres = await db('genres').select('*').orderBy('name', 'asc');
         res.json(genres.map(g => ({
             id: g.id,
             name: g.name,
