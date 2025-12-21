@@ -257,12 +257,28 @@ export const useLibrary = () => {
   const onUpdateArtist = useCallback((u: Artist) => setArtists(prev => prev.map(a => a.id === u.id ? u : a)), []);
 
   const handleToggleFavorite = useCallback(async (id: string, targetType?: 'song' | 'album' | 'artist' | 'playlist') => {
+    // Optimistic Updates for local lists
+    const isSong = !targetType || targetType === 'song';
+    if (isSong) {
+        setSongs(prev => prev.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s));
+        setRecentlyPlayed(prev => prev.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s));
+    } else if (targetType === 'album') {
+        setAlbums(prev => prev.map(a => a.id === id ? { ...a, isFavorite: !a.isFavorite } : a));
+    } else if (targetType === 'artist') {
+        setArtists(prev => prev.map(a => a.id === id ? { ...a, isFavorite: !a.isFavorite } : a));
+    } else if (targetType === 'playlist') {
+        setPlaylists(prev => prev.map(p => p.id === id ? { ...p, isFavorite: !p.isFavorite } : p));
+    }
+
     try {
-        if (!targetType || targetType === 'song') await api.toggleSongFavorite(id);
+        if (isSong) await api.toggleSongFavorite(id);
         else if (targetType === 'album') await api.toggleAlbumFavorite(id);
         else if (targetType === 'artist') await api.toggleArtistFavorite(id);
         else if (targetType === 'playlist') await api.togglePlaylistFavorite(id);
-    } catch (err) { console.warn("Favorite toggle failed", err); }
+    } catch (err) { 
+        console.warn("Favorite toggle failed", err);
+        // Revert on error (optional, implemented by refetching or reversing optimistic update)
+    }
   }, []);
 
   const deletePlaylist = useCallback(async (id: string) => {

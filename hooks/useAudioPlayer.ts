@@ -132,6 +132,17 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
       }
   }, []);
 
+  // Helpers to update state of songs already in the player/queue without disrupting playback
+  const updateQueueSong = useCallback((updatedSong: Song) => {
+      setPlaybackQueue(prev => prev.map(s => s.id === updatedSong.id ? { ...s, ...updatedSong } : s));
+      setCurrentSong(prev => prev?.id === updatedSong.id ? { ...prev, ...updatedSong } : prev);
+  }, []);
+
+  const toggleQueueFavorite = useCallback((id: string) => {
+      setPlaybackQueue(prev => prev.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s));
+      setCurrentSong(prev => prev?.id === id ? { ...prev, isFavorite: !prev.isFavorite } : prev);
+  }, []);
+
   // Keyboard Controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -231,6 +242,8 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
     handlePrev,
     handleToggleRepeat,
     handleTimeUpdate,
-    handleLoadedMetadata
+    handleLoadedMetadata,
+    updateQueueSong,
+    toggleQueueFavorite
   };
 };

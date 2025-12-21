@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { config } from '../config/env.js';
 import { getArtistDetails, getReleaseGroupDetails } from './musicBrainz.js';
+import { getSetting } from '../utils/settings.js';
 
 /**
  * Identify song using Audio Fingerprinting and fetch metadata
@@ -16,8 +17,14 @@ export async function identifySongMetadata(filePath) {
     const { duration, fingerprint } = await getFingerprint(filePath);
 
     // 2. Query AcoustID
+    const clientId = await getSetting('ACOUSTID_CLIENT_ID');
+    
+    if (!clientId) {
+        throw new Error('AcoustID Client ID not configured in Settings.');
+    }
+
     const params = new URLSearchParams({
-        client: config.ACOUSTID_CLIENT_ID,
+        client: clientId,
         meta: 'recordings releases releasegroups compress', 
         duration: duration.toString(),
         fingerprint: fingerprint

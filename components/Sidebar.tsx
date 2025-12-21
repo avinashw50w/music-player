@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Home, Search, FolderOpen, Heart, PlusSquare, Music, ListMusic, ChevronDown, ChevronUp } from 'lucide-react';
+import { Home, Search, FolderOpen, Heart, PlusSquare, Music, ListMusic, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Playlist } from '../types';
 
@@ -18,6 +18,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCreatePlaylist, playlists }) => {
     { path: '/search', label: 'Search', icon: Search },
     { path: '/browse', label: 'Browse', icon: FolderOpen },
     { path: '/favorites', label: 'Favorite', icon: Heart },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
   const visiblePlaylists = isExpanded ? playlists : playlists.slice(0, 3);

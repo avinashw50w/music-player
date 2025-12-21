@@ -11,6 +11,7 @@ import artistsRouter from './routes/artists.js';
 import playlistsRouter from './routes/playlists.js';
 import uploadRouter from './routes/upload.js';
 import libraryRouter from './routes/library.js';
+import settingsRouter from './routes/settings.js';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -39,6 +40,7 @@ app.use('/api/artists', artistsRouter);
 app.use('/api/playlists', playlistsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/library', libraryRouter);
+app.use('/api/settings', settingsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

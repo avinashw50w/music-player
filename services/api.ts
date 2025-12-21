@@ -407,3 +407,18 @@ export async function refreshLibrary(): Promise<{ success: boolean; removedCount
     });
     return handleResponse(response);
 }
+
+// System Settings
+export async function getSettings(): Promise<Record<string, string>> {
+    const response = await fetch(`${API_BASE_URL}/settings`);
+    return handleResponse<Record<string, string>>(response);
+}
+
+export async function saveSettings(settings: Record<string, string>): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+    });
+    return handleResponse(response);
+}

@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import Browse from './pages/Browse';
 import Favorites from './pages/Favorites';
+import Settings from './pages/Settings';
 import { AlbumDetails } from './pages/AlbumDetails';
 import { ArtistDetails } from './pages/ArtistDetails';
 import { PlaylistDetails } from './pages/PlaylistDetails';
@@ -62,12 +63,10 @@ const App: React.FC = () => {
   }, [location.key]);
 
   // --- Wrapper Handler for Song Updates ---
-  // Ensures that updates propagate to both the Library list AND the current Player state
+  // Ensures that updates propagate to both the Library list AND the current Player state (including Queue)
   const handleUpdateSong = useCallback((updatedSong: Song) => {
       library.onUpdateSong(updatedSong);
-      if (player.currentSong?.id === updatedSong.id) {
-          player.setCurrentSong(prev => prev ? ({ ...prev, ...updatedSong }) : updatedSong);
-      }
+      player.updateQueueSong(updatedSong);
   }, [library, player]);
 
   // --- Handle Add To Playlist (Open Modal) ---
@@ -76,15 +75,23 @@ const App: React.FC = () => {
       setShowAddToPlaylistModal(true);
   }, []);
 
+  // --- Handle Favorite Toggle (Wrapper with Optimistic Update) ---
+  const handleToggleFavorite = useCallback((id: string, targetType?: 'song' | 'album' | 'artist' | 'playlist') => {
+      // Optimistic update for player queue
+      if (!targetType || targetType === 'song') {
+          player.toggleQueueFavorite(id);
+      }
+      library.handleToggleFavorite(id, targetType);
+  }, [player, library]); // Depend on player object directly to ensure fresh state
+
   // --- Sync Player State with Real-time Library Events (e.g. Favorites toggle) ---
   useEffect(() => {
       if (library.lastEvent?.type === 'song:update') {
           const updated = library.lastEvent.payload as Song;
-          if (player.currentSong?.id === updated.id) {
-              player.setCurrentSong(prev => prev ? ({ ...prev, ...updated }) : updated);
-          }
+          // Sync update to playback queue so next/prev has fresh data
+          player.updateQueueSong(updated);
       }
-  }, [library.lastEvent, player.currentSong?.id, player.setCurrentSong]);
+  }, [library.lastEvent, player]);
 
   // --- Layout ---
   const MainContent = useMemo(() => (
@@ -94,20 +101,21 @@ const App: React.FC = () => {
       </div>
       <main className="flex-1 min-w-0 pb-32">
             <Routes>
-                <Route path="/" element={<Home recentSongs={library.recentlyPlayed} recentlyAdded={library.songs} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={library.handleToggleFavorite} />} />
-                <Route path="/search" element={<Search songs={library.songs} albums={library.albums} artists={library.artists} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={library.handleToggleFavorite} />} />
+                <Route path="/" element={<Home recentSongs={library.recentlyPlayed} recentlyAdded={library.songs} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={handleToggleFavorite} />} />
+                <Route path="/search" element={<Search songs={library.songs} albums={library.albums} artists={library.artists} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={handleToggleFavorite} />} />
                 <Route path="/browse" element={<Browse onImportSongs={library.setSongs} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} albums={library.albums} artists={library.artists} songs={library.songs} playlists={library.playlists} scanStatus={library.scanStatus} isScanning={library.isScanning} scanError={library.scanError} setScanError={library.setScanError} setIsScanning={library.setIsScanning} />} />
-                <Route path="/favorites" element={<Favorites onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />} />
-                <Route path="/album/:id" element={<AlbumDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateAlbum={library.onUpdateAlbum} lastEvent={library.lastEvent} />} />
-                <Route path="/artist/:id" element={<ArtistDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateArtist={library.onUpdateArtist} lastEvent={library.lastEvent} />} />
-                <Route path="/playlist/:id" element={<PlaylistDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onDeletePlaylist={library.deletePlaylist} onRenamePlaylist={api.renamePlaylist} onRemoveSong={api.removeSongFromPlaylist} onReorderSongs={api.reorderPlaylistSongs} lastEvent={library.lastEvent} />} />
-                <Route path="/song/:id" element={<SongDetails songs={library.songs} albums={library.albums} artists={library.artists} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateSong={handleUpdateSong} />} />
+                <Route path="/favorites" element={<Favorites onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/album/:id" element={<AlbumDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateAlbum={library.onUpdateAlbum} lastEvent={library.lastEvent} />} />
+                <Route path="/artist/:id" element={<ArtistDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateArtist={library.onUpdateArtist} lastEvent={library.lastEvent} />} />
+                <Route path="/playlist/:id" element={<PlaylistDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onDeletePlaylist={library.deletePlaylist} onRenamePlaylist={api.renamePlaylist} onRemoveSong={api.removeSongFromPlaylist} onReorderSongs={api.reorderPlaylistSongs} lastEvent={library.lastEvent} />} />
+                <Route path="/song/:id" element={<SongDetails songs={library.songs} albums={library.albums} artists={library.artists} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateSong={handleUpdateSong} />} />
                 <Route path="/library/:type" element={
                     <FullList 
                         songs={library.songs} albums={library.albums} artists={library.artists} playlists={library.playlists}
                         isLoadingMap={library.isLoading} onPlaySong={player.handlePlaySong} 
                         currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} 
-                        onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist}
+                        onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist}
                         initialSearchQuery={library.listQueries.songs || library.listQueries.albums || library.listQueries.artists}
                         hasMoreMap={library.hasMore}
                         onLoadMoreSongs={library.handleLoadMoreSongs}
@@ -121,7 +129,7 @@ const App: React.FC = () => {
       </main>
     </>
   ), [
-    library, player, handleUpdateSong, handleAddToPlaylist
+    library, player, handleUpdateSong, handleAddToPlaylist, handleToggleFavorite
   ]);
 
   return (
@@ -134,7 +142,7 @@ const App: React.FC = () => {
       <div className="z-[100] w-full fixed bottom-0 left-0">
         <PlayerBar 
             currentSong={player.currentSong} isPlaying={player.isPlaying} onPlayPause={() => player.setIsPlaying(!player.isPlaying)}
-            onNext={player.handleNext} onPrev={player.handlePrev} onToggleFavorite={library.handleToggleFavorite}
+            onNext={player.handleNext} onPrev={player.handlePrev} onToggleFavorite={handleToggleFavorite}
             onAddToPlaylist={handleAddToPlaylist} currentTime={player.currentTime} duration={player.duration} onSeek={player.handleSeek}
             volume={player.volume} onVolumeChange={player.setVolume} onExpand={() => setShowVisualizer(true)}
             isShuffle={player.isShuffle} repeatMode={player.repeatMode} onToggleShuffle={() => player.setIsShuffle(!player.isShuffle)} onToggleRepeat={player.handleToggleRepeat}

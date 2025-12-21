@@ -1,16 +1,18 @@
 
 import { config } from '../config/env.js';
 import db from '../config/database.js';
+import { getSetting } from '../utils/settings.js';
 
 /**
  * Get a valid Spotify Access Token using Client Credentials Flow
  * Checks DB first, then fetches if expired.
  */
 async function getAccessToken() {
-    const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET } = config;
+    const SPOTIFY_CLIENT_ID = await getSetting('SPOTIFY_CLIENT_ID');
+    const SPOTIFY_CLIENT_SECRET = await getSetting('SPOTIFY_CLIENT_SECRET');
 
     if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-        throw new Error('Spotify Client ID or Secret not configured in .env');
+        throw new Error('Spotify Client ID or Secret not configured in Settings');
     }
 
     // 1. Check Database for valid token
