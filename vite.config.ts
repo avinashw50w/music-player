@@ -11,18 +11,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {
     server: {
-      proxy: {
-        '/api': {
-          target: 'http://localhost:3010',
-          changeOrigin: true,
-          secure: false,
-        },
-        '/uploads': {
-          target: 'http://localhost:3010',
-          changeOrigin: true,
-          secure: false,
-        }
-      }
+      // Proxy removed. API URL is handled in services/api.ts via VITE_API_URL
     },
     plugins: [react()],
     define: {

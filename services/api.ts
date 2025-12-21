@@ -1,7 +1,8 @@
 
 import { Song, Album, Artist, Playlist } from '../types';
 
-const API_BASE_URL = '/api';
+const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3010';
+const API_BASE_URL = `${API_HOST}/api`;
 
 export interface UploadProgress {
   loaded: number;
@@ -26,6 +27,36 @@ export interface Genre {
     color: string;
 }
 
+// Helper to resolve relative URLs to absolute backend URLs
+const resolveUrl = (url?: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
+    if (url.startsWith('/')) return `${API_HOST}${url}`;
+    return `${API_HOST}/${url}`;
+};
+
+// Data Transformers
+const transformSong = (s: Song): Song => ({
+    ...s,
+    coverUrl: resolveUrl(s.coverUrl),
+    fileUrl: resolveUrl(s.fileUrl)
+});
+
+const transformAlbum = (a: Album): Album => ({
+    ...a,
+    coverUrl: resolveUrl(a.coverUrl)
+});
+
+const transformArtist = (a: Artist): Artist => ({
+    ...a,
+    avatarUrl: resolveUrl(a.avatarUrl)
+});
+
+const transformPlaylist = (p: Playlist): Playlist => ({
+    ...p,
+    coverUrl: p.coverUrl ? resolveUrl(p.coverUrl) : undefined
+});
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -46,7 +77,13 @@ export async function search(query: string, options?: { type?: 'song' | 'album' 
     if (options?.type) params.append('type', options.type);
     
     const response = await fetch(`${API_BASE_URL}/search?${params.toString()}`, { signal: options?.signal });
-    return handleResponse<SearchResults>(response);
+    const data = await handleResponse<SearchResults>(response);
+    
+    return {
+        songs: data.songs.map(transformSong),
+        albums: data.albums.map(transformAlbum),
+        artists: data.artists.map(transformArtist)
+    };
 }
 
 // Genres
@@ -64,17 +101,20 @@ export async function getSongs(limit?: number, offset?: number, search?: string,
   if (favorites) params.append('favorites', 'true');
   
   const response = await fetch(`${API_BASE_URL}/songs?${params.toString()}`, { signal });
-  return handleResponse<Song[]>(response);
+  const data = await handleResponse<Song[]>(response);
+  return data.map(transformSong);
 }
 
 export async function getSong(id: string): Promise<Song> {
     const response = await fetch(`${API_BASE_URL}/songs/${id}`);
-    return handleResponse<Song>(response);
+    const data = await handleResponse<Song>(response);
+    return transformSong(data);
 }
 
 export async function toggleSongFavorite(id: string): Promise<Song> {
   const response = await fetch(`${API_BASE_URL}/songs/${id}/favorite`, { method: 'PATCH' });
-  return handleResponse<Song>(response);
+  const data = await handleResponse<Song>(response);
+  return transformSong(data);
 }
 
 export async function updateSong(id: string, data: Partial<Song> & { year?: number; remoteCoverUrl?: string }): Promise<Song> {
@@ -83,7 +123,8 @@ export async function updateSong(id: string, data: Partial<Song> & { year?: numb
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    return handleResponse<Song>(response);
+    const result = await handleResponse<Song>(response);
+    return transformSong(result);
 }
 
 export async function updateSongLyrics(id: string, lyrics: string): Promise<Song> {
@@ -92,14 +133,16 @@ export async function updateSongLyrics(id: string, lyrics: string): Promise<Song
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lyrics })
     });
-    return handleResponse<Song>(response);
+    const result = await handleResponse<Song>(response);
+    return transformSong(result);
 }
 
 export async function fetchSyncedLyrics(id: string): Promise<Song> {
     const response = await fetch(`${API_BASE_URL}/songs/${id}/lyrics/fetch`, {
         method: 'POST'
     });
-    return handleResponse<Song>(response);
+    const result = await handleResponse<Song>(response);
+    return transformSong(result);
 }
 
 export async function updateSongCover(id: string, file: File): Promise<Song> {
@@ -109,28 +152,36 @@ export async function updateSongCover(id: string, file: File): Promise<Song> {
         method: 'PATCH',
         body: formData
     });
-    return handleResponse<Song>(response);
+    const result = await handleResponse<Song>(response);
+    return transformSong(result);
 }
 
-export async function identifySong(id: string): Promise<Song> {
+export async function identifySong(id: string): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/songs/${id}/identify`, {
         method: 'POST'
     });
-    return handleResponse<Song>(response);
+    const data = await handleResponse<any>(response);
+    // Identify returns a candidate object, not a full DB song, but may contain coverUrl
+    if (data.coverUrl) data.coverUrl = resolveUrl(data.coverUrl);
+    return data;
 }
 
-export async function identifySongSpotify(id: string): Promise<Song> {
+export async function identifySongSpotify(id: string): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/songs/${id}/identify-spotify`, {
         method: 'POST'
     });
-    return handleResponse<Song>(response);
+    const data = await handleResponse<any>(response);
+    if (data.coverUrl) data.coverUrl = resolveUrl(data.coverUrl);
+    return data;
 }
 
-export async function getGeminiSuggestion(id: string): Promise<{ title: string; artist: string; album: string; genre: string[]; year?: number }> {
+export async function getGeminiSuggestion(id: string): Promise<{ title: string; artist: string; album: string; genre: string[]; year?: number; coverUrl?: string }> {
     const response = await fetch(`${API_BASE_URL}/songs/${id}/refine`, {
         method: 'POST'
     });
-    return handleResponse<{ title: string; artist: string; album: string; genre: string[]; year?: number }>(response);
+    const data = await handleResponse<{ title: string; artist: string; album: string; genre: string[]; year?: number; coverUrl?: string }>(response);
+    if (data.coverUrl) data.coverUrl = resolveUrl(data.coverUrl);
+    return data;
 }
 
 export async function deleteSong(id: string): Promise<void> {
@@ -146,22 +197,29 @@ export async function getAlbums(limit?: number, offset?: number, search?: string
   if (favorites) params.append('favorites', 'true');
 
   const response = await fetch(`${API_BASE_URL}/albums?${params.toString()}`, { signal });
-  return handleResponse<Album[]>(response);
+  const data = await handleResponse<Album[]>(response);
+  return data.map(transformAlbum);
 }
 
 export async function getAlbum(id: string, songLimit: number = 20, songOffset: number = 0): Promise<Album & { songs: Song[] }> {
     const response = await fetch(`${API_BASE_URL}/albums/${id}?songLimit=${songLimit}&songOffset=${songOffset}`);
-    return handleResponse<Album & { songs: Song[] }>(response);
+    const data = await handleResponse<Album & { songs: Song[] }>(response);
+    return {
+        ...transformAlbum(data),
+        songs: data.songs.map(transformSong)
+    };
 }
 
 export async function getAlbumSongs(id: string, limit: number = 20, offset: number = 0): Promise<Song[]> {
     const response = await fetch(`${API_BASE_URL}/albums/${id}/songs?limit=${limit}&offset=${offset}`);
-    return handleResponse<Song[]>(response);
+    const data = await handleResponse<Song[]>(response);
+    return data.map(transformSong);
 }
 
 export async function toggleAlbumFavorite(id: string): Promise<Album> {
   const response = await fetch(`${API_BASE_URL}/albums/${id}/favorite`, { method: 'PATCH' });
-  return handleResponse<Album>(response);
+  const data = await handleResponse<Album>(response);
+  return transformAlbum(data);
 }
 
 export async function updateAlbum(id: string, data: Partial<Album>): Promise<Album> {
@@ -170,7 +228,8 @@ export async function updateAlbum(id: string, data: Partial<Album>): Promise<Alb
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    return handleResponse<Album>(response);
+    const result = await handleResponse<Album>(response);
+    return transformAlbum(result);
 }
 
 export async function updateAlbumCover(id: string, file: File): Promise<Album> {
@@ -180,7 +239,8 @@ export async function updateAlbumCover(id: string, file: File): Promise<Album> {
         method: 'PATCH',
         body: formData
     });
-    return handleResponse<Album>(response);
+    const result = await handleResponse<Album>(response);
+    return transformAlbum(result);
 }
 
 // Artists
@@ -192,22 +252,30 @@ export async function getArtists(limit?: number, offset?: number, search?: strin
   if (favorites) params.append('favorites', 'true');
 
   const response = await fetch(`${API_BASE_URL}/artists?${params.toString()}`, { signal });
-  return handleResponse<Artist[]>(response);
+  const data = await handleResponse<Artist[]>(response);
+  return data.map(transformArtist);
 }
 
 export async function getArtist(id: string, songLimit: number = 20, songOffset: number = 0): Promise<Artist & { songs: Song[], albums: Album[] }> {
     const response = await fetch(`${API_BASE_URL}/artists/${id}?songLimit=${songLimit}&songOffset=${songOffset}`);
-    return handleResponse<Artist & { songs: Song[], albums: Album[] }>(response);
+    const data = await handleResponse<Artist & { songs: Song[], albums: Album[] }>(response);
+    return {
+        ...transformArtist(data),
+        albums: data.albums.map(transformAlbum),
+        songs: data.songs.map(transformSong)
+    };
 }
 
 export async function getArtistSongs(id: string, limit: number = 20, offset: number = 0): Promise<Song[]> {
     const response = await fetch(`${API_BASE_URL}/artists/${id}/songs?limit=${limit}&offset=${offset}`);
-    return handleResponse<Song[]>(response);
+    const data = await handleResponse<Song[]>(response);
+    return data.map(transformSong);
 }
 
 export async function toggleArtistFavorite(id: string): Promise<Artist> {
   const response = await fetch(`${API_BASE_URL}/artists/${id}/favorite`, { method: 'PATCH' });
-  return handleResponse<Artist>(response);
+  const data = await handleResponse<Artist>(response);
+  return transformArtist(data);
 }
 
 export async function updateArtist(id: string, data: Partial<Artist>): Promise<Artist> {
@@ -216,7 +284,8 @@ export async function updateArtist(id: string, data: Partial<Artist>): Promise<A
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    return handleResponse<Artist>(response);
+    const result = await handleResponse<Artist>(response);
+    return transformArtist(result);
 }
 
 export async function updateArtistAvatar(id: string, file: File): Promise<Artist> {
@@ -226,7 +295,8 @@ export async function updateArtistAvatar(id: string, file: File): Promise<Artist
         method: 'PATCH',
         body: formData
     });
-    return handleResponse<Artist>(response);
+    const result = await handleResponse<Artist>(response);
+    return transformArtist(result);
 }
 
 // Playlists
@@ -234,12 +304,17 @@ export async function getPlaylists(favorites?: boolean): Promise<Playlist[]> {
   const params = new URLSearchParams();
   if (favorites) params.append('favorites', 'true');
   const response = await fetch(`${API_BASE_URL}/playlists?${params.toString()}`);
-  return handleResponse<Playlist[]>(response);
+  const data = await handleResponse<Playlist[]>(response);
+  return data.map(transformPlaylist);
 }
 
 export async function getPlaylist(id: string): Promise<Playlist & { songs: Song[] }> {
     const response = await fetch(`${API_BASE_URL}/playlists/${id}`);
-    return handleResponse<Playlist & { songs: Song[] }>(response);
+    const data = await handleResponse<Playlist & { songs: Song[] }>(response);
+    return {
+        ...transformPlaylist(data),
+        songs: data.songs.map(transformSong)
+    };
 }
 
 export async function createPlaylist(name: string): Promise<Playlist> {
@@ -248,12 +323,14 @@ export async function createPlaylist(name: string): Promise<Playlist> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
     });
-    return handleResponse<Playlist>(response);
+    const result = await handleResponse<Playlist>(response);
+    return transformPlaylist(result);
 }
 
 export async function togglePlaylistFavorite(id: string): Promise<Playlist> {
   const response = await fetch(`${API_BASE_URL}/playlists/${id}/favorite`, { method: 'PATCH' });
-  return handleResponse<Playlist>(response);
+  const result = await handleResponse<Playlist>(response);
+  return transformPlaylist(result);
 }
 
 export async function addSongToPlaylist(playlistId: string, songId: string): Promise<void> {
@@ -280,7 +357,8 @@ export async function renamePlaylist(id: string, name: string): Promise<Playlist
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
     });
-    return handleResponse<Playlist>(response);
+    const result = await handleResponse<Playlist>(response);
+    return transformPlaylist(result);
 }
 
 export async function reorderPlaylistSongs(playlistId: string, songIds: string[]): Promise<void> {
@@ -309,7 +387,13 @@ export async function uploadAudioFiles(files: File[]): Promise<UploadProgress> {
         method: 'POST',
         body: formData
     });
-    return handleResponse<UploadProgress>(response);
+    const data = await handleResponse<UploadProgress>(response);
+    
+    if (data.songs) {
+        data.songs = data.songs.map(transformSong);
+    }
+    
+    return data;
 }
 
 export async function getLibraryStatus(): Promise<ScanStatus> {
