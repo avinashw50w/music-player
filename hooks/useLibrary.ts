@@ -265,6 +265,18 @@ export const useLibrary = () => {
     } catch (err) { console.warn("Favorite toggle failed", err); }
   }, []);
 
+  const deletePlaylist = useCallback(async (id: string) => {
+      // Optimistic update to remove playlist immediately from sidebar
+      setPlaylists(prev => prev.filter(p => p.id !== id));
+      try {
+          await api.deletePlaylist(id);
+      } catch (err) {
+          console.error("Failed to delete playlist", err);
+          // Re-fetch on error to ensure sync
+          api.getPlaylists().then(setPlaylists);
+      }
+  }, []);
+
   return {
     songs, setSongs,
     albums, setAlbums,
@@ -286,6 +298,7 @@ export const useLibrary = () => {
     onUpdateSong,
     onUpdateAlbum,
     onUpdateArtist,
-    handleToggleFavorite
+    handleToggleFavorite,
+    deletePlaylist
   };
 };

@@ -100,7 +100,7 @@ const App: React.FC = () => {
                 <Route path="/favorites" element={<Favorites onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />} />
                 <Route path="/album/:id" element={<AlbumDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateAlbum={library.onUpdateAlbum} lastEvent={library.lastEvent} />} />
                 <Route path="/artist/:id" element={<ArtistDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateArtist={library.onUpdateArtist} lastEvent={library.lastEvent} />} />
-                <Route path="/playlist/:id" element={<PlaylistDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onDeletePlaylist={api.deletePlaylist} onRenamePlaylist={api.renamePlaylist} onRemoveSong={api.removeSongFromPlaylist} onReorderSongs={api.reorderPlaylistSongs} lastEvent={library.lastEvent} />} />
+                <Route path="/playlist/:id" element={<PlaylistDetails currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onDeletePlaylist={library.deletePlaylist} onRenamePlaylist={api.renamePlaylist} onRemoveSong={api.removeSongFromPlaylist} onReorderSongs={api.reorderPlaylistSongs} lastEvent={library.lastEvent} />} />
                 <Route path="/song/:id" element={<SongDetails songs={library.songs} albums={library.albums} artists={library.artists} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onPlaySong={player.handlePlaySong} onPlayContext={player.handlePlayContext} onToggleFavorite={library.handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} onUpdateSong={handleUpdateSong} />} />
                 <Route path="/library/:type" element={
                     <FullList 
@@ -158,7 +158,17 @@ const App: React.FC = () => {
             onVisualizerChange={player.setActiveVisualizer} onUpdateSong={handleUpdateSong} 
           />
       )}
-      {showCreatePlaylistModal && <CreatePlaylistModal onClose={() => setShowCreatePlaylistModal(false)} onCreate={async (n) => { const p = await api.createPlaylist(n); library.setPlaylists(prev => [p, ...prev]); setShowCreatePlaylistModal(false); }} />}
+      {showCreatePlaylistModal && (
+        <CreatePlaylistModal 
+            onClose={() => setShowCreatePlaylistModal(false)} 
+            onCreate={async (n) => { 
+                const p = await api.createPlaylist(n); 
+                // Check if already added by SSE to avoid duplication
+                library.setPlaylists(prev => prev.some(pl => pl.id === p.id) ? prev : [p, ...prev]); 
+                setShowCreatePlaylistModal(false); 
+            }} 
+        />
+      )}
       {showAddToPlaylistModal && songToAdd && <AddToPlaylistModal song={songToAdd} playlists={library.playlists} onClose={() => { setShowAddToPlaylistModal(false); setSongToAdd(null); }} onSelect={async (pid) => { await api.addSongToPlaylist(pid, songToAdd.id); setShowAddToPlaylistModal(false); }} onCreateNew={() => { setShowAddToPlaylistModal(false); setShowCreatePlaylistModal(true); }} />}
     </div>
   );
