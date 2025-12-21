@@ -131,35 +131,6 @@ const Browse: React.FC<BrowseProps> = (props) => {
         </div>
       )}
 
-      {/* Artists */}
-      {props.artists.length > 0 && (
-        <div className="mb-14 animate-fade-in-up delay-200">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                <Mic2 className="w-6 h-6 text-rose-400" /> Artists
-            </h2>
-            <button onClick={() => navigate('/library/artists')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">
-                See all <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-            {props.artists.slice(0, 6).map((artist, idx) => (
-                <div 
-                    key={artist.id} 
-                    onClick={() => navigate(`/artist/${artist.id}`)}
-                    className="flex flex-col items-center group cursor-pointer"
-                >
-                    <div className="w-32 h-32 rounded-full overflow-hidden mb-3 shadow-lg group-hover:scale-105 transition-transform border-2 border-transparent group-hover:border-white/20">
-                        <img src={artist.avatarUrl} alt={artist.name} className="w-full h-full object-cover" />
-                    </div>
-                    <h4 className="text-white font-bold text-center truncate w-full group-hover:text-rose-400 transition-colors">{artist.name}</h4>
-                    <p className="text-slate-500 text-xs font-medium">{artist.followers} Followers</p>
-                </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Albums */}
       {props.albums.length > 0 && (
         <div className="mb-14 animate-fade-in-up delay-200">
@@ -187,6 +158,35 @@ const Browse: React.FC<BrowseProps> = (props) => {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+       {/* Artists */}
+      {props.artists.length > 0 && (
+        <div className="mb-14 animate-fade-in-up delay-200">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                <Mic2 className="w-6 h-6 text-rose-400" /> Artists
+            </h2>
+            <button onClick={() => navigate('/library/artists')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">
+                See all <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            {props.artists.slice(0, 6).map((artist, idx) => (
+                <div 
+                    key={artist.id} 
+                    onClick={() => navigate(`/artist/${artist.id}`)}
+                    className="flex flex-col items-center group cursor-pointer"
+                >
+                    <div className="w-32 h-32 rounded-full overflow-hidden mb-3 shadow-lg group-hover:scale-105 transition-transform border-2 border-transparent group-hover:border-white/20">
+                        <img src={artist.avatarUrl} alt={artist.name} className="w-full h-full object-cover" />
+                    </div>
+                    <h4 className="text-white font-bold text-center truncate w-full group-hover:text-rose-400 transition-colors">{artist.name}</h4>
+                    <p className="text-slate-500 text-xs font-medium">{artist.followers} Followers</p>
+                </div>
+            ))}
           </div>
         </div>
       )}
