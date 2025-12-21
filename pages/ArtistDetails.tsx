@@ -163,7 +163,6 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
       <ActionButtons 
         isPlaying={!!isContextPlaying}
         onPlay={handlePlayToggle} 
-        onFollow={() => { }} 
         onEdit={() => setIsEditing(true)}
         isFavorite={artist.isFavorite}
         onToggleFavorite={() => handleToggleFavoriteInternal(artist.id)}

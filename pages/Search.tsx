@@ -76,15 +76,6 @@ const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
     localStorage.setItem('recentSearches', JSON.stringify(updated));
   };
   
-  const categories = [
-    { title: 'Pop', color: 'from-pink-500 to-rose-500', img: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
-    { title: 'R&B', color: 'from-purple-500 to-indigo-500', img: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300' },
-    { title: 'Jazz', color: 'from-blue-500 to-cyan-500', img: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=300' },
-    { title: 'Rock', color: 'from-red-500 to-orange-500', img: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=300' },
-    { title: 'Indie', color: 'from-emerald-500 to-teal-500', img: 'https://images.unsplash.com/photo-1759415548138-4754287fb43f?w=300' },
-    { title: 'Hip Hop', color: 'from-amber-500 to-yellow-500', img: 'https://images.unsplash.com/photo-1602306022553-2bd3c9928f0d?w=300' },
-  ];
-
   return (
     <div className="p-10 pb-10">
       <div className="max-w-6xl mx-auto">
@@ -198,7 +189,7 @@ const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
           /* Default State */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             {/* Recent Searches */}
-            <div className="lg:col-span-4 space-y-6">
+            <div className="lg:col-span-12 space-y-6">
                <h3 className="text-xl font-bold text-white flex items-center gap-3">
                  <Clock className="w-5 h-5 text-slate-400" /> Recent Searches
                </h3>
@@ -218,23 +209,6 @@ const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
                     <div className="text-slate-500 p-2">No recent searches</div>
                  )}
                </div>
-            </div>
-
-            {/* Trending Categories */}
-            <div className="lg:col-span-8 space-y-6">
-              <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                <TrendingUp className="w-5 h-5 text-indigo-400" /> Trending Categories
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                {categories.map((cat, i) => (
-                  <div key={i} onClick={() => setSearchTerm(cat.title)} className="relative h-40 rounded-3xl overflow-hidden cursor-pointer group shadow-lg">
-                    <div className={`absolute inset-0 bg-gradient-to-br ${cat.color} opacity-80 group-hover:opacity-90 transition-opacity z-10`}></div>
-                    <img src={cat.img} className="absolute inset-0 w-full h-full object-cover grayscale mix-blend-overlay" alt={cat.title} />
-                    <span className="absolute bottom-4 left-5 text-white font-bold text-2xl z-20">{cat.title}</span>
-                    <img src={cat.img} className="absolute -bottom-5 -right-5 w-20 h-20 rounded-xl rotate-12 shadow-lg z-20 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" alt={cat.title} />
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}

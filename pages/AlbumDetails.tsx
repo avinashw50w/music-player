@@ -192,7 +192,6 @@ export const AlbumDetails: React.FC<DetailProps> = ({
       <ActionButtons 
         isPlaying={!!isContextPlaying}
         onPlay={handlePlayToggle} 
-        onFollow={() => { }} 
         onEdit={() => setIsEditing(true)}
         isFavorite={album.isFavorite}
         onToggleFavorite={() => handleToggleFavoriteInternal(album.id)}
