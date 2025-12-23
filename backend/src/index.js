@@ -13,6 +13,8 @@ import uploadRouter from './routes/upload.js';
 import libraryRouter from './routes/library.js';
 import settingsRouter from './routes/settings.js';
 
+import { closeAllClients } from './services/sse.js';
+
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -197,6 +199,16 @@ const startServer = async () => {
         // Graceful Shutdown
         const shutdown = () => {
             console.log('Received shutdown signal. Closing server...');
+            
+            // 1. Close all SSE clients explicitly
+            closeAllClients();
+
+            // 2. Force close all TCP connections (Node v18.2+)
+            if (server.closeAllConnections) {
+                server.closeAllConnections();
+            }
+
+            // 3. Stop accepting new connections
             server.close(async () => {
                 console.log('HTTP server closed.');
                 try {
@@ -209,6 +221,12 @@ const startServer = async () => {
                     process.exit(1);
                 }
             });
+
+            // Force exit if hanging
+            setTimeout(() => {
+                console.error('Could not close connections in time, forcefully shutting down');
+                process.exit(1);
+            }, 5000);
         };
 
         process.on('SIGTERM', shutdown);

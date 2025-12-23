@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as api from '../services/api';
 import { Song, Album, Artist, Playlist, LibraryEvent } from '../types';
@@ -7,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 
 let lastScanUpdateTimestamp = 0;
 const PAGE_LIMIT = 20;
-const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3010';
+const API_HOST = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3010';
 
 export const useLibrary = () => {
   const location = useLocation();

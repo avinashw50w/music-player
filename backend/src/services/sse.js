@@ -1,3 +1,4 @@
+
 let clients = [];
 
 // Store last scan status to send to new clients immediately
@@ -18,13 +19,13 @@ export const addClient = (res) => {
     const clientId = Date.now();
     const client = {
         id: clientId,
-        write: (data) => res.write(data)
+        res // Store response object
     };
     clients.push(client);
     
     // Send immediate scan status on connection
     const initialData = JSON.stringify({ type: 'scan:status', payload: currentScanStatus });
-    client.write(`data: ${initialData}\n\n`);
+    client.res.write(`data: ${initialData}\n\n`);
     
     return clientId;
 };
@@ -36,6 +37,20 @@ export const removeClient = (clientId) => {
 export const broadcast = (type, payload) => {
     const data = JSON.stringify({ type, payload });
     clients.forEach(client => {
-        client.write(`data: ${data}\n\n`);
+        // Check if connection is writable before writing
+        if (!client.res.writableEnded) {
+            client.res.write(`data: ${data}\n\n`);
+        }
     });
+};
+
+export const closeAllClients = () => {
+    clients.forEach(client => {
+        try {
+            client.res.end();
+        } catch (e) {
+            console.error('Error closing SSE client', e);
+        }
+    });
+    clients = [];
 };

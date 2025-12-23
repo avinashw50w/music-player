@@ -1,8 +1,6 @@
-/// <reference types="vite/client" />
-
 import { Song, Album, Artist, Playlist } from '../types';
 
-const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3010';
+const API_HOST = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3010';
 const API_BASE_URL = `${API_HOST}/api`;
 
 export interface UploadProgress {
