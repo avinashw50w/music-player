@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 
 import { Song, Album, Artist, Playlist } from '../types';
 

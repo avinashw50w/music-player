@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as api from '../services/api';
@@ -6,6 +7,7 @@ import { useLocation } from 'react-router-dom';
 
 let lastScanUpdateTimestamp = 0;
 const PAGE_LIMIT = 20;
+const API_HOST = import.meta.env.VITE_API_URL || 'http://localhost:3010';
 
 export const useLibrary = () => {
   const location = useLocation();
@@ -186,7 +188,9 @@ export const useLibrary = () => {
 
   // SSE Listener
   useEffect(() => {
-    const eventSource = new EventSource('/api/library/events');
+    // Construct full URL since proxy is removed in vite config
+    const eventSource = new EventSource(`${API_HOST}/api/library/events`);
+    
     eventSource.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
@@ -248,6 +252,12 @@ export const useLibrary = () => {
             }
         } catch (e) { console.error('Error parsing SSE message', e); }
     };
+    
+    eventSource.onerror = (e) => {
+        // console.error("SSE Error", e);
+        // Optional: Implement reconnection logic or simply let the browser handle standard retries
+    };
+
     return () => eventSource.close();
   }, []);
 
