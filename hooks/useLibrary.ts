@@ -8,6 +8,14 @@ let lastScanUpdateTimestamp = 0;
 const PAGE_LIMIT = 20;
 const API_HOST = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3010';
 
+// Helper to resolve URLs (duplicated from api.ts logic for SSE context)
+const resolveUrl = (url?: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
+    if (url.startsWith('/')) return `${API_HOST}${url}`;
+    return `${API_HOST}/${url}`;
+};
+
 export const useLibrary = () => {
   const location = useLocation();
   const [songs, setSongs] = useState<Song[]>([]);
@@ -199,8 +207,32 @@ export const useLibrary = () => {
     eventSource.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
-            const { type, payload } = data;
+            let { type, payload } = data;
             
+            // Pre-process payload to resolve URLs before any state updates
+            if (payload && typeof payload === 'object') {
+                payload = { ...payload }; // Clone
+                
+                // Resolve URLs
+                if (payload.coverUrl) {
+                    payload.coverUrl = resolveUrl(payload.coverUrl);
+                    // Add timestamp for cache busting images
+                    const sep = payload.coverUrl.includes('?') ? '&' : '?';
+                    payload.coverUrl = `${payload.coverUrl}${sep}t=${Date.now()}`;
+                }
+                
+                if (payload.fileUrl) {
+                    payload.fileUrl = resolveUrl(payload.fileUrl);
+                }
+                
+                if (payload.avatarUrl) {
+                    payload.avatarUrl = resolveUrl(payload.avatarUrl);
+                    // Add timestamp for cache busting avatars
+                    const sep = payload.avatarUrl.includes('?') ? '&' : '?';
+                    payload.avatarUrl = `${payload.avatarUrl}${sep}t=${Date.now()}`;
+                }
+            }
+
             if (['song:', 'album:', 'artist:', 'playlist:'].some(p => type.startsWith(p))) {
                 setLastEvent({ type, payload, timestamp: Date.now() });
             }
@@ -232,23 +264,25 @@ export const useLibrary = () => {
                 }
             }
             else if (type === 'song:update') {
-                const updatedPayload = { ...payload };
-                if (updatedPayload.coverUrl) updatedPayload.coverUrl = `${updatedPayload.coverUrl.split('?')[0]}?t=${Date.now()}`;
                 setSongs(prev => {
-                    const exists = prev.find(s => s.id === updatedPayload.id);
-                    if (exists) return prev.map(s => s.id === updatedPayload.id ? updatedPayload : s);
-                    return [updatedPayload, ...prev];
+                    const exists = prev.find(s => s.id === payload.id);
+                    if (exists) return prev.map(s => s.id === payload.id ? payload : s);
+                    return [payload, ...prev];
                 });
             } else if (type === 'song:delete') {
                 setSongs(prev => prev.filter(s => s.id !== payload.id));
                 setStats(prev => ({ ...prev, songCount: Math.max(0, prev.songCount - 1) }));
             } else if (type === 'album:update') {
-                 const updatedPayload = { ...payload };
-                 if (updatedPayload.coverUrl) updatedPayload.coverUrl = `${updatedPayload.coverUrl.split('?')[0]}?t=${Date.now()}`;
                  setAlbums(prev => {
-                    const exists = prev.find(a => a.id === updatedPayload.id);
-                    if (exists) return prev.map(a => a.id === updatedPayload.id ? updatedPayload : a);
-                    return [updatedPayload, ...prev];
+                    const exists = prev.find(a => a.id === payload.id);
+                    if (exists) return prev.map(a => a.id === payload.id ? payload : a);
+                    return [payload, ...prev];
+                });
+            } else if (type === 'artist:update') {
+                 setArtists(prev => {
+                    const exists = prev.find(a => a.id === payload.id);
+                    if (exists) return prev.map(a => a.id === payload.id ? payload : a);
+                    return [payload, ...prev];
                 });
             } else if (type === 'playlist:create') {
                 setPlaylists(prev => prev.some(p => p.id === payload.id) ? prev : [payload, ...prev]);
@@ -264,7 +298,6 @@ export const useLibrary = () => {
     
     eventSource.onerror = (e) => {
         // console.error("SSE Error", e);
-        // Optional: Implement reconnection logic or simply let the browser handle standard retries
     };
 
     return () => eventSource.close();
@@ -296,7 +329,6 @@ export const useLibrary = () => {
         else if (targetType === 'playlist') await api.togglePlaylistFavorite(id);
     } catch (err) { 
         console.warn("Favorite toggle failed", err);
-        // Revert on error (optional, implemented by refetching or reversing optimistic update)
     }
   }, []);
 
@@ -307,7 +339,6 @@ export const useLibrary = () => {
           await api.deletePlaylist(id);
       } catch (err) {
           console.error("Failed to delete playlist", err);
-          // Re-fetch on error to ensure sync
           api.getPlaylists().then(setPlaylists);
       }
   }, []);

@@ -62,12 +62,16 @@ const App: React.FC = () => {
     };
   }, [location.key]);
 
+  // Extract stable functions to avoid dependency loops
+  const { updateQueueSong, toggleQueueFavorite } = player;
+  const { handleToggleFavorite: libraryToggleFavorite, onUpdateSong: libraryUpdateSong } = library;
+
   // --- Wrapper Handler for Song Updates ---
   // Ensures that updates propagate to both the Library list AND the current Player state (including Queue)
   const handleUpdateSong = useCallback((updatedSong: Song) => {
-      library.onUpdateSong(updatedSong);
-      player.updateQueueSong(updatedSong);
-  }, [library, player]);
+      libraryUpdateSong(updatedSong);
+      updateQueueSong(updatedSong);
+  }, [libraryUpdateSong, updateQueueSong]);
 
   // --- Handle Add To Playlist (Open Modal) ---
   const handleAddToPlaylist = useCallback((song: Song) => {
@@ -79,19 +83,19 @@ const App: React.FC = () => {
   const handleToggleFavorite = useCallback((id: string, targetType?: 'song' | 'album' | 'artist' | 'playlist') => {
       // Optimistic update for player queue
       if (!targetType || targetType === 'song') {
-          player.toggleQueueFavorite(id);
+          toggleQueueFavorite(id);
       }
-      library.handleToggleFavorite(id, targetType);
-  }, [player, library]); // Depend on player object directly to ensure fresh state
+      libraryToggleFavorite(id, targetType);
+  }, [toggleQueueFavorite, libraryToggleFavorite]); 
 
   // --- Sync Player State with Real-time Library Events (e.g. Favorites toggle) ---
   useEffect(() => {
       if (library.lastEvent?.type === 'song:update') {
           const updated = library.lastEvent.payload as Song;
           // Sync update to playback queue so next/prev has fresh data
-          player.updateQueueSong(updated);
+          updateQueueSong(updated);
       }
-  }, [library.lastEvent, player]);
+  }, [library.lastEvent, updateQueueSong]);
 
   // --- Layout ---
   const MainContent = useMemo(() => (

@@ -56,20 +56,20 @@ export const SongDetailsHero: React.FC<HeroProps> = (props) => {
       <div className="flex flex-col gap-6 w-full min-w-0">
          <div className="flex justify-end relative">
             <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-xl">
-                <button onClick={props.onIdentify} disabled={isIdentifying} title="Identify Song with MusicBrainz" className={`p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-all ${isIdentifying ? 'animate-pulse text-indigo-400' : ''}`}>
+                <button onClick={props.onIdentify} disabled={isIdentifying} title="Identify Song with MusicBrainz" className={`p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-all cursor-pointer ${isIdentifying ? 'animate-pulse text-indigo-400' : ''}`}>
                     <Wand2 className="w-5 h-5"/>
                 </button>
-                <button onClick={props.onIdentifySpotify} disabled={isIdentifyingSpotify} title="Find Metadata on Spotify" className={`p-2 text-slate-300 hover:text-green-400 rounded-xl hover:bg-white/10 transition-all ${isIdentifyingSpotify ? 'animate-pulse text-green-400' : ''}`}>
+                <button onClick={props.onIdentifySpotify} disabled={isIdentifyingSpotify} title="Find Metadata on Spotify" className={`p-2 text-slate-300 hover:text-green-400 rounded-xl hover:bg-white/10 transition-all cursor-pointer ${isIdentifyingSpotify ? 'animate-pulse text-green-400' : ''}`}>
                     <Sparkles className="w-5 h-5"/>
                 </button>
-                <button onClick={props.onRefine} disabled={isRefining} title="Refine Metadata with AI" className={`p-2 text-slate-300 hover:text-indigo-300 rounded-xl hover:bg-white/10 transition-all ${isRefining ? 'animate-pulse text-indigo-300' : ''}`}>
+                <button onClick={props.onRefine} disabled={isRefining} title="Refine Metadata with AI" className={`p-2 text-slate-300 hover:text-indigo-300 rounded-xl hover:bg-white/10 transition-all cursor-pointer ${isRefining ? 'animate-pulse text-indigo-300' : ''}`}>
                     <Bot className="w-5 h-5"/>
                 </button>
                 <div className="w-[1px] h-5 bg-white/20 mx-1"></div>
-                <button onClick={props.onEdit} className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10" title="Edit Info">
+                <button onClick={props.onEdit} className="p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 cursor-pointer" title="Edit Info">
                     <Edit3 className="w-5 h-5"/>
                 </button>
-                <button onClick={props.onDelete} className="p-2 text-rose-400 hover:text-rose-300 rounded-xl hover:bg-rose-500/20" title="Delete Song">
+                <button onClick={props.onDelete} className="p-2 text-rose-400 hover:text-rose-300 rounded-xl hover:bg-rose-500/20 cursor-pointer" title="Delete Song">
                     <Trash2 className="w-5 h-5"/>
                 </button>
             </div>
@@ -88,20 +88,20 @@ export const SongDetailsHero: React.FC<HeroProps> = (props) => {
          <div className="flex items-center justify-start gap-4 flex-wrap">
             <button
               onClick={props.onPlay}
-              className="px-8 py-3 bg-white text-black rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform"
+              className="px-8 py-3 bg-white text-black rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform cursor-pointer"
             >
               {currentSongId === song.id && isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
               {currentSongId === song.id && isPlaying ? "Pause" : "Play"}
             </button>
             <button
               onClick={props.onToggleFavorite}
-              className={`p-3 rounded-full border border-white/10 hover:bg-white/10 transition-colors ${song.isFavorite ? 'text-rose-500' : 'text-slate-400'}`}
+              className={`p-3 rounded-full border border-white/10 hover:bg-white/10 transition-colors cursor-pointer ${song.isFavorite ? 'text-rose-500' : 'text-slate-400'}`}
             >
               <Heart className={`w-6 h-6 ${song.isFavorite ? 'fill-current' : ''}`} />
             </button>
             <button
               onClick={props.onAddToPlaylist}
-              className="p-3 rounded-full border border-white/10 hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+              className="p-3 rounded-full border border-white/10 hover:bg-white/10 transition-colors text-slate-400 hover:text-white cursor-pointer"
               title="Add to Playlist"
             >
               <ListPlus className="w-6 h-6" />

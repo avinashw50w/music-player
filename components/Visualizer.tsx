@@ -374,7 +374,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                             <p className="text-slate-400 font-medium">Loading lyrics...</p>
                         </div>
                     ) : currentSong.lyrics ? (
-                        <div className="w-full max-w-4xl h-full overflow-y-auto px-8 text-center space-y-4 custom-scrollbar">
+                        <div className="w-full max-w-4xl h-full overflow-y-auto px-8 text-center space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                              <div className="h-[20vh]"></div>
                              <p className="text-slate-400 text-sm mb-8 uppercase tracking-widest">Unsynced Lyrics</p>
                              <p className="whitespace-pre-line text-white/90 text-2xl font-medium leading-loose">
@@ -394,7 +394,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                             <button
                                 onClick={handleFetchLyrics}
                                 disabled={isFetchingLyrics}
-                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 mx-auto disabled:opacity-50 pointer-events-auto"
+                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 mx-auto disabled:opacity-50 pointer-events-auto cursor-pointer"
                             >
                                 {isFetchingLyrics ? (
                                     <>
@@ -426,7 +426,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                         <div className="relative">
                             <button 
                                 onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }}
-                                className="flex items-center gap-1 text-white text-sm font-bold hover:text-indigo-400 transition-colors uppercase"
+                                className="flex items-center gap-1 text-white text-sm font-bold hover:text-indigo-400 transition-colors uppercase cursor-pointer"
                             >
                                 {activeVisualizer.replace(/_/g, ' ')} <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -440,7 +440,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                                 <button
                                                     key={v.name}
                                                     onClick={() => { onVisualizerChange(v.name); setIsDropdownOpen(false); }}
-                                                    className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/10 transition-colors capitalize border-b border-white/5 last:border-0 ${activeVisualizer === v.name ? 'text-indigo-400 bg-white/5' : 'text-slate-300'}`}
+                                                    className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/10 transition-colors capitalize border-b border-white/5 last:border-0 cursor-pointer ${activeVisualizer === v.name ? 'text-indigo-400 bg-white/5' : 'text-slate-300'}`}
                                                 >
                                                     <div className="flex items-center justify-between">
                                                         {v.displayName}
@@ -456,7 +456,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-3 bg-black/40 hover:bg-white/10 rounded-full text-white transition-colors backdrop-blur-xl border border-white/10 shadow-lg pointer-events-auto"
+                        className="p-3 bg-black/40 hover:bg-white/10 rounded-full text-white transition-colors backdrop-blur-xl border border-white/10 shadow-lg pointer-events-auto cursor-pointer"
                     >
                         <X className="w-6 h-6" />
                     </button>
@@ -482,12 +482,12 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                         </div>
 
                         <div className="flex items-center justify-center gap-10">
-                            <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform">
+                            <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform cursor-pointer">
                                 <SkipBack className="w-8 h-8 fill-current" />
                             </button>
                             <button
                                 onClick={onPlayPause}
-                                className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl hover:shadow-indigo-500/50"
+                                className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl hover:shadow-indigo-500/50 cursor-pointer"
                             >
                                 {isPlaying ? (
                                     <Pause className="w-7 h-7 text-black fill-current" />
@@ -495,7 +495,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                                     <Play className="w-7 h-7 text-black fill-current ml-1" />
                                 )}
                             </button>
-                            <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform">
+                            <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors hover:scale-110 transform cursor-pointer">
                                 <SkipForward className="w-8 h-8 fill-current" />
                             </button>
                         </div>

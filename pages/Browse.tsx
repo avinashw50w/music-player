@@ -73,7 +73,7 @@ const Browse: React.FC<BrowseProps> = (props) => {
           <button 
             onClick={handleRefreshLibrary}
             disabled={isRefreshing || props.isScanning}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full font-bold text-sm text-white transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full font-bold text-sm text-white transition-colors disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh Library
@@ -121,7 +121,7 @@ const Browse: React.FC<BrowseProps> = (props) => {
             <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                 <Music className="w-6 h-6 text-indigo-400" /> Top Songs
             </h2>
-            <button onClick={() => navigate('/library/songs')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">
+            <button onClick={() => navigate('/library/songs')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1 cursor-pointer">
                 See all <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -152,7 +152,7 @@ const Browse: React.FC<BrowseProps> = (props) => {
             <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                 <Disc className="w-6 h-6 text-emerald-400" /> Albums
             </h2>
-            <button onClick={() => navigate('/library/albums')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">
+            <button onClick={() => navigate('/library/albums')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1 cursor-pointer">
                 See all <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -183,7 +183,7 @@ const Browse: React.FC<BrowseProps> = (props) => {
             <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                 <Mic2 className="w-6 h-6 text-rose-400" /> Artists
             </h2>
-            <button onClick={() => navigate('/library/artists')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1">
+            <button onClick={() => navigate('/library/artists')} className="text-slate-400 text-base font-bold hover:text-white flex items-center gap-1 cursor-pointer">
                 See all <ArrowRight className="w-4 h-4" />
             </button>
           </div>

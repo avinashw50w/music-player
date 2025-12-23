@@ -47,9 +47,16 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
   }, []);
 
   const playAudio = useCallback(async () => {
-    if (!audioRef.current || !currentSong) return;
-    try { await audioRef.current.play(); } catch (err: any) { if (err.name !== 'AbortError') console.error("Playback failed", err); }
-  }, [currentSong]);
+    if (!audioRef.current || !audioRef.current.src) return;
+    try { 
+        await audioRef.current.play(); 
+    } catch (err: any) { 
+        // Ignore AbortError (interrupted by load) and NotSupportedError (empty src during transition)
+        if (err.name !== 'AbortError' && err.name !== 'NotSupportedError') {
+            console.error("Playback failed", err); 
+        }
+    }
+  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -57,7 +64,7 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
         if (isPlaying) playAudio();
         else audioRef.current.pause();
     }
-  }, [isPlaying, currentSong, playAudio, volume]);
+  }, [isPlaying, currentSong?.id, currentSong?.fileUrl, playAudio, volume]);
 
   const handlePlaySong = useCallback((song: Song, context?: Song[]) => {
     addToHistory(song);

@@ -199,14 +199,14 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({ currentData, s
           <button 
             onClick={onClose} 
             disabled={isSaving}
-            className="px-6 py-3 text-slate-300 hover:text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 text-slate-300 hover:text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Cancel
           </button>
           <button 
             onClick={handleConfirm} 
             disabled={isSaving}
-            className="px-8 py-3 bg-white text-black rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-white/10 flex items-center gap-2 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-wait"
+            className="px-8 py-3 bg-white text-black rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-white/10 flex items-center gap-2 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-wait cursor-pointer"
           >
             {isSaving ? (
                 <>

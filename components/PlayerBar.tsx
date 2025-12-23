@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume2, Repeat, Repeat1, Shuffle, Heart, Maximize2, VolumeX, ListPlus } from 'lucide-react';
 import { Song } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -53,6 +53,43 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
   onToggleRepeat
 }) => {
   const navigate = useNavigate();
+  const volumeBarRef = useRef<HTMLDivElement>(null);
+  const [isDraggingVolume, setIsDraggingVolume] = useState(false);
+
+  const calculateVolume = useCallback((clientX: number) => {
+      if (!volumeBarRef.current) return 0;
+      const rect = volumeBarRef.current.getBoundingClientRect();
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  }, []);
+
+  const handleVolumeStart = (e: React.MouseEvent | React.TouchEvent) => {
+      setIsDraggingVolume(true);
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      onVolumeChange(calculateVolume(clientX));
+  };
+
+  useEffect(() => {
+      const handleMove = (e: MouseEvent | TouchEvent) => {
+          if (isDraggingVolume) {
+              const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+              onVolumeChange(calculateVolume(clientX));
+          }
+      };
+      const handleUp = () => setIsDraggingVolume(false);
+
+      if (isDraggingVolume) {
+          window.addEventListener('mousemove', handleMove);
+          window.addEventListener('touchmove', handleMove);
+          window.addEventListener('mouseup', handleUp);
+          window.addEventListener('touchend', handleUp);
+      }
+      return () => {
+          window.removeEventListener('mousemove', handleMove);
+          window.removeEventListener('touchmove', handleMove);
+          window.removeEventListener('mouseup', handleUp);
+          window.removeEventListener('touchend', handleUp);
+      };
+  }, [isDraggingVolume, onVolumeChange, calculateVolume]);
   
   if (!currentSong) return null;
 
@@ -71,7 +108,7 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
            {onExpand && (
                <button 
                  onClick={(e) => { e.stopPropagation(); onExpand(); }}
-                 className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-xl"
+                 className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-xl cursor-pointer"
                >
                  <Maximize2 className="w-6 h-6 text-white" />
                </button>
@@ -93,14 +130,14 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
         </div>
         <button 
           onClick={() => onToggleFavorite(currentSong.id)}
-          className="ml-2 text-slate-400 hover:text-rose-500 transition-colors"
+          className="ml-2 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
           title="Favorite"
         >
           <Heart className={`w-6 h-6 ${currentSong.isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
         </button>
         <button 
           onClick={() => onAddToPlaylist(currentSong)}
-          className="ml-2 text-slate-400 hover:text-white transition-colors"
+          className="ml-2 text-slate-400 hover:text-white transition-colors cursor-pointer"
           title="Add to Playlist"
         >
           <ListPlus className="w-6 h-6" />
@@ -112,19 +149,19 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
         <div className="flex items-center gap-8 mb-3">
           <button 
             onClick={onToggleShuffle}
-            className={`transition-colors ${isShuffle ? 'text-indigo-500' : 'text-slate-500 hover:text-white'}`}
+            className={`transition-colors cursor-pointer ${isShuffle ? 'text-indigo-500' : 'text-slate-500 hover:text-white'}`}
             title="Shuffle"
           >
             <Shuffle className="w-5 h-5" />
           </button>
           
-          <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform">
+          <button onClick={onPrev} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform cursor-pointer">
             <SkipBack className="w-7 h-7 fill-current" />
           </button>
           
           <button
             onClick={onPlayPause}
-            className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl shadow-white/10 active:scale-95"
+            className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl shadow-white/10 active:scale-95 cursor-pointer"
           >
             {isPlaying ? (
               <Pause className="w-6 h-6 text-black fill-current" />
@@ -133,20 +170,20 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
             )}
           </button>
           
-          <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform">
+          <button onClick={onNext} className="text-slate-300 hover:text-white transition-colors active:scale-95 transform cursor-pointer">
             <SkipForward className="w-7 h-7 fill-current" />
           </button>
           
           <button 
             onClick={onToggleRepeat}
-            className={`transition-colors ${repeatMode !== 'off' ? 'text-indigo-500' : 'text-slate-500 hover:text-white'}`}
+            className={`transition-colors cursor-pointer ${repeatMode !== 'off' ? 'text-indigo-500' : 'text-slate-500 hover:text-white'}`}
             title="Repeat"
           >
             {repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
           </button>
         </div>
         
-        <div className="w-full flex items-center gap-4 text-sm text-slate-500 font-medium select-none">
+        <div className="w-full flex items-center gap-4 text-sm font-medium select-none text-white">
           <span className="tabular-nums w-10 text-right">{formatTime(currentTime)}</span>
           <ProgressBar 
             currentTime={currentTime} 
@@ -161,28 +198,24 @@ const PlayerBar: React.FC<PlayerBarProps> = ({
       <div className="flex items-center justify-end gap-4 w-[30%] group/vol">
         <button 
           onClick={() => onVolumeChange(volume === 0 ? 1 : 0)}
-          className="text-slate-500 hover:text-white transition-colors"
+          className="text-white hover:text-slate-300 transition-colors cursor-pointer"
         >
           {volume === 0 ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
         </button>
         
-        {/* Custom Volume Slider reusing ProgressBar logic but simplified */}
-        <div className="w-28 h-1.5 bg-white/10 rounded-full cursor-pointer relative group-hover/vol:h-2 transition-all">
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={volume}
-            onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          />
+        {/* Custom Volume Slider */}
+        <div 
+            ref={volumeBarRef}
+            className="w-28 h-1.5 bg-white/10 rounded-full cursor-pointer relative group-hover/vol:h-2 transition-all"
+            onMouseDown={handleVolumeStart}
+            onTouchStart={handleVolumeStart}
+        >
           <div 
-            className="absolute h-full bg-slate-400 rounded-full group-hover/vol:bg-white transition-colors" 
+            className="absolute h-full bg-slate-400 rounded-full group-hover/vol:bg-white transition-colors pointer-events-none" 
             style={{ width: `${volume * 100}%` }}
           />
           <div 
-             className="absolute h-3 w-3 bg-white rounded-full top-1/2 -translate-y-1/2 shadow-md opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+             className="absolute h-3 w-3 bg-white rounded-full top-1/2 shadow-md opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
              style={{ left: `${volume * 100}%`, transform: 'translate(-50%, -50%)' }}
           />
         </div>

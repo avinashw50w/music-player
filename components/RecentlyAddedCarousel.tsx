@@ -32,7 +32,7 @@ export const RecentlyAddedCarousel: React.FC<CarouselProps> = ({ songs, currentS
             <h2 className="text-3xl font-bold text-white">Recently Added</h2>
             <button 
                 onClick={() => navigate('/library/songs')}
-                className="text-slate-400 text-sm font-bold hover:text-white flex items-center gap-1 transition-colors"
+                className="text-slate-400 text-sm font-bold hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
             >
                 See all <ArrowRight className="w-4 h-4" />
             </button>
@@ -41,7 +41,7 @@ export const RecentlyAddedCarousel: React.FC<CarouselProps> = ({ songs, currentS
         <div className="relative group/scroll">
             <button
                 onClick={() => scroll('left')}
-                className="absolute left-0 top-1/2 -translate-y-[calc(50%+10px)] z-20 p-3 bg-black/50 backdrop-blur-md rounded-full text-white opacity-0 group-hover/scroll:opacity-100 transition-opacity -ml-4 border border-white/10 hover:bg-black/70 hover:scale-110 shadow-lg"
+                className="absolute left-0 top-1/2 -translate-y-[calc(50%+10px)] z-20 p-3 bg-black/50 backdrop-blur-md rounded-full text-white opacity-0 group-hover/scroll:opacity-100 transition-opacity -ml-4 border border-white/10 hover:bg-black/70 hover:scale-110 shadow-lg cursor-pointer"
                 aria-label="Scroll left"
             >
                 <ChevronLeft className="w-6 h-6" />
@@ -74,12 +74,12 @@ export const RecentlyAddedCarousel: React.FC<CarouselProps> = ({ songs, currentS
                                                     <PlayingIndicator />
                                                 </div>
                                             </div>
-                                            <button className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center hover:scale-110 transition-all opacity-0 group-hover:opacity-100 shadow-lg transform translate-y-2 group-hover:translate-y-0">
+                                            <button className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center hover:scale-110 transition-all opacity-0 group-hover:opacity-100 shadow-lg transform translate-y-2 group-hover:translate-y-0 cursor-pointer">
                                                 <Pause className="w-5 h-5 fill-current" />
                                             </button>
                                         </>
                                     ) : (
-                                        <button className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0">
+                                        <button className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-lg transform translate-y-2 group-hover:translate-y-0 cursor-pointer">
                                             <Play className="w-5 h-5 fill-current ml-0.5" />
                                         </button>
                                     )}
@@ -94,7 +94,7 @@ export const RecentlyAddedCarousel: React.FC<CarouselProps> = ({ songs, currentS
 
             <button
                 onClick={() => scroll('right')}
-                className="absolute right-0 top-1/2 -translate-y-[calc(50%+10px)] z-20 p-3 bg-black/50 backdrop-blur-md rounded-full text-white opacity-0 group-hover/scroll:opacity-100 transition-opacity -mr-4 border border-white/10 hover:bg-black/70 hover:scale-110 shadow-lg"
+                className="absolute right-0 top-1/2 -translate-y-[calc(50%+10px)] z-20 p-3 bg-black/50 backdrop-blur-md rounded-full text-white opacity-0 group-hover/scroll:opacity-100 transition-opacity -mr-4 border border-white/10 hover:bg-black/70 hover:scale-110 shadow-lg cursor-pointer"
                 aria-label="Scroll right"
             >
                 <ChevronRight className="w-6 h-6" />

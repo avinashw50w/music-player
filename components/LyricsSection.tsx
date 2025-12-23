@@ -26,7 +26,7 @@ export const LyricsSection: React.FC<LyricsSectionProps> = ({
                 <button
                     onClick={onFetchSynced}
                     disabled={isFetching}
-                    className="text-sm font-bold text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 px-4 py-2 rounded-full transition-colors flex items-center gap-2 disabled:opacity-50"
+                    className="text-sm font-bold text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 px-4 py-2 rounded-full transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                     {isFetching ? (
                         <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -39,7 +39,7 @@ export const LyricsSection: React.FC<LyricsSectionProps> = ({
             {!isEditing && (
                 <button
                     onClick={() => onEditToggle(true)}
-                    className="text-sm font-bold text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full transition-colors"
+                    className="text-sm font-bold text-slate-400 hover:text-white bg-white/5 px-4 py-2 rounded-full transition-colors cursor-pointer"
                 >
                     {lyrics ? 'Edit' : 'Add'}
                 </button>
@@ -59,13 +59,13 @@ export const LyricsSection: React.FC<LyricsSectionProps> = ({
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => onEditToggle(false)}
-                className="px-6 py-2 rounded-full font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                className="px-6 py-2 rounded-full font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={onSave}
-                className="px-6 py-2 rounded-full font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-lg"
+                className="px-6 py-2 rounded-full font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-lg cursor-pointer"
               >
                 Save Lyrics
               </button>
@@ -84,10 +84,10 @@ export const LyricsSection: React.FC<LyricsSectionProps> = ({
                 </div>
                 <h4 className="text-lg font-bold text-white mb-2">No Lyrics</h4>
                 <div className="flex items-center justify-center gap-4 mt-6">
-                    <button onClick={onFetchSynced} disabled={isFetching} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2">
+                    <button onClick={onFetchSynced} disabled={isFetching} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed">
                         {isFetching ? 'Searching...' : 'Find Synced'}
                     </button>
-                    <button onClick={() => onEditToggle(true)} className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all">
+                    <button onClick={() => onEditToggle(true)} className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all cursor-pointer">
                         Manual Entry
                     </button>
                 </div>

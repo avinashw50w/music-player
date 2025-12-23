@@ -201,7 +201,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
             <button 
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
             >
                 {loadingMore ? (
                   <>
@@ -217,7 +217,7 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
         <div className="px-10 max-w-7xl mx-auto mt-16 mb-12">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold text-white">Albums</h2>
-            <button className="text-slate-400 text-base font-bold hover:text-white transition-colors">See all</button>
+            <button className="text-slate-400 text-base font-bold hover:text-white transition-colors cursor-pointer">See all</button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {albums.map(album => (

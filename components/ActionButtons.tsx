@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Pause, Play, Shuffle, Heart, MoreHorizontal, Edit3, Trash2 } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
     <div className="px-10 py-2 flex items-center gap-6 relative z-20 max-w-7xl mx-auto">
       <button
         onClick={onPlay}
-        className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 hover:bg-indigo-50 transition-all shadow-xl shadow-white/5 active:scale-95 group"
+        className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 hover:bg-indigo-50 transition-all shadow-xl shadow-white/5 active:scale-95 group cursor-pointer"
       >
         {isPlaying ? (
            <Pause className="w-7 h-7 text-black fill-current ml-0 group-hover:scale-110 transition-transform" />
@@ -42,7 +43,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       {onFollow && (
         <button
           onClick={onFollow}
-          className={`px-8 py-3 rounded-full font-bold text-base border-2 transition-all ${isFollowing
+          className={`px-8 py-3 rounded-full font-bold text-base border-2 transition-all cursor-pointer ${isFollowing
             ? 'border-indigo-500 text-indigo-400 hover:bg-indigo-950'
             : 'border-slate-600 text-white hover:border-white'
             }`}
@@ -52,13 +53,13 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       )}
 
       <div className="flex items-center gap-4 ml-2">
-        <button className="p-3 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/5">
+        <button className="p-3 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/5 cursor-pointer">
           <Shuffle className="w-7 h-7" />
         </button>
         {onToggleFavorite && (
           <button 
             onClick={onToggleFavorite}
-            className="p-3 text-slate-400 hover:text-rose-500 transition-colors rounded-full hover:bg-white/5"
+            className="p-3 text-slate-400 hover:text-rose-500 transition-colors rounded-full hover:bg-white/5 cursor-pointer"
           >
             <Heart className={`w-7 h-7 ${isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
           </button>
@@ -69,7 +70,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
         <div className="ml-auto relative">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+            className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10 cursor-pointer"
           >
             <MoreHorizontal className="w-7 h-7" />
           </button>
@@ -79,7 +80,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
               {onEdit && (
                 <button
                   onClick={() => { setShowMenu(false); onEdit(); }}
-                  className="w-full text-left px-5 py-4 text-base text-slate-200 hover:bg-white/5 flex items-center gap-3 transition-colors"
+                  className="w-full text-left px-5 py-4 text-base text-slate-200 hover:bg-white/5 flex items-center gap-3 transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-5 h-5" /> Edit Details
                 </button>
@@ -87,7 +88,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
               {onDelete && (
                 <button
                   onClick={() => { setShowMenu(false); onDelete(); }}
-                  className="w-full text-left px-5 py-4 text-base text-rose-400 hover:bg-white/5 flex items-center gap-3 transition-colors"
+                  className="w-full text-left px-5 py-4 text-base text-rose-400 hover:bg-white/5 flex items-center gap-3 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-5 h-5" /> Delete
                 </button>

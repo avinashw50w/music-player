@@ -219,7 +219,7 @@ export const AlbumDetails: React.FC<DetailProps> = ({
             <button 
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-2 rounded-full font-bold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer disabled:cursor-default"
             >
                 {loadingMore ? (
                   <>

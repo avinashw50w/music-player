@@ -202,13 +202,13 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
         <div className="flex justify-end gap-4">
           <button 
             onClick={onClose} 
-            className="px-6 py-2 text-slate-300 hover:text-white font-medium transition-colors"
+            className="px-6 py-2 text-slate-300 hover:text-white font-medium transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button 
             onClick={() => onSave(formData, selectedIds)} 
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-colors shadow-lg shadow-indigo-500/20"
+            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-colors shadow-lg shadow-indigo-500/20 cursor-pointer"
           >
             Save Changes
           </button>
