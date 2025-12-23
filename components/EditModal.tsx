@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Loader2 } from 'lucide-react';
 
 export interface SuggestionItem {
     text: string;
@@ -12,7 +13,7 @@ export interface SuggestionItem {
 interface EditModalProps {
   title: string;
   onClose: () => void;
-  onSave: (data: any, ids?: Record<string, string>) => void;
+  onSave: (data: any, ids?: Record<string, string>) => Promise<void> | void;
   fields: { name: string; label: string; value: string; isMulti?: boolean; suggestions?: (string | SuggestionItem)[] }[];
   onFieldChange?: (name: string, value: string) => void;
 }
@@ -22,19 +23,14 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
     fields.reduce((acc, field) => ({ ...acc, [field.name]: field.value }), {})
   );
   
-  // Track selected IDs for suggestions (e.g. albumId)
   const [selectedIds, setSelectedIds] = useState<Record<string, string>>({});
-  
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
   const wrapperRef = useRef<HTMLDivElement>(null);
-  
-  // Refs for input elements to manage focus
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  
-  // Refs for field containers (input + dropdown) to handle click outside
   const fieldContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Prevent background scrolling when modal is open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -42,13 +38,10 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
     };
   }, []);
 
-  // Handle click outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-        // If a field is focused
         if (focusedField) {
             const container = fieldContainersRef.current[focusedField];
-            // If click is outside the specific field container, close dropdown
             if (container && !container.contains(event.target as Node)) {
                 setFocusedField(null);
             }
@@ -63,28 +56,23 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
       let newValue = suggestionValue;
 
       if (field?.isMulti) {
-          // Split by comma, trim, remove the incomplete last part, and append the suggestion
           const parts = (formData[fieldName] || '').split(',');
-          parts.pop(); // Remove the partial text currently being typed
-          parts.push(suggestionValue); // Add the full suggestion
-          // Join and add a trailing comma+space for next entry
+          parts.pop(); 
+          parts.push(suggestionValue); 
           newValue = parts.map(p => p.trim()).filter(Boolean).join(', ') + ', ';
       }
 
       setFormData(prev => ({ ...prev, [fieldName]: newValue }));
       
-      // For multi-value fields, we typically don't track a single ID for the whole field.
       if (id && !field?.isMulti) {
           setSelectedIds(prev => ({ ...prev, [fieldName]: id }));
       }
       
-      // For multi-select, keep focus and re-set to allow continued typing
       if (field?.isMulti) {
           const inputEl = inputRefs.current[fieldName];
           if (inputEl) {
               requestAnimationFrame(() => {
                   inputEl.focus();
-                  // Move cursor to end
                   inputEl.setSelectionRange(newValue.length, newValue.length);
               });
           }
@@ -92,34 +80,38 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
           setFocusedField(null);
       }
       
-      // Trigger field change for search reset or update
       if (onFieldChange) onFieldChange(fieldName, newValue);
+  };
+
+  const handleSave = async () => {
+      if (isLoading) return;
+      setIsLoading(true);
+      try {
+          await onSave(formData, selectedIds);
+      } catch (e) {
+          console.error(e);
+          setIsLoading(false);
+      }
   };
 
   const getSuggestionText = (s: string | SuggestionItem) => typeof s === 'string' ? s : s.text;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
-        onClick={onClose}
+        onClick={() => !isLoading && onClose()}
       />
       
-      {/* Modal Content */}
       <div className="bg-[#1c1c1e] border border-white/10 rounded-3xl p-8 w-full max-w-lg shadow-2xl relative z-10 animate-in fade-in zoom-in duration-200" ref={wrapperRef}>
         <h3 className="text-2xl font-bold text-white mb-6">{title}</h3>
         <div className="space-y-6 mb-8">
           {fields.map(field => {
             const currentValue = formData[field.name] || '';
-            
-            // Calculate search term: use full string or just the last segment for multi-fields
             const searchTerm = field.isMulti 
                 ? currentValue.split(',').pop()?.trim() || ''
                 : currentValue.trim();
 
-            // Filter suggestions
-            // Show only if focused, has suggestions, AND user has typed something
             const showSuggestions = focusedField === field.name && 
                                     field.suggestions && 
                                     field.suggestions.length > 0 && 
@@ -128,7 +120,6 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
             const filteredSuggestions = showSuggestions 
                 ? field.suggestions!.filter(s => {
                     const text = getSuggestionText(s);
-                    // Filter based on the active segment (searchTerm)
                     return text.toLowerCase().includes(searchTerm.toLowerCase());
                   }).slice(0, 5) 
                 : [];
@@ -147,25 +138,20 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
                     onChange={(e) => {
                         const val = e.target.value;
                         setFormData(prev => ({ ...prev, [field.name]: val }));
-                        
-                        // Ensure dropdown opens when typing
                         if (focusedField !== field.name) setFocusedField(field.name);
-
-                        // Clear selected ID if user types (assumes they are entering something new)
                         if (!field.isMulti && selectedIds[field.name]) {
                             const newIds = { ...selectedIds };
                             delete newIds[field.name];
                             setSelectedIds(newIds);
                         }
-
                         if (onFieldChange) onFieldChange(field.name, val);
                     }}
                     onFocus={() => setFocusedField(field.name)}
-                    className="w-full bg-black/50 text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 transition-colors"
+                    disabled={isLoading}
+                    className={`w-full bg-black/50 text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     autoComplete="off"
                 />
                 
-                {/* Suggestions Dropdown */}
                 {filteredSuggestions.length > 0 && (
                     <ul className="absolute left-0 right-0 top-full mt-2 bg-[#2c2c2e] border border-white/10 rounded-xl shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar">
                         {filteredSuggestions.map((suggestion, idx) => {
@@ -178,7 +164,7 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
                                 <li 
                                     key={idx}
                                     onMouseDown={(e) => {
-                                        e.preventDefault(); // Prevent blur before click
+                                        e.preventDefault(); 
                                         handleSuggestionClick(field.name, text, id);
                                     }}
                                     className="px-4 py-3 text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer text-sm transition-colors border-b border-white/5 last:border-0 flex items-center gap-3"
@@ -201,16 +187,23 @@ export const EditModal: React.FC<EditModalProps> = ({ title, onClose, onSave, fi
         </div>
         <div className="flex justify-end gap-4">
           <button 
-            onClick={onClose} 
-            className="px-6 py-2 text-slate-300 hover:text-white font-medium transition-colors cursor-pointer"
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-6 py-2 text-slate-300 hover:text-white font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button 
-            onClick={() => onSave(formData, selectedIds)} 
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-colors shadow-lg shadow-indigo-500/20 cursor-pointer"
+            onClick={handleSave} 
+            disabled={isLoading}
+            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-colors shadow-lg shadow-indigo-500/20 cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save Changes
+            {isLoading ? (
+                <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                </>
+            ) : 'Save Changes'}
           </button>
         </div>
       </div>

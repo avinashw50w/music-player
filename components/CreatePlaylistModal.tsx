@@ -1,18 +1,26 @@
 
 import React, { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface CreatePlaylistModalProps {
   onClose: () => void;
-  onCreate: (name: string) => void;
+  onCreate: (name: string) => Promise<void> | void;
 }
 
 export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({ onClose, onCreate }) => {
   const [name, setName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onCreate(name);
+    if (name.trim() && !isLoading) {
+      setIsLoading(true);
+      try {
+        await onCreate(name);
+      } catch (error) {
+        console.error("Failed to create playlist", error);
+        setIsLoading(false);
+      }
     }
   };
 
@@ -29,23 +37,32 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({ onClos
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Awesome Playlist"
                 autoFocus
-                className="w-full bg-black/50 text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 placeholder:text-slate-600"
+                disabled={isLoading}
+                className="w-full bg-black/50 text-white border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 placeholder:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               />
             </div>
             <div className="flex justify-end gap-3">
               <button 
                 type="button"
-                onClick={onClose} 
-                className="px-6 py-2.5 rounded-full font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                onClick={onClose}
+                disabled={isLoading}
+                className="px-6 py-2.5 rounded-full font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button 
                 type="submit"
-                disabled={!name.trim()}
-                className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full font-bold transition-colors shadow-lg shadow-indigo-500/20 cursor-pointer"
+                disabled={!name.trim() || isLoading}
+                className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full font-bold transition-colors shadow-lg shadow-indigo-500/20 cursor-pointer flex items-center gap-2"
               >
-                Create
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create'
+                )}
               </button>
             </div>
         </form>

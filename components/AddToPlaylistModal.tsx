@@ -1,17 +1,30 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Playlist, Song } from '../types';
-import { X, ListMusic, Plus } from 'lucide-react';
+import { X, ListMusic, Plus, Loader2 } from 'lucide-react';
 
 interface AddToPlaylistModalProps {
   song: Song;
   playlists: Playlist[];
   onClose: () => void;
-  onSelect: (playlistId: string) => void;
+  onSelect: (playlistId: string) => Promise<void> | void;
   onCreateNew: () => void;
 }
 
 export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ song, playlists, onClose, onSelect, onCreateNew }) => {
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  const handleSelect = async (playlistId: string) => {
+      if (loadingId) return;
+      setLoadingId(playlistId);
+      try {
+          await onSelect(playlistId);
+      } catch (e) {
+          console.error("Failed to add to playlist", e);
+          setLoadingId(null);
+      }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={onClose}>
       <div 
@@ -37,13 +50,16 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ song, pl
           <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
             {playlists.map(playlist => {
                const isAlreadyIn = playlist.songIds.includes(song.id);
+               const isLoading = loadingId === playlist.id;
+               const isDisabled = isAlreadyIn || (loadingId !== null);
+
                return (
                 <button
                   key={playlist.id}
-                  onClick={() => !isAlreadyIn && onSelect(playlist.id)}
-                  disabled={isAlreadyIn}
+                  onClick={() => !isAlreadyIn && handleSelect(playlist.id)}
+                  disabled={isDisabled}
                   className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all ${
-                    isAlreadyIn 
+                    isDisabled 
                       ? 'opacity-50 cursor-not-allowed bg-white/5' 
                       : 'hover:bg-indigo-600/20 hover:border-indigo-500/50 border border-transparent cursor-pointer'
                   }`}
@@ -59,14 +75,19 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ song, pl
                     <div className="text-white font-medium truncate">{playlist.name}</div>
                     <div className="text-slate-500 text-xs">{playlist.songIds.length} songs</div>
                   </div>
-                  {isAlreadyIn && <span className="text-xs text-slate-500">Added</span>}
+                  {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                  ) : isAlreadyIn ? (
+                      <span className="text-xs text-slate-500">Added</span>
+                  ) : null}
                 </button>
                );
             })}
 
             <button
               onClick={onCreateNew}
-              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 border border-dashed border-white/20 hover:border-white/50 transition-all group cursor-pointer"
+              disabled={loadingId !== null}
+              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 border border-dashed border-white/20 hover:border-white/50 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 transition-colors">
                 <Plus className="w-5 h-5 text-slate-400 group-hover:text-white" />

@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Mic2, Search, Music } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mic2, Search, Music, Loader2 } from 'lucide-react';
 
 interface LyricsSectionProps {
   lyrics: string;
@@ -9,12 +9,25 @@ interface LyricsSectionProps {
   onLyricsChange: (text: string) => void;
   onEditToggle: (editing: boolean) => void;
   onFetchSynced: () => void;
-  onSave: () => void;
+  onSave: () => Promise<void> | void;
 }
 
 export const LyricsSection: React.FC<LyricsSectionProps> = ({ 
   lyrics, isEditing, isFetching, onLyricsChange, onEditToggle, onFetchSynced, onSave 
 }) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+      if (isSaving) return;
+      setIsSaving(true);
+      try {
+          await onSave();
+      } catch (e) {
+          console.error("Failed to save lyrics", e);
+          setIsSaving(false);
+      }
+  };
+
   return (
     <div className="bg-[#1c1c1e]/80 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-10 flex flex-col min-h-[400px] shadow-2xl relative overflow-hidden">
       <div className="flex items-center justify-between mb-8 relative z-10">
@@ -54,20 +67,28 @@ export const LyricsSection: React.FC<LyricsSectionProps> = ({
               value={lyrics}
               onChange={(e) => onLyricsChange(e.target.value)}
               placeholder="Paste lyrics here..."
-              className="w-full min-h-[300px] bg-black/20 text-white rounded-xl p-6 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xl leading-relaxed font-medium placeholder:text-slate-600 mb-4"
+              disabled={isSaving}
+              className="w-full min-h-[300px] bg-black/20 text-white rounded-xl p-6 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xl leading-relaxed font-medium placeholder:text-slate-600 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => onEditToggle(false)}
-                className="px-6 py-2 rounded-full font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                onClick={() => !isSaving && onEditToggle(false)}
+                disabled={isSaving}
+                className="px-6 py-2 rounded-full font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
-                onClick={onSave}
-                className="px-6 py-2 rounded-full font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-lg cursor-pointer"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-6 py-2 rounded-full font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-lg cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Lyrics
+                {isSaving ? (
+                    <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                    </>
+                ) : 'Save Lyrics'}
               </button>
             </div>
           </div>
