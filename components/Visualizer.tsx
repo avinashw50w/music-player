@@ -134,14 +134,13 @@ const LyricLine = React.memo(({
     isActive: boolean, 
     onSeek: (time: number) => void 
 }) => {
-    // Removed blur-[0.5px] to prevent flickering and heavy painting during resize
-    // Added will-change-transform to hint composition layer
+    // Updated transitions to prevent flickering on resize (caused by transition-all on font-size changes)
     return (
         <p 
-            className={`transition-all ease-out origin-center cursor-pointer py-3 select-none will-change-transform ${
+            className={`transition-[opacity,transform,color,filter] duration-300 ease-out origin-center cursor-pointer py-3 select-none will-change-[opacity,transform] ${
                 isActive 
-                  ? 'text-white text-3xl md:text-4xl font-bold opacity-100' 
-                  : 'text-neutral-500 text-2xl md:text-3xl font-medium opacity-40 hover:opacity-60'
+                  ? 'text-white text-3xl md:text-4xl font-bold opacity-100 scale-105' 
+                  : 'text-neutral-500 text-2xl md:text-3xl font-medium opacity-40 hover:opacity-60 scale-100'
             }`}
             onClick={() => onSeek(line.time)}
         >
@@ -181,6 +180,14 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     // Background fetch tracking
     const [fetchedDetailsForId, setFetchedDetailsForId] = useState<string | null>(null);
     const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+
+    // Lock body scroll when visualizer is open
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, []);
 
     // Escape key handler
     useEffect(() => {
