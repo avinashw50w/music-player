@@ -63,11 +63,14 @@ router.get('/stats', async (req, res, next) => {
 
 // POST start scanning
 router.post('/scan', async (req, res) => {
-    const { path: scanPath } = req.body;
+    let { path: scanPath } = req.body;
 
     if (!scanPath) {
         return res.status(400).json({ error: 'Path is required' });
     }
+
+    // Resolve to absolute path to ensure consistency
+    scanPath = path.resolve(scanPath);
 
     if (currentScanStatus.isScanning) {
         return res.status(409).json({ error: 'Scan already in progress' });

@@ -200,7 +200,16 @@ export async function extractCoverArt(audioPath, outputPath) {
  * @param {string} [newFilePath] - Optional new path to rename the file to (e.g. "Artist - Title.mp3")
  */
 export async function updateAudioTags(filePath, metadata, newFilePath = null) {
-    const targetPath = newFilePath || filePath;
+    // Ensure file exists or try to resolve it
+    let resolvedPath = filePath;
+    if (!fs.existsSync(resolvedPath)) {
+        resolvedPath = path.resolve(filePath);
+        if (!fs.existsSync(resolvedPath)) {
+             throw new Error(`Input file not found: ${filePath}`);
+        }
+    }
+
+    const targetPath = newFilePath || resolvedPath;
     // We write to a temp file in the same directory as the target to ensure atomic rename is possible
     const tempPath = `${targetPath}.tmp${path.extname(targetPath)}`;
     
@@ -209,7 +218,7 @@ export async function updateAudioTags(filePath, metadata, newFilePath = null) {
 
         // 1. INPUTS
         // Main Audio File
-        args.push('-i', filePath);
+        args.push('-i', resolvedPath);
 
         // Cover Art File (if exists)
         let hasCover = false;
@@ -252,7 +261,7 @@ export async function updateAudioTags(filePath, metadata, newFilePath = null) {
 
         if (metadata.lyrics !== undefined) {
             const safeLyrics = metadata.lyrics ? metadata.lyrics.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : '';
-            const ext = path.extname(filePath).toLowerCase();
+            const ext = path.extname(resolvedPath).toLowerCase();
             
             if (ext === '.mp3' || ext === '.id3') {
                 addMeta('unsyncedlyrics', safeLyrics);
@@ -287,11 +296,11 @@ export async function updateAudioTags(filePath, metadata, newFilePath = null) {
                     await fs.promises.rename(tempPath, targetPath);
                     
                     // 2. If we renamed the file (target != source), delete the old source
-                    if (targetPath !== filePath) {
+                    if (targetPath !== resolvedPath) {
                         try {
-                            await fs.promises.unlink(filePath);
+                            await fs.promises.unlink(resolvedPath);
                         } catch (e) {
-                            console.warn(`[Metadata] Failed to delete old file ${path.basename(filePath)}: ${e.message}`);
+                            console.warn(`[Metadata] Failed to delete old file ${path.basename(resolvedPath)}: ${e.message}`);
                         }
                     }
 
@@ -303,7 +312,7 @@ export async function updateAudioTags(filePath, metadata, newFilePath = null) {
                 }
             } else {
                 fs.unlink(tempPath, () => {});
-                console.error(`[Metadata] FFmpeg Error for ${path.basename(filePath)}:`, stderr);
+                console.error(`[Metadata] FFmpeg Error for ${path.basename(resolvedPath)}:`, stderr);
                 reject(new Error(`ffmpeg exited with code ${code}`));
             }
         });

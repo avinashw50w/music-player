@@ -150,6 +150,42 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
       setCurrentSong(prev => prev?.id === id ? { ...prev, isFavorite: !prev.isFavorite } : prev);
   }, []);
 
+  const updateQueueAlbum = useCallback((updatedAlbum: any) => {
+      const updateSong = (s: Song) => {
+          if (s.albumId === updatedAlbum.id) {
+              return { 
+                  ...s, 
+                  album: updatedAlbum.title, 
+                  coverUrl: updatedAlbum.coverUrl || s.coverUrl
+              };
+          }
+          return s;
+      };
+
+      setPlaybackQueue(prev => prev.map(updateSong));
+      setCurrentSong(prev => prev ? updateSong(prev) : null);
+  }, []);
+
+  const updateQueueArtist = useCallback((updatedArtist: any) => {
+      const updateSong = (s: Song) => {
+          if (s.artists && s.artists.some(a => a.id === updatedArtist.id)) {
+              const newArtists = s.artists.map(a => a.id === updatedArtist.id ? { ...a, name: updatedArtist.name } : a);
+              return {
+                  ...s,
+                  artists: newArtists,
+                  artist: newArtists.map(a => a.name).join(', ')
+              };
+          }
+          if (s.artistId === updatedArtist.id) {
+               return { ...s, artist: updatedArtist.name };
+          }
+          return s;
+      };
+
+      setPlaybackQueue(prev => prev.map(updateSong));
+      setCurrentSong(prev => prev ? updateSong(prev) : null);
+  }, []);
+
   // Keyboard Controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -251,6 +287,8 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
     handleTimeUpdate,
     handleLoadedMetadata,
     updateQueueSong,
-    toggleQueueFavorite
+    toggleQueueFavorite,
+    updateQueueAlbum,
+    updateQueueArtist
   };
 };

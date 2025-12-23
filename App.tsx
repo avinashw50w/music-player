@@ -63,7 +63,7 @@ const App: React.FC = () => {
   }, [location.key]);
 
   // Extract stable functions to avoid dependency loops
-  const { updateQueueSong, toggleQueueFavorite } = player;
+  const { updateQueueSong, toggleQueueFavorite, updateQueueAlbum, updateQueueArtist } = player;
   const { handleToggleFavorite: libraryToggleFavorite, onUpdateSong: libraryUpdateSong } = library;
 
   // --- Wrapper Handler for Song Updates ---
@@ -90,12 +90,19 @@ const App: React.FC = () => {
 
   // --- Sync Player State with Real-time Library Events (e.g. Favorites toggle) ---
   useEffect(() => {
-      if (library.lastEvent?.type === 'song:update') {
-          const updated = library.lastEvent.payload as Song;
+      if (!library.lastEvent) return;
+      const { type, payload } = library.lastEvent;
+
+      if (type === 'song:update') {
+          const updated = payload as Song;
           // Sync update to playback queue so next/prev has fresh data
           updateQueueSong(updated);
+      } else if (type === 'album:update') {
+          updateQueueAlbum(payload);
+      } else if (type === 'artist:update') {
+          updateQueueArtist(payload);
       }
-  }, [library.lastEvent, updateQueueSong]);
+  }, [library.lastEvent, updateQueueSong, updateQueueAlbum, updateQueueArtist]);
 
   // --- Layout ---
   const MainContent = useMemo(() => (

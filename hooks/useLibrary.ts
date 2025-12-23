@@ -304,12 +304,34 @@ export const useLibrary = () => {
                     if (exists) return prev.map(a => a.id === payload.id ? payload : a);
                     return [payload, ...prev];
                 });
+                // Propagate album updates to songs (cover, album name)
+                setSongs(prev => prev.map(s => {
+                    if (s.albumId === payload.id) {
+                        return { ...s, album: payload.title, coverUrl: payload.coverUrl || s.coverUrl };
+                    }
+                    return s;
+                }));
             } else if (type === 'artist:update') {
                  setArtists(prev => {
                     const exists = prev.find(a => a.id === payload.id);
                     if (exists) return prev.map(a => a.id === payload.id ? payload : a);
                     return [payload, ...prev];
                 });
+                // Propagate artist updates to songs
+                setSongs(prev => prev.map(s => {
+                    if (s.artists && s.artists.some(a => a.id === payload.id)) {
+                        const newArtists = s.artists.map(a => a.id === payload.id ? { ...a, name: payload.name } : a);
+                        return { 
+                            ...s, 
+                            artists: newArtists,
+                            artist: newArtists.map(a => a.name).join(', ')
+                        };
+                    }
+                    if (s.artistId === payload.id) {
+                        return { ...s, artist: payload.name };
+                    }
+                    return s;
+                }));
             } else if (type === 'playlist:create') {
                 setPlaylists(prev => prev.some(p => p.id === payload.id) ? prev : [payload, ...prev]);
                 setStats(prev => ({ ...prev, playlistCount: prev.playlistCount + 1 }));
