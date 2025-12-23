@@ -262,7 +262,7 @@ const FullList: React.FC<FullListProps> = ({
 
   return (
     <div className="min-h-screen pb-10">
-        <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-white/5 px-10 py-6 mb-8 shadow-xl shadow-black/20">
+        <div className="sticky top-0 z-40 backdrop-blur-xl border-b border-white/5 px-10 py-6 mb-8 shadow-xl shadow-black/20">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                     <BackButton />
