@@ -105,7 +105,7 @@ const App: React.FC = () => {
       </div>
       <main className="flex-1 min-w-0 pb-32">
             <Routes>
-                <Route path="/" element={<Home recentSongs={library.recentlyPlayed} recentlyAdded={library.songs} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />} />
+                <Route path="/" element={<Home stats={library.stats} recentSongs={library.recentlyPlayed} recentlyAdded={library.songs} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />} />
                 <Route path="/search" element={<Search songs={library.songs} albums={library.albums} artists={library.artists} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={handleToggleFavorite} />} />
                 <Route path="/browse" element={<Browse onImportSongs={library.setSongs} onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} albums={library.albums} artists={library.artists} songs={library.songs} playlists={library.playlists} scanStatus={library.scanStatus} isScanning={library.isScanning} scanError={library.scanError} setScanError={library.setScanError} setIsScanning={library.setIsScanning} stats={library.stats} />} />
                 <Route path="/favorites" element={<Favorites onPlaySong={player.handlePlaySong} currentSongId={player.currentSong?.id} isPlaying={player.isPlaying} onToggleFavorite={handleToggleFavorite} onAddToPlaylist={handleAddToPlaylist} />} />

@@ -2,14 +2,19 @@
 import React from 'react';
 import { Disc, Music, Mic2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { LibraryStats } from '../services/api';
 
-export const HomeHeroCards: React.FC = () => {
+interface HomeHeroCardsProps {
+  stats: LibraryStats;
+}
+
+export const HomeHeroCards: React.FC<HomeHeroCardsProps> = ({ stats }) => {
   const navigate = useNavigate();
 
   const cards = [
     {
       title: 'Albums',
-      subtitle: 'Explore all albums',
+      subtitle: `${stats.albumCount} Albums`,
       path: '/library/albums',
       gradient: 'from-[#4f46e5] to-[#3b82f6]',
       shadow: 'shadow-indigo-900/20',
@@ -19,7 +24,7 @@ export const HomeHeroCards: React.FC = () => {
     },
     {
       title: 'Songs',
-      subtitle: 'Discover new tracks',
+      subtitle: `${stats.songCount} Songs`,
       path: '/library/songs',
       gradient: 'from-[#f59e0b] to-[#fbbf24]',
       shadow: 'shadow-amber-900/20',
@@ -29,7 +34,7 @@ export const HomeHeroCards: React.FC = () => {
     },
     {
       title: 'Artists',
-      subtitle: 'Find your favorites',
+      subtitle: `${stats.artistCount} Artists`,
       path: '/library/artists',
       gradient: 'from-[#f43f5e] to-[#fb7185]',
       shadow: 'shadow-rose-900/20',
@@ -45,7 +50,7 @@ export const HomeHeroCards: React.FC = () => {
         <div 
           key={card.title}
           onClick={() => navigate(card.path)}
-          className={`h-64 rounded-[2.5rem] bg-gradient-to-br ${card.gradient} p-8 relative overflow-hidden group cursor-pointer transition-transform hover:scale-[1.02] shadow-xl ${card.shadow} isolate animate-fade-in-up ${card.delay}`}
+          className={`h-64 rounded-[2.5rem] bg-gradient-to-br ${card.gradient} p-8 relative overflow-hidden group cursor-pointer transition-transform shadow-xl ${card.shadow} isolate animate-fade-in-up ${card.delay}`}
           style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
         >
           <div className="relative z-10 flex flex-col h-full justify-between pointer-events-none">
@@ -54,7 +59,7 @@ export const HomeHeroCards: React.FC = () => {
             </div>
             <div>
               <h2 className="text-4xl font-bold text-white mb-2">{card.title}</h2>
-              <p className="text-indigo-100 text-base font-medium opacity-80">{card.subtitle}</p>
+              <p className="text-indigo-100 text-lg font-bold opacity-90">{card.subtitle}</p>
             </div>
           </div>
           <img 

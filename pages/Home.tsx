@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Song } from '../types';
+import { LibraryStats } from '../services/api';
 import { HomeHeroCards } from '../components/HomeHeroCards';
 import { RecentlyAddedCarousel } from '../components/RecentlyAddedCarousel';
 import { SongListItem } from '../components/SongListItem';
 
 interface HomeProps {
+  stats: LibraryStats;
   recentSongs: Song[];
   recentlyAdded: Song[];
   onPlaySong: (song: Song, context?: Song[]) => void;
@@ -15,7 +17,7 @@ interface HomeProps {
   onAddToPlaylist: (song: Song) => void;
 }
 
-const Home: React.FC<HomeProps> = ({ recentSongs, recentlyAdded, onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist }) => {
+const Home: React.FC<HomeProps> = ({ stats, recentSongs, recentlyAdded, onPlaySong, currentSongId, isPlaying, onToggleFavorite, onAddToPlaylist }) => {
   const [frozenIds, setFrozenIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ const Home: React.FC<HomeProps> = ({ recentSongs, recentlyAdded, onPlaySong, cur
         <h1 className="text-4xl font-bold text-white tracking-tight">Discover</h1>
       </div>
       
-      <HomeHeroCards />
+      <HomeHeroCards stats={stats} />
 
       <div className="flex flex-col gap-10 animate-fade-in-up delay-300">
         <RecentlyAddedCarousel 
