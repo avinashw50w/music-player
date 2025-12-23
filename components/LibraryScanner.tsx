@@ -70,7 +70,7 @@ export const LibraryScanner: React.FC<LibraryScannerProps> = ({
                   <button 
                       onClick={handleScan}
                       disabled={!scanPath.trim()}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
                   >
                       Start Scan
                   </button>
@@ -87,7 +87,7 @@ export const LibraryScanner: React.FC<LibraryScannerProps> = ({
                            <button 
                                 onClick={handleStop}
                                 disabled={isStopping}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors border border-rose-500/20 disabled:opacity-50"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors border border-rose-500/20 disabled:opacity-50 cursor-pointer"
                            >
                                 {isStopping ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3 fill-current" />}
                                 Stop

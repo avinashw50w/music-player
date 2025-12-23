@@ -88,19 +88,31 @@ const Browse: React.FC<BrowseProps> = (props) => {
 
       {/* Library Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-fade-in-up delay-75">
-          <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-indigo-500/20 transition-colors">
+          <div 
+            onClick={() => navigate('/library/songs')}
+            className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-indigo-500/20 transition-colors cursor-pointer"
+          >
               <span className="text-2xl font-bold text-indigo-400 tabular-nums">{props.stats.songCount}</span>
               <span className="text-xs font-bold text-indigo-300/70 uppercase tracking-wider flex items-center gap-1"><Music className="w-3 h-3"/> Songs</span>
           </div>
-          <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-emerald-500/20 transition-colors">
+          <div 
+            onClick={() => navigate('/library/albums')}
+            className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-emerald-500/20 transition-colors cursor-pointer"
+          >
               <span className="text-2xl font-bold text-emerald-400 tabular-nums">{props.stats.albumCount}</span>
               <span className="text-xs font-bold text-emerald-300/70 uppercase tracking-wider flex items-center gap-1"><Disc className="w-3 h-3"/> Albums</span>
           </div>
-          <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-rose-500/20 transition-colors">
+          <div 
+            onClick={() => navigate('/library/artists')}
+            className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-rose-500/20 transition-colors cursor-pointer"
+          >
               <span className="text-2xl font-bold text-rose-400 tabular-nums">{props.stats.artistCount}</span>
               <span className="text-xs font-bold text-rose-300/70 uppercase tracking-wider flex items-center gap-1"><Mic2 className="w-3 h-3"/> Artists</span>
           </div>
-          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-amber-500/20 transition-colors">
+          <div 
+            onClick={() => navigate('/library/playlists')}
+            className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex flex-col items-center hover:bg-amber-500/20 transition-colors cursor-pointer"
+          >
               <span className="text-2xl font-bold text-amber-400 tabular-nums">{props.stats.playlistCount}</span>
               <span className="text-xs font-bold text-amber-300/70 uppercase tracking-wider flex items-center gap-1"><ListMusic className="w-3 h-3"/> Playlists</span>
           </div>

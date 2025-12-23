@@ -5,6 +5,7 @@ import { Song, Album, Artist, Playlist, LibraryEvent } from '../types';
 import { useLocation } from 'react-router-dom';
 
 let lastScanUpdateTimestamp = 0;
+let lastListUpdateTimestamp = 0;
 const PAGE_LIMIT = 20;
 const API_HOST = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3010';
 
@@ -240,9 +241,16 @@ export const useLibrary = () => {
             if (type.startsWith('scan:')) {
                 if (type === 'scan:progress') {
                     const now = Date.now();
+                    // Throttle status updates (100ms)
                     if (now - lastScanUpdateTimestamp > 100) {
                         setScanStatus(payload);
                         lastScanUpdateTimestamp = now;
+                    }
+                    // Throttle list refreshes (2 seconds) to reflect new files "while scanning"
+                    if (now - lastListUpdateTimestamp > 2000) {
+                        api.getSongs(PAGE_LIMIT, 0).then(setSongs);
+                        api.getLibraryStats().then(setStats);
+                        lastListUpdateTimestamp = now;
                     }
                 } else if (type === 'scan:status' || type === 'scan:start') {
                     setScanStatus(payload);
@@ -250,13 +258,11 @@ export const useLibrary = () => {
                 } else if (type === 'scan:complete') {
                     setScanStatus(payload);
                     setIsScanning(false);
-                    if (payload.totalFound > 0) {
-                         // Refresh data and stats
-                         api.getSongs(PAGE_LIMIT, 0).then(setSongs);
-                         api.getAlbums(PAGE_LIMIT, 0).then(setAlbums);
-                         api.getArtists(PAGE_LIMIT, 0).then(setArtists);
-                         api.getLibraryStats().then(setStats);
-                    }
+                    // Always refresh on complete to ensure consistency
+                    api.getSongs(PAGE_LIMIT, 0).then(setSongs);
+                    api.getAlbums(PAGE_LIMIT, 0).then(setAlbums);
+                    api.getArtists(PAGE_LIMIT, 0).then(setArtists);
+                    api.getLibraryStats().then(setStats);
                 } else if (type === 'scan:error') {
                     setScanStatus(payload);
                     setIsScanning(false);
