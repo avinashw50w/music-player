@@ -140,7 +140,7 @@ const Settings: React.FC = () => {
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 {saving ? (
                                     <>
