@@ -248,7 +248,18 @@ export const useLibrary = () => {
                     }
                     // Throttle list refreshes (2 seconds) to reflect new files "while scanning"
                     if (now - lastListUpdateTimestamp > 2000) {
-                        api.getSongs(PAGE_LIMIT, 0).then(setSongs);
+                        api.getSongs(PAGE_LIMIT, 0).then(data => {
+                            setSongs(data);
+                            setHasMore(prev => ({ ...prev, songs: data.length === PAGE_LIMIT }));
+                        });
+                        api.getAlbums(PAGE_LIMIT, 0).then(data => {
+                            setAlbums(data);
+                            setHasMore(prev => ({ ...prev, albums: data.length === PAGE_LIMIT }));
+                        });
+                        api.getArtists(PAGE_LIMIT, 0).then(data => {
+                            setArtists(data);
+                            setHasMore(prev => ({ ...prev, artists: data.length === PAGE_LIMIT }));
+                        });
                         api.getLibraryStats().then(setStats);
                         lastListUpdateTimestamp = now;
                     }
@@ -258,10 +269,19 @@ export const useLibrary = () => {
                 } else if (type === 'scan:complete') {
                     setScanStatus(payload);
                     setIsScanning(false);
-                    // Always refresh on complete to ensure consistency
-                    api.getSongs(PAGE_LIMIT, 0).then(setSongs);
-                    api.getAlbums(PAGE_LIMIT, 0).then(setAlbums);
-                    api.getArtists(PAGE_LIMIT, 0).then(setArtists);
+                    // Always refresh on complete to ensure consistency and reset pagination state
+                    api.getSongs(PAGE_LIMIT, 0).then(data => {
+                        setSongs(data);
+                        setHasMore(prev => ({ ...prev, songs: data.length === PAGE_LIMIT }));
+                    });
+                    api.getAlbums(PAGE_LIMIT, 0).then(data => {
+                        setAlbums(data);
+                        setHasMore(prev => ({ ...prev, albums: data.length === PAGE_LIMIT }));
+                    });
+                    api.getArtists(PAGE_LIMIT, 0).then(data => {
+                        setArtists(data);
+                        setHasMore(prev => ({ ...prev, artists: data.length === PAGE_LIMIT }));
+                    });
                     api.getLibraryStats().then(setStats);
                 } else if (type === 'scan:error') {
                     setScanStatus(payload);
