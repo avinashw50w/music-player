@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as api from '../services/api';
 import { Song, Album, Artist, Playlist, LibraryEvent } from '../types';
@@ -13,6 +14,7 @@ export const useLibrary = () => {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [stats, setStats] = useState<api.LibraryStats>({ songCount: 0, albumCount: 0, artistCount: 0, playlistCount: 0 });
   
   const [lastEvent, setLastEvent] = useState<LibraryEvent | null>(null);
   
@@ -48,6 +50,11 @@ export const useLibrary = () => {
         const storedHistory = localStorage.getItem('recentlyPlayed');
         if (storedHistory) setRecentlyPlayed(JSON.parse(storedHistory));
     } catch (e) { console.error("Failed to load history", e); }
+  }, []);
+
+  // Fetch Stats on mount
+  useEffect(() => {
+      api.getLibraryStats().then(setStats).catch(console.error);
   }, []);
 
   // Add to recently played
@@ -212,10 +219,11 @@ export const useLibrary = () => {
                     setScanStatus(payload);
                     setIsScanning(false);
                     if (payload.totalFound > 0) {
-                         // Refresh data
+                         // Refresh data and stats
                          api.getSongs(PAGE_LIMIT, 0).then(setSongs);
                          api.getAlbums(PAGE_LIMIT, 0).then(setAlbums);
                          api.getArtists(PAGE_LIMIT, 0).then(setArtists);
+                         api.getLibraryStats().then(setStats);
                     }
                 } else if (type === 'scan:error') {
                     setScanStatus(payload);
@@ -233,6 +241,7 @@ export const useLibrary = () => {
                 });
             } else if (type === 'song:delete') {
                 setSongs(prev => prev.filter(s => s.id !== payload.id));
+                setStats(prev => ({ ...prev, songCount: Math.max(0, prev.songCount - 1) }));
             } else if (type === 'album:update') {
                  const updatedPayload = { ...payload };
                  if (updatedPayload.coverUrl) updatedPayload.coverUrl = `${updatedPayload.coverUrl.split('?')[0]}?t=${Date.now()}`;
@@ -243,10 +252,12 @@ export const useLibrary = () => {
                 });
             } else if (type === 'playlist:create') {
                 setPlaylists(prev => prev.some(p => p.id === payload.id) ? prev : [payload, ...prev]);
+                setStats(prev => ({ ...prev, playlistCount: prev.playlistCount + 1 }));
             } else if (type === 'playlist:update') {
                 setPlaylists(prev => prev.map(p => p.id === payload.id ? payload : p));
             } else if (type === 'playlist:delete') {
                 setPlaylists(prev => prev.filter(p => p.id !== payload.id));
+                setStats(prev => ({ ...prev, playlistCount: Math.max(0, prev.playlistCount - 1) }));
             }
         } catch (e) { console.error('Error parsing SSE message', e); }
     };
@@ -306,6 +317,7 @@ export const useLibrary = () => {
     albums, setAlbums,
     artists, setArtists,
     playlists, setPlaylists,
+    stats, setStats,
     recentlyPlayed, addToHistory,
     isLoading,
     hasMore,

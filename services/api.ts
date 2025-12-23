@@ -1,3 +1,4 @@
+
 import { Song, Album, Artist, Playlist } from '../types';
 
 const API_HOST = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3010';
@@ -24,6 +25,13 @@ export interface Genre {
     id: string;
     name: string;
     color: string;
+}
+
+export interface LibraryStats {
+    songCount: number;
+    albumCount: number;
+    artistCount: number;
+    playlistCount: number;
 }
 
 // Helper to resolve relative URLs to absolute backend URLs
@@ -378,6 +386,13 @@ export async function scanLibrary(path: string): Promise<{ success: boolean; mes
     return handleResponse(response);
 }
 
+export async function stopScan(): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/library/scan/stop`, {
+        method: 'POST'
+    });
+    return handleResponse(response);
+}
+
 export async function uploadAudioFiles(files: File[]): Promise<UploadProgress> {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
@@ -398,6 +413,11 @@ export async function uploadAudioFiles(files: File[]): Promise<UploadProgress> {
 export async function getLibraryStatus(): Promise<ScanStatus> {
     const response = await fetch(`${API_BASE_URL}/library/status`);
     return handleResponse<ScanStatus>(response);
+}
+
+export async function getLibraryStats(): Promise<LibraryStats> {
+    const response = await fetch(`${API_BASE_URL}/library/stats`);
+    return handleResponse<LibraryStats>(response);
 }
 
 export async function refreshLibrary(): Promise<{ success: boolean; removedCount: number; message: string }> {

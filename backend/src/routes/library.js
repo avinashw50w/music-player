@@ -9,6 +9,7 @@ import { extractMetadata, extractCoverArt } from '../services/audioService.js';
 import { addClient, removeClient, broadcast, updateScanStatus, currentScanStatus } from '../services/sse.js';
 
 const router = express.Router();
+let isScanCancelled = false;
 
 // SSE Endpoint
 router.get('/events', (req, res) => {
@@ -31,6 +32,7 @@ async function* walk(dir) {
     try {
         const files = await fs.promises.readdir(dir, { withFileTypes: true });
         for (const d of files) {
+            if (isScanCancelled) break; 
             const entry = path.join(dir, d.name);
             if (d.isDirectory()) yield* walk(entry);
             else if (d.isFile()) yield entry;
@@ -39,6 +41,25 @@ async function* walk(dir) {
         console.error(`Error scanning directory ${dir}:`, e);
     }
 }
+
+// GET library stats
+router.get('/stats', async (req, res, next) => {
+    try {
+        const [songs] = await db('songs').count('id as count');
+        const [albums] = await db('albums').count('id as count');
+        const [artists] = await db('artists').count('id as count');
+        const [playlists] = await db('playlists').count('id as count');
+        
+        res.json({
+            songCount: songs.count || 0,
+            albumCount: albums.count || 0,
+            artistCount: artists.count || 0,
+            playlistCount: playlists.count || 0
+        });
+    } catch (err) {
+        next(err);
+    }
+});
 
 // POST start scanning
 router.post('/scan', async (req, res) => {
@@ -53,6 +74,7 @@ router.post('/scan', async (req, res) => {
     }
 
     // Reset status
+    isScanCancelled = false;
     updateScanStatus({
         isScanning: true,
         progress: 0,
@@ -76,10 +98,17 @@ router.post('/scan', async (req, res) => {
             let audioFiles = [];
 
             for await (const file of walk(scanPath)) {
+                if (isScanCancelled) break;
                 const ext = path.extname(file).toLowerCase();
                 if (audioExtensions.includes(ext)) {
                     audioFiles.push(file);
                 }
+            }
+
+            if (isScanCancelled) {
+                updateScanStatus({ isScanning: false, currentFile: 'Scan cancelled.' });
+                broadcast('scan:complete', currentScanStatus);
+                return;
             }
 
             updateScanStatus({ totalFound: audioFiles.length });
@@ -108,6 +137,16 @@ router.post('/scan', async (req, res) => {
 
             // 3. Process files
             for (let i = 0; i < audioFiles.length; i++) {
+                if (isScanCancelled) {
+                    updateScanStatus({ 
+                        isScanning: false, 
+                        currentFile: 'Scan cancelled by user.',
+                        progress: 0
+                    });
+                    broadcast('scan:complete', currentScanStatus);
+                    return;
+                }
+
                 const filePath = audioFiles[i];
                 
                 // Skip if already exists
@@ -265,6 +304,16 @@ router.post('/scan', async (req, res) => {
             broadcast('scan:error', currentScanStatus);
         }
     })();
+});
+
+// POST stop scanning
+router.post('/scan/stop', (req, res) => {
+    if (currentScanStatus.isScanning) {
+        isScanCancelled = true;
+        res.json({ success: true, message: 'Scan stop requested' });
+    } else {
+        res.json({ success: false, message: 'No scan in progress' });
+    }
 });
 
 // GET scan status

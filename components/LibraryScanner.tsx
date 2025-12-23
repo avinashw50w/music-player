@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { FolderSearch } from 'lucide-react';
-import { ScanStatus, scanLibrary } from '../services/api';
+import { FolderSearch, Square, Loader2 } from 'lucide-react';
+import { ScanStatus, scanLibrary, stopScan } from '../services/api';
 
 interface LibraryScannerProps {
   scanStatus: ScanStatus | null;
@@ -15,6 +15,7 @@ export const LibraryScanner: React.FC<LibraryScannerProps> = ({
   scanStatus, isScanning, scanError, onScanStart, onScanError 
 }) => {
   const [scanPath, setScanPath] = useState('');
+  const [isStopping, setIsStopping] = useState(false);
 
   const handleScan = async () => {
     if (!scanPath.trim()) return;
@@ -26,6 +27,18 @@ export const LibraryScanner: React.FC<LibraryScannerProps> = ({
       onScanError(e.message || 'Failed to start scan');
       onScanStart(false);
     }
+  };
+
+  const handleStop = async () => {
+      setIsStopping(true);
+      try {
+          await stopScan();
+          // The SSE 'scan:complete' event will eventually set isScanning to false
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsStopping(false);
+      }
   };
 
   return (
@@ -64,13 +77,26 @@ export const LibraryScanner: React.FC<LibraryScannerProps> = ({
                </div>
            ) : (
                <div className="bg-black/40 rounded-xl p-6 border border-white/5">
-                  <div className="flex items-center justify-between mb-2">
-                       <span className="text-indigo-300 font-bold text-sm uppercase tracking-wider animate-pulse">Scanning...</span>
-                       <span className="text-white font-bold">{scanStatus?.progress || 0}%</span>
+                  <div className="flex items-center justify-between mb-4">
+                       <div className="flex items-center gap-3">
+                           <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+                           <span className="text-indigo-300 font-bold text-sm uppercase tracking-wider">Scanning...</span>
+                       </div>
+                       <div className="flex items-center gap-4">
+                           <span className="text-white font-bold tabular-nums">{scanStatus?.progress || 0}%</span>
+                           <button 
+                                onClick={handleStop}
+                                disabled={isStopping}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors border border-rose-500/20 disabled:opacity-50"
+                           >
+                                {isStopping ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3 fill-current" />}
+                                Stop
+                           </button>
+                       </div>
                   </div>
                   <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-4">
                       <div 
-                          className="h-full bg-indigo-500 transition-all duration-300"
+                          className="h-full bg-indigo-500 transition-all duration-300 ease-out"
                           style={{ width: `${scanStatus?.progress || 0}%` }}
                       ></div>
                   </div>

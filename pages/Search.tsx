@@ -41,7 +41,7 @@ const Search: React.FC<SearchProps> = ({ onPlaySong }) => {
       }
     } else {
         // Default initial searches
-        setRecentSearches(['Lagu Untuk Matahari', 'Save Your Tears', 'Tulus', 'Monokrom']);
+        setRecentSearches([]);
     }
   }, []);
 
