@@ -14,6 +14,7 @@ import libraryRouter from './routes/library.js';
 import settingsRouter from './routes/settings.js';
 
 import { closeAllClients } from './services/sse.js';
+import { fuzzySearch } from './services/searchService.js';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -66,46 +67,49 @@ app.get('/api/search', async (req, res, next) => {
         }
 
         const db = (await import('./config/database.js')).default;
-        const searchTerm = `%${q}%`;
+        
+        // 1. Get Fuzzy Matched IDs
+        const { songIds, albumIds, artistIds } = await fuzzySearch(q, type);
         
         let songs = [];
         let albums = [];
         let artists = [];
 
+        // 2. Fetch Full Details for Matched IDs (Maintaining Order)
+        
         // Search Songs
-        if (!type || type === 'song') {
-            songs = await db('songs')
+        if (songIds.length > 0) {
+            const unorderedSongs = await db('songs')
                 .leftJoin('albums', 'songs.album_id', 'albums.id')
-                .where('songs.title', 'like', searchTerm)
-                .orWhere('songs.genre', 'like', searchTerm) // Search Genre
-                .orWhereIn('songs.id', function() {
-                    this.select('song_id').from('song_artists')
-                        .join('artists', 'song_artists.artist_id', 'artists.id')
-                        .where('artists.name', 'like', searchTerm);
-                })
-                .orWhere('albums.title', 'like', searchTerm)
-                .limit(20)
+                .whereIn('songs.id', songIds)
                 .select('songs.*', 'albums.title as album_title', 'albums.cover_url as album_cover_url');
+            
+            // Re-sort based on Fuse score (order of IDs)
+            songs = songIds
+                .map(id => unorderedSongs.find(s => s.id === id))
+                .filter(Boolean);
         }
 
         // Search Albums
-        if (!type || type === 'album') {
-            albums = await db('albums')
-                .where(function() {
-                    this.where('title', 'like', searchTerm)
-                        .orWhere('genre', 'like', searchTerm); // Search Genre
-                })
-                .andWhere('track_count', '>', 0)
-                .limit(10)
+        if (albumIds.length > 0) {
+            const unorderedAlbums = await db('albums')
+                .whereIn('id', albumIds)
                 .select('*');
+            
+            albums = albumIds
+                .map(id => unorderedAlbums.find(a => a.id === id))
+                .filter(Boolean);
         }
 
         // Search Artists
-        if (!type || type === 'artist') {
-            artists = await db('artists')
-                .where('name', 'like', searchTerm)
-                .limit(10)
+        if (artistIds.length > 0) {
+            const unorderedArtists = await db('artists')
+                .whereIn('id', artistIds)
                 .select('*');
+            
+            artists = artistIds
+                .map(id => unorderedArtists.find(a => a.id === id))
+                .filter(Boolean);
         }
 
         // --- Post-Processing ---
@@ -145,7 +149,6 @@ app.get('/api/search', async (req, res, next) => {
                 fileUrl: s.file_path ? `/api/songs/${s.id}/stream` : null,
                 genre: (() => { try { return JSON.parse(s.genre); } catch { return [s.genre]; } })(),
                 isFavorite: Boolean(s.is_favorite)
-                // Removed lyrics to optimize payload
             })),
             albums: albums.map((a, idx) => ({
                 id: a.id,
