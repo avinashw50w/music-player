@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Playlist, Song } from '../types';
 import { X, ListMusic, Plus } from 'lucide-react';
@@ -19,7 +20,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ song, pl
       >
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
           <h3 className="text-xl font-bold text-white">Add to Playlist</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors cursor-pointer">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -44,7 +45,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ song, pl
                   className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all ${
                     isAlreadyIn 
                       ? 'opacity-50 cursor-not-allowed bg-white/5' 
-                      : 'hover:bg-indigo-600/20 hover:border-indigo-500/50 border border-transparent'
+                      : 'hover:bg-indigo-600/20 hover:border-indigo-500/50 border border-transparent cursor-pointer'
                   }`}
                 >
                   <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">
@@ -65,7 +66,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({ song, pl
 
             <button
               onClick={onCreateNew}
-              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 border border-dashed border-white/20 hover:border-white/50 transition-all group"
+              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 border border-dashed border-white/20 hover:border-white/50 transition-all group cursor-pointer"
             >
               <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 transition-colors">
                 <Plus className="w-5 h-5 text-slate-400 group-hover:text-white" />

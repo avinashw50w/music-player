@@ -47,7 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCreatePlaylist, playlists }) => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                className={({ isActive }) => `w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all text-base font-semibold ${
+                className={({ isActive }) => `w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all text-base font-semibold cursor-pointer ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -66,7 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCreatePlaylist, playlists }) => {
           <div className="space-y-2">
             <button 
               onClick={onCreatePlaylist}
-              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-base font-medium group"
+              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-base font-medium group cursor-pointer"
             >
               <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center group-hover:bg-indigo-500 transition-colors">
                 <PlusSquare className="w-4 h-4" />
@@ -78,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCreatePlaylist, playlists }) => {
               <button
                 key={pl.id}
                 onClick={() => navigate(`/playlist/${pl.id}`)}
-                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-base font-medium truncate"
+                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-base font-medium truncate cursor-pointer"
               >
                 <ListMusic className="w-5 h-5 flex-shrink-0" />
                 <span className="truncate">{pl.name}</span>
@@ -88,7 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCreatePlaylist, playlists }) => {
             {showExpandButton && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between px-4 py-3 mt-1 text-xs font-bold text-slate-500 hover:text-white transition-colors uppercase tracking-wider group rounded-xl hover:bg-white/5"
+                className="w-full flex items-center justify-between px-4 py-3 mt-1 text-xs font-bold text-slate-500 hover:text-white transition-colors uppercase tracking-wider group rounded-xl hover:bg-white/5 cursor-pointer"
               >
                 <span>{isExpanded ? 'View Less' : `View All (${playlists.length})`}</span>
                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

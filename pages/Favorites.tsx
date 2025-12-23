@@ -116,11 +116,11 @@ const Favorites: React.FC<FavoritesProps> = ({ onPlaySong, currentSongId, isPlay
                 <div className="flex items-center gap-6 pr-4">
                    <button 
                     onClick={(e) => { e.stopPropagation(); handleToggleFavoriteLocal(album.id, 'album'); }}
-                    className="p-2 text-rose-500 hover:scale-110 transition-transform"
+                    className="p-2 text-rose-500 hover:scale-110 transition-transform cursor-pointer"
                    >
                     <Heart className="w-6 h-6 fill-current" />
                   </button>
-                  <button className="p-2 text-slate-600 hover:text-white transition-colors">
+                  <button className="p-2 text-slate-600 hover:text-white transition-colors cursor-pointer">
                     <MoreHorizontal className="w-6 h-6" />
                   </button>
                 </div>
@@ -150,11 +150,11 @@ const Favorites: React.FC<FavoritesProps> = ({ onPlaySong, currentSongId, isPlay
                 <div className="flex items-center gap-6 pr-4">
                    <button 
                      onClick={(e) => { e.stopPropagation(); handleToggleFavoriteLocal(artist.id, 'artist'); }}
-                     className="p-2 text-rose-500 hover:scale-110 transition-transform"
+                     className="p-2 text-rose-500 hover:scale-110 transition-transform cursor-pointer"
                    >
                     <Heart className="w-6 h-6 fill-current" />
                   </button>
-                  <button className="p-2 text-slate-600 hover:text-white transition-colors">
+                  <button className="p-2 text-slate-600 hover:text-white transition-colors cursor-pointer">
                     <MoreHorizontal className="w-6 h-6" />
                   </button>
                 </div>
@@ -190,11 +190,11 @@ const Favorites: React.FC<FavoritesProps> = ({ onPlaySong, currentSongId, isPlay
                 <div className="flex items-center gap-6 pr-4">
                    <button 
                      onClick={(e) => { e.stopPropagation(); handleToggleFavoriteLocal(pl.id, 'playlist'); }}
-                     className="p-2 text-rose-500 hover:scale-110 transition-transform"
+                     className="p-2 text-rose-500 hover:scale-110 transition-transform cursor-pointer"
                    >
                     <Heart className="w-6 h-6 fill-current" />
                   </button>
-                  <button className="p-2 text-slate-600 hover:text-white transition-colors">
+                  <button className="p-2 text-slate-600 hover:text-white transition-colors cursor-pointer">
                     <MoreHorizontal className="w-6 h-6" />
                   </button>
                 </div>
@@ -216,7 +216,7 @@ const Favorites: React.FC<FavoritesProps> = ({ onPlaySong, currentSongId, isPlay
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-8 py-3 rounded-full text-sm font-bold transition-all ${
+              className={`px-8 py-3 rounded-full text-sm font-bold transition-all cursor-pointer ${
                 activeTab === tab
                   ? 'bg-[#2c2c2e] text-white shadow-lg shadow-black/20 scale-105'
                   : 'text-slate-500 hover:text-white hover:bg-white/5'

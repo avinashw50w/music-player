@@ -41,36 +41,6 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
   const displayIndex = String(index + 1).padStart(2, '0');
   const navigate = useNavigate();
 
-  const renderArtists = () => {
-      if (song.artists && song.artists.length > 0) {
-          return song.artists.map((artist, i) => (
-              <React.Fragment key={artist.id}>
-                  {i > 0 && <span className="text-slate-500 cursor-default">, </span>}
-                  <span 
-                      className="hover:text-white hover:underline cursor-pointer transition-colors truncate"
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/artist/${artist.id}`);
-                      }}
-                  >
-                      {artist.name}
-                  </span>
-              </React.Fragment>
-          ));
-      }
-      return (
-          <span 
-              className="hover:text-white hover:underline cursor-pointer transition-colors truncate max-w-full"
-              onClick={(e) => {
-                  e.stopPropagation();
-                  if (song.artistId) navigate(`/artist/${song.artistId}`);
-              }}
-          >
-              {song.artist}
-          </span>
-      );
-  };
-
   return (
     <div
       draggable={isEditable}
@@ -104,14 +74,14 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
         
         {/* Play Button: Shown on hover if NOT playing this song */}
         <button 
-            className={`hidden group-hover:flex ${isCurrent && isPlaying ? '!hidden' : ''} items-center justify-center w-6`}
+            className={`hidden group-hover:flex ${isCurrent && isPlaying ? '!hidden' : ''} items-center justify-center w-6 cursor-pointer`}
         >
             <Play className="w-4 h-4 text-white fill-current" />
         </button>
 
         {/* Pause Button: Shown on hover if IS playing this song */}
         <button 
-            className={`hidden ${isCurrent && isPlaying ? 'group-hover:flex' : ''} items-center justify-center w-6`}
+            className={`hidden ${isCurrent && isPlaying ? 'group-hover:flex' : ''} items-center justify-center w-6 cursor-pointer`}
         >
             <Pause className="w-4 h-4 text-white fill-current" />
         </button>
@@ -144,8 +114,16 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
             >
                 {song.title}
             </span>
-            <div className="flex items-center text-sm text-slate-500 w-full mt-0.5 truncate">
-                {renderArtists()}
+            <div className="flex items-center text-sm text-slate-500 w-full mt-0.5">
+                <span 
+                    className="hover:text-white hover:underline cursor-pointer transition-colors truncate max-w-full"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (song.artistId) navigate(`/artist/${song.artistId}`);
+                    }}
+                >
+                    {song.artist}
+                </span>
             </div>
          </div>
       </div>
@@ -171,7 +149,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
          {!isEditable && (
              <button 
                 onClick={(e) => { e.stopPropagation(); onToggleFavorite(song.id); }}
-                className={`p-2 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all ${song.isFavorite ? 'opacity-100 text-rose-500' : 'text-slate-500 hover:text-rose-500'}`}
+                className={`p-2 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer ${song.isFavorite ? 'opacity-100 text-rose-500' : 'text-slate-500 hover:text-rose-500'}`}
              >
                 <Heart className={`w-5 h-5 ${song.isFavorite ? 'fill-current' : ''}`} />
              </button>
@@ -181,7 +159,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
          {!isEditable && (
              <button 
                 onClick={(e) => { e.stopPropagation(); onAddToPlaylist(song); }}
-                className="p-2 rounded-full hover:bg-white/10 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
+                className="p-2 rounded-full hover:bg-white/10 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                 title="Add to Playlist"
              >
                 <ListPlus className="w-5 h-5" />
@@ -192,7 +170,7 @@ const SongListItemComponent: React.FC<SongListItemProps> = ({
          {isEditable && onRemove && (
              <button
                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                className="p-2 rounded-full hover:bg-white/10 text-slate-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                className="p-2 rounded-full hover:bg-white/10 text-slate-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
              >
                 <Trash2 className="w-5 h-5" />
              </button>
