@@ -87,8 +87,9 @@ async function ensureIndex() {
  * Perform a fuzzy search
  * @param {string} query 
  * @param {'song'|'album'|'artist'|null} type 
+ * @param {number|null} limit - Max results. 0 for generous limit (1000), null for defaults (20/10).
  */
-export async function fuzzySearch(query, type = null) {
+export async function fuzzySearch(query, type = null, limit = null) {
     await ensureIndex();
 
     const results = {
@@ -97,19 +98,25 @@ export async function fuzzySearch(query, type = null) {
         artistIds: []
     };
 
+    // Determine limits
+    const getLimit = (defaultLimit) => (limit === null ? defaultLimit : (limit === 0 ? 1000 : limit));
+
     if (!type || type === 'song') {
         const res = songIndex.search(query);
-        results.songIds = res.slice(0, 20).map(r => r.item.id);
+        const l = getLimit(20);
+        results.songIds = res.slice(0, l).map(r => r.item.id);
     }
 
     if (!type || type === 'album') {
         const res = albumIndex.search(query);
-        results.albumIds = res.slice(0, 10).map(r => r.item.id);
+        const l = getLimit(10);
+        results.albumIds = res.slice(0, l).map(r => r.item.id);
     }
 
     if (!type || type === 'artist') {
         const res = artistIndex.search(query);
-        results.artistIds = res.slice(0, 10).map(r => r.item.id);
+        const l = getLimit(10);
+        results.artistIds = res.slice(0, l).map(r => r.item.id);
     }
 
     return results;

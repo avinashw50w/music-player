@@ -6,6 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import { broadcast } from '../services/sse.js';
 import { config } from '../config/env.js';
+import { fuzzySearch } from '../services/searchService.js';
 
 const router = express.Router();
 
@@ -55,23 +56,55 @@ router.get('/', async (req, res, next) => {
             this.select('*').from('song_artists').whereRaw('song_artists.artist_id = artists.id');
         });
 
+        let fuzzyIds = null;
+
         if (search) {
-            query = query.where('name', 'like', `%${search}%`);
+            // Fuzzy Search
+            const { artistIds } = await fuzzySearch(search, 'artist', 500);
+            fuzzyIds = artistIds;
+            
+            if (fuzzyIds.length === 0) {
+                return res.json([]);
+            }
+            
+            query = query.whereIn('id', fuzzyIds);
         }
 
         if (favorites === 'true') {
             query = query.where('is_favorite', true);
         }
 
-        if (limit) {
-            query = query.limit(parseInt(limit));
-        }
-        if (offset) {
-            query = query.offset(parseInt(offset));
-        }
+        if (search) {
+            const artists = await query;
+            
+            // Sort by relevance
+            const idMap = new Map(fuzzyIds.map((id, index) => [id, index]));
+            artists.sort((a, b) => {
+                const indexA = idMap.has(a.id) ? idMap.get(a.id) : Infinity;
+                const indexB = idMap.has(b.id) ? idMap.get(b.id) : Infinity;
+                return indexA - indexB;
+            });
 
-        const artists = await query;
-        res.json(artists.map(transformArtist));
+            // Paginate
+            let pagedArtists = artists;
+            if (limit !== undefined && offset !== undefined) {
+                const start = parseInt(offset);
+                const end = start + parseInt(limit);
+                pagedArtists = artists.slice(start, end);
+            }
+            
+            res.json(pagedArtists.map(transformArtist));
+        } else {
+            if (limit) {
+                query = query.limit(parseInt(limit));
+            }
+            if (offset) {
+                query = query.offset(parseInt(offset));
+            }
+    
+            const artists = await query;
+            res.json(artists.map(transformArtist));
+        }
     } catch (err) {
         next(err);
     }

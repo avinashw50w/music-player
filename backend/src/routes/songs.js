@@ -13,6 +13,7 @@ import { fetchSyncedLyrics } from '../services/lyricsService.js'; // Import Lyri
 import { updateAudioTags } from '../services/audioService.js'; // Import Tag Writer
 import { identificationQueue } from '../services/taskQueue.js';
 import { config } from '../config/env.js';
+import { fuzzySearch } from '../services/searchService.js';
 
 const router = express.Router();
 
@@ -177,31 +178,25 @@ router.get('/', async (req, res, next) => {
     try {
         const { limit, offset, search, favorites, title, artist, album, genre } = req.query;
         let query = db('songs').orderBy('songs.created_at', 'desc');
+        let fuzzyIds = null;
         
-        // Generalized Search
+        // 1. Fuzzy Search Phase (Global Search)
         if (search) {
-            const term = `%${search}%`;
-            query = query.where(function() {
-                this.where('songs.title', 'like', term)
-                    .orWhereIn('songs.id', function() {
-                        // Subquery for artists
-                        this.select('song_id').from('song_artists')
-                            .join('artists', 'song_artists.artist_id', 'artists.id')
-                            .where('artists.name', 'like', term);
-                    })
-                    .orWhereIn('songs.album_id', function() {
-                        // Subquery for albums
-                        this.select('id').from('albums')
-                            .where('title', 'like', term);
-                    });
-            });
+            // Get up to 500 matches for the list view
+            const { songIds } = await fuzzySearch(search, 'song', 500);
+            fuzzyIds = songIds;
+            
+            if (fuzzyIds.length === 0) {
+                return res.json([]);
+            }
+            
+            // Restrict query to these IDs
+            query = query.whereIn('songs.id', fuzzyIds);
         }
 
-        // Specific Filters
-        if (title) {
-            query = query.where('songs.title', 'like', `%${title}%`);
-        }
-
+        // 2. Specific Filters Phase (AND logic)
+        if (title) query = query.where('songs.title', 'like', `%${title}%`);
+        
         if (artist) {
             query = query.whereIn('songs.id', function() {
                 this.select('song_id').from('song_artists')
@@ -217,24 +212,41 @@ router.get('/', async (req, res, next) => {
             });
         }
 
-        if (genre) {
-            query = query.where('songs.genre', 'like', `%${genre}%`);
-        }
+        if (genre) query = query.where('songs.genre', 'like', `%${genre}%`);
+        if (favorites === 'true') query = query.where('songs.is_favorite', true);
 
-        if (favorites === 'true') {
-            query = query.where('songs.is_favorite', true);
+        // 3. Execution & Sort & Pagination
+        if (search) {
+            // If searching, we fetch all matches first to sort by relevance (fuzzy rank)
+            const results = await fetchSongsWithDetails(query, false);
+            
+            // Create a map for O(1) lookup of rank
+            const idMap = new Map(fuzzyIds.map((id, index) => [id, index]));
+            
+            // Sort by index in fuzzyIds
+            results.sort((a, b) => {
+                const indexA = idMap.has(a.id) ? idMap.get(a.id) : Infinity;
+                const indexB = idMap.has(b.id) ? idMap.get(b.id) : Infinity;
+                return indexA - indexB;
+            });
+            
+            // Paginate in memory
+            if (limit !== undefined && offset !== undefined) {
+                const start = parseInt(offset);
+                const end = start + parseInt(limit);
+                res.json(results.slice(start, end));
+            } else {
+                res.json(results);
+            }
+        } else {
+            // Standard SQL Pagination
+            if (limit) query = query.limit(parseInt(limit));
+            if (offset) query = query.offset(parseInt(offset));
+            
+            // Do not include lyrics in list view
+            const results = await fetchSongsWithDetails(query, false);
+            res.json(results);
         }
-
-        if (limit) {
-            query = query.limit(parseInt(limit));
-        }
-        if (offset) {
-            query = query.offset(parseInt(offset));
-        }
-
-        // Do not include lyrics in list view
-        const results = await fetchSongsWithDetails(query, false);
-        res.json(results);
     } catch (err) {
         next(err);
     }
@@ -269,6 +281,9 @@ router.get('/:id/stream', async (req, res, next) => {
         next(err);
     }
 });
+
+// ... (Rest of the file remains unchanged: identify endpoints, create/update/delete logic) ...
+// Since I am providing full content, I need to include the rest of the file content below.
 
 // POST identify song using audio fingerprinting (AcoustID) - RETURNS CANDIDATE
 router.post('/:id/identify', async (req, res, next) => {

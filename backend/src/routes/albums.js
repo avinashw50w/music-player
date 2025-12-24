@@ -6,6 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import { broadcast } from '../services/sse.js';
 import { config } from '../config/env.js';
+import { fuzzySearch } from '../services/searchService.js';
 
 const router = express.Router();
 
@@ -108,27 +109,57 @@ router.get('/', async (req, res, next) => {
             this.select('*').from('songs').whereRaw('songs.album_id = albums.id');
         });
 
+        let fuzzyIds = null;
+
         if (search) {
-            const term = `%${search}%`;
-            query = query.where(function() {
-                this.where('title', 'like', term);
-            });
+            // Fuzzy search first
+            const { albumIds } = await fuzzySearch(search, 'album', 500);
+            fuzzyIds = albumIds;
+            
+            if (fuzzyIds.length === 0) {
+                return res.json([]);
+            }
+            
+            query = query.whereIn('albums.id', fuzzyIds);
         }
 
         if (favorites === 'true') {
             query = query.where('is_favorite', true);
         }
 
-        if (limit) {
-            query = query.limit(parseInt(limit));
-        }
-        if (offset) {
-            query = query.offset(parseInt(offset));
-        }
+        if (search) {
+            const albums = await query;
+            
+            // Sort by relevance
+            const idMap = new Map(fuzzyIds.map((id, index) => [id, index]));
+            albums.sort((a, b) => {
+                const indexA = idMap.has(a.id) ? idMap.get(a.id) : Infinity;
+                const indexB = idMap.has(b.id) ? idMap.get(b.id) : Infinity;
+                return indexA - indexB;
+            });
 
-        const albums = await query;
-        const results = await Promise.all(albums.map(transformAlbum));
-        res.json(results);
+            // Paginate
+            let pagedAlbums = albums;
+            if (limit !== undefined && offset !== undefined) {
+                const start = parseInt(offset);
+                const end = start + parseInt(limit);
+                pagedAlbums = albums.slice(start, end);
+            }
+            
+            const results = await Promise.all(pagedAlbums.map(transformAlbum));
+            res.json(results);
+        } else {
+            if (limit) {
+                query = query.limit(parseInt(limit));
+            }
+            if (offset) {
+                query = query.offset(parseInt(offset));
+            }
+    
+            const albums = await query;
+            const results = await Promise.all(albums.map(transformAlbum));
+            res.json(results);
+        }
     } catch (err) {
         next(err);
     }
