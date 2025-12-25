@@ -24,7 +24,7 @@ export const useAudioPlayer = (addToHistory: (song: Song) => void) => {
   });
 
   const [activeVisualizer, setActiveVisualizer] = useState(() => {
-    return getCookie('myousic_visualizer') || 'bars';
+    return getCookie('myousic_visualizer') || 'album cover';
   });
 
   const [currentTime, setCurrentTime] = useState(0);

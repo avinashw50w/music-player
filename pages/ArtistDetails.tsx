@@ -73,7 +73,11 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
           // If song is in the list, update it
           setSongs(prev => prev.map(s => s.id === payload.id ? payload : s));
       } else if (type === 'artist:update' && payload.id === id) {
-          setArtist(prev => prev ? { ...prev, ...payload } : null);
+          const updatedPayload = { ...payload };
+          if (updatedPayload.avatarUrl) {
+              updatedPayload.avatarUrl = `${updatedPayload.avatarUrl.split('?')[0]}?t=${Date.now()}`;
+          }
+          setArtist(prev => prev ? { ...prev, ...updatedPayload } : null);
       }
   }, [lastEvent, id]);
 
@@ -122,8 +126,12 @@ export const ArtistDetails: React.FC<DetailProps> = ({ currentSongId, isPlaying,
   const handleAvatarUpload = async (file: File) => {
     try {
       const updated = await api.updateArtistAvatar(artist.id, file);
-      setArtist(prev => prev ? { ...prev, avatarUrl: updated.avatarUrl } : null);
-      onUpdateArtist?.(updated);
+      const withCacheBust = { 
+          ...updated, 
+          avatarUrl: `${updated.avatarUrl.split('?')[0]}?t=${Date.now()}` 
+      };
+      setArtist(prev => prev ? { ...prev, avatarUrl: withCacheBust.avatarUrl } : null);
+      onUpdateArtist?.(withCacheBust);
     } catch (err) {
       console.error("Failed to update artist avatar", err);
     }

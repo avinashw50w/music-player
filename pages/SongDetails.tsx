@@ -164,7 +164,12 @@ export const SongDetails: React.FC<DetailProps> = ({ songs, albums, artists, cur
           song={song} isPlaying={isPlaying} currentSongId={currentSongId}
           isIdentifying={isIdentifying} isIdentifyingSpotify={isIdentifyingSpotify} isRefining={isRefining} identifyError={identifyError}
           onPlay={() => onPlaySong(song)} onToggleFavorite={() => onToggleFavorite(song.id)} onAddToPlaylist={() => onAddToPlaylist(song)}
-          onCoverUpload={async (f) => { const u = await api.updateSongCover(song.id, f); setSong(u); onUpdateSong?.(u); }}
+          onCoverUpload={async (f) => { 
+              const u = await api.updateSongCover(song.id, f); 
+              const withCacheBust = { ...u, coverUrl: `${u.coverUrl.split('?')[0]}?t=${Date.now()}` };
+              setSong(withCacheBust); 
+              onUpdateSong?.(withCacheBust); 
+          }}
           onIdentify={handleIdentify} onIdentifySpotify={handleIdentifySpotify} onRefine={handleRefine} onEdit={() => setIsEditingInfo(true)} onDelete={handleDelete}
           renderArtists={() => song.artists?.map((a, i) => <span key={a.id} onClick={() => navigate(`/artist/${a.id}`)} className="cursor-pointer hover:underline">{i > 0 ? `, ${a.name}` : a.name}</span>) || song.artist}
         />
