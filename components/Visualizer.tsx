@@ -168,6 +168,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
     const [showControls, setShowControls] = useState(true);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isHoveringControls, setIsHoveringControls] = useState(false);
     
     // Dynamic Color State
     const [dominantColor, setDominantColor] = useState('rgba(30, 30, 40, 0.5)');
@@ -304,9 +305,9 @@ export const Visualizer: React.FC<VisualizerProps> = ({
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = setTimeout(() => {
-            if (!isDropdownOpen) setShowControls(false);
+            if (!isDropdownOpen && !isHoveringControls) setShowControls(false);
         }, 3000);
-    }, [isDropdownOpen]);
+    }, [isDropdownOpen, isHoveringControls]);
 
     useEffect(() => {
         handleMouseMove();
@@ -422,7 +423,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
 
             {/* Layer 4: Controls Overlay */}
             <div 
-                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-300 z-[100] pointer-events-none ${showControls || isDropdownOpen ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute inset-0 flex flex-col justify-between p-8 transition-opacity duration-300 z-[100] pointer-events-none ${showControls || isDropdownOpen || isHoveringControls ? 'opacity-100' : 'opacity-0'}`}
                 style={{ background: showControls ? 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 20%, transparent 80%, rgba(0,0,0,0.8))' : 'none' }}
             >
                 {/* Header */}
@@ -470,7 +471,11 @@ export const Visualizer: React.FC<VisualizerProps> = ({
                 </div>
 
                 {/* Footer Controls */}
-                <div className="w-full max-w-3xl mx-auto pointer-events-auto">
+                <div 
+                    className="w-full max-w-3xl mx-auto pointer-events-auto"
+                    onMouseEnter={() => setIsHoveringControls(true)}
+                    onMouseLeave={() => setIsHoveringControls(false)}
+                >
                     <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl space-y-6">
                         <div className="text-center space-y-2">
                             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-lg truncate">{currentSong.title}</h1>

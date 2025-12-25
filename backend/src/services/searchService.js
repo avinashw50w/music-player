@@ -62,8 +62,12 @@ async function buildIndex() {
         )
         .where('track_count', '>', 0);
 
-    // 3. Fetch Artists
-    const artists = await db('artists').select('id', 'name');
+    // 3. Fetch Artists (Only those with songs)
+    const artists = await db('artists')
+        .whereExists(function() {
+            this.select('*').from('song_artists').whereRaw('song_artists.artist_id = artists.id');
+        })
+        .select('id', 'name');
 
     // Create Fuse instances
     songIndex = new Fuse(songs, songOptions);
