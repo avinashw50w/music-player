@@ -1,12 +1,16 @@
 
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Noto Sans", sans-serif;
+}
+
 html, body {
   scroll-behavior: auto !important;
 }
 
 body {
-  font-family: 'Poppins', 'Inter', sans-serif;
+  font-family: 'Noto Sans', sans-serif;
   color: #f8fafc; /* slate-50 */
   margin: 0;
   background-color: #000000;

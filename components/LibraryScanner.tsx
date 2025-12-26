@@ -50,52 +50,12 @@ export const LibraryScanner: React.FC<LibraryScannerProps> = ({
       }
   };
 
-  const handleBrowseClick = () => {
-      fileInputRef.current?.click();
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files;
-      if (files && files.length > 0) {
-          // Try to get the path property if available (e.g. Electron or some browsers)
-          // Standard browsers security prevents getting full path, but if this app is wrapped or user setup allows it.
-          const file = files[0];
-          // @ts-ignore - 'path' property exists on File objects in Electron/Node environments
-          const path = (file as any).path || file.webkitRelativePath;
-          
-          if (path) {
-              // If it's a relative path (webkitRelativePath), we usually only get the folder name relative to selection
-              // If it's an absolute path (Electron), we get the full path.
-              // For standard web, we can't get absolute path, but we can try to extract the directory part if available.
-              
-              // In Electron 'path' is absolute.
-              // In Browser 'path' is undefined usually. 
-              
-              // If we only get relative path, we can't really do server scanning unless server and client share root.
-              // We'll set what we have, but user might need to edit it.
-              
-              // Simplistic logic: assume if it starts with slash or drive letter it is absolute
-              setScanPath(path);
-              
-              // If we detect it's likely just a relative path or filename, we might want to warn or just let user type.
-              // But per request "absolute path should be copied". This implies the environment supports it.
-              if ('path' in file) {
-                   // @ts-ignore
-                   let dirPath = (file as any).path as string;
-                   // Remove filename if it points to a file inside
-                   // Actually webkitdirectory selects files inside. files[0] is the first file.
-                   // We want the directory of that file.
-                   
-                   // Basic dirname approximation
-                   const lastSlash = Math.max(dirPath.lastIndexOf('/'), dirPath.lastIndexOf('\\'));
-                   if (lastSlash !== -1) {
-                       dirPath = dirPath.substring(0, lastSlash);
-                   }
-                   setScanPath(dirPath);
-              }
-          }
-      }
-  };
+  const handleSelectDirectory = async () => {
+    const dirPath = await window.electronAPI.pickDirectory()
+    if (dirPath) {
+      setScanPath(dirPath)
+    }
+  }
 
   return (
     <div className="mb-14 bg-gradient-to-br from-[#1e1e24] to-[#151518] rounded-[2rem] p-8 border border-white/5 shadow-2xl relative overflow-hidden animate-fade-in-up delay-100">
@@ -123,18 +83,8 @@ export const LibraryScanner: React.FC<LibraryScannerProps> = ({
                           className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono text-sm"
                       />
                       
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileSelect} 
-                        style={{ display: 'none' }} 
-                        webkitdirectory="" 
-                        directory="" 
-                        multiple 
-                      />
-                      
                       <button 
-                        onClick={handleBrowseClick}
+                        onClick={handleSelectDirectory}
                         className="bg-white/10 hover:bg-white/20 text-white p-4 rounded-xl transition-colors border border-white/5 cursor-pointer"
                         title="Browse Folder"
                       >

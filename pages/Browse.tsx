@@ -210,7 +210,6 @@ const Browse: React.FC<BrowseProps> = (props) => {
                         <img src={artist.avatarUrl} alt={artist.name} className="w-full h-full object-cover" />
                     </div>
                     <h4 className="text-white font-bold text-center truncate w-full group-hover:text-rose-400 transition-colors">{artist.name}</h4>
-                    <p className="text-slate-500 text-xs font-medium">{artist.followers} Followers</p>
                 </div>
             ))}
           </div>
